@@ -6,28 +6,63 @@
 @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&family=Fira+Code:wght@400;500;600;700&display=swap');
 
 @layer base {
-  :root {
-    /* F1 Dark Palette */
-    --f1-black:   #15151e;
-    --f1-surface: #1e1e2a;
-    --f1-card:    #22222f;
-    --f1-border:  rgba(255,255,255,0.07);
-    --f1-muted:   #606066;
+  /* ── DARK theme (default) — F1 dark palette ── */
+  :root,
+  html.dark {
+    --f1-black:      #15151e;
+    --f1-surface:    #1e1e2a;
+    --f1-card:       #22222f;
+    --f1-border:     rgba(255,255,255,0.07);
+    --f1-muted:      #606066;
+    --f1-text:       #ffffff;
+    --f1-text-sub:   rgba(255,255,255,0.55);
+    --f1-text-dim:   rgba(255,255,255,0.25);
+    --f1-hover:      rgba(255,255,255,0.04);
+    --f1-stripe:     rgba(255,255,255,0.018);
 
     /* F1 Brand */
-    --f1-red:     #e10600;
-    --f1-red-dim: rgba(225,6,0,0.12);
+    --f1-red:        #e10600;
+    --f1-red-dim:    rgba(225,6,0,0.12);
 
     /* Legacy tokens kept for compatibility */
-    --carbon-950: #15151e;
-    --carbon-900: #1e1e2a;
-    --carbon-800: #22222f;
-    --carbon-700: #2a2a3a;
-    --carbon-600: #333348;
-    --racing-red:   #e10600;
-    --racing-blue:  #e10600;   /* redirect blue → F1 red globally */
-    --racing-amber: #ffc906;
-    --racing-green: #00d2be;
+    --carbon-950:    #15151e;
+    --carbon-900:    #1e1e2a;
+    --carbon-800:    #22222f;
+    --carbon-700:    #2a2a3a;
+    --carbon-600:    #333348;
+    --racing-red:    #e10600;
+    --racing-blue:   #e10600;
+    --racing-amber:  #ffc906;
+    --racing-green:  #00d2be;
+  }
+
+  /* ── LIGHT theme — F1.com site palette ── */
+  html:not(.dark) {
+    --f1-black:      #f3f3f4;
+    --f1-surface:    #eaeaec;
+    --f1-card:       #ffffff;
+    --f1-border:     rgba(0,0,0,0.08);
+    --f1-muted:      #818188;
+    --f1-text:       #1c1c25;
+    --f1-text-sub:   rgba(28,28,37,0.6);
+    --f1-text-dim:   rgba(28,28,37,0.35);
+    --f1-hover:      rgba(0,0,0,0.04);
+    --f1-stripe:     rgba(0,0,0,0.018);
+
+    /* F1 Brand stays same */
+    --f1-red:        #e10600;
+    --f1-red-dim:    rgba(225,6,0,0.10);
+
+    /* Legacy tokens */
+    --carbon-950:    #f3f3f4;
+    --carbon-900:    #eaeaec;
+    --carbon-800:    #ffffff;
+    --carbon-700:    #e8e8ea;
+    --carbon-600:    #d4d4d8;
+    --racing-red:    #e10600;
+    --racing-blue:   #e10600;
+    --racing-amber:  #ffc906;
+    --racing-green:  #00d2be;
   }
 
   /* Scrollbar */
@@ -44,8 +79,12 @@
   *::-webkit-scrollbar-thumb:hover { background: rgba(225,6,0,0.4); }
 
   body {
-    @apply bg-f1-black text-white antialiased;
+    background-color: var(--f1-black);
+    color: var(--f1-text);
     font-family: 'Titillium Web', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -63,10 +102,15 @@
 @layer components {
   /* ── Cards ── */
   .glass-card {
-    background: rgba(34,34,47,0.7);
-    backdrop-filter: blur(20px);
+    background: var(--f1-card);
     border: 1px solid var(--f1-border);
     border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.02);
+    transition: background 0.25s ease, border-color 0.25s ease;
+  }
+  html.dark .glass-card {
+    background: rgba(34,34,47,0.7);
+    backdrop-filter: blur(20px);
     box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02);
   }
 
@@ -77,7 +121,7 @@
   .glass-card-hover:hover {
     border-color: rgba(225,6,0,0.2);
     transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(225,6,0,0.06), 0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03);
+    box-shadow: 0 8px 32px rgba(225,6,0,0.06), 0 1px 3px rgba(0,0,0,0.15);
   }
   .glass-card-hover:active {
     transform: translateY(0);
@@ -98,19 +142,19 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--f1-muted);
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid var(--f1-border);
   }
   .f1-table tbody tr {
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    border-bottom: 1px solid var(--f1-border);
     transition: background 0.15s;
   }
   .f1-table tbody tr:hover {
-    background: rgba(255,255,255,0.025);
+    background: var(--f1-hover);
   }
   .f1-table tbody td {
     padding: 12px 12px;
     font-size: 13px;
-    color: rgba(255,255,255,0.85);
+    color: var(--f1-text);
   }
 
   /* ── F1 Position Badge ── */
@@ -163,14 +207,14 @@
   /* ── F1 Pill Select ── */
   .f1-select {
     appearance: none;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.10);
+    background: var(--f1-hover);
+    border: 1px solid var(--f1-border);
     border-radius: 999px;
     padding: 6px 32px 6px 14px;
     font-family: 'Titillium Web', sans-serif;
     font-size: 13px;
     font-weight: 600;
-    color: white;
+    color: var(--f1-text);
     cursor: pointer;
     transition: border-color 0.2s;
     outline: none;
@@ -248,9 +292,11 @@
 
   /* ── Grid dot background ── */
   .grid-bg {
+    background-color: var(--f1-black);
     background-image:
       radial-gradient(rgba(225,6,0,0.03) 1px, transparent 1px);
     background-size: 28px 28px;
+    transition: background-color 0.25s ease;
   }
 
   /* ── Misc ── */
@@ -287,11 +333,13 @@
   .text-balance { text-wrap: balance; }
   .fade-right { mask-image: linear-gradient(to right, black 90%, transparent 100%); }
   .fade-bottom { mask-image: linear-gradient(to bottom, black 85%, transparent 100%); }
-  .bg-f1-black  { background-color: #15151e; }
-  .bg-f1-surface { background-color: #1e1e2a; }
-  .bg-f1-card   { background-color: #22222f; }
-  .text-f1-muted { color: #606066; }
-  .border-f1 { border-color: rgba(255,255,255,0.07); }
+  .bg-f1-black   { background-color: var(--f1-black); }
+  .bg-f1-surface { background-color: var(--f1-surface); }
+  .bg-f1-card    { background-color: var(--f1-card); }
+  .text-f1-muted { color: var(--f1-muted); }
+  .text-f1       { color: var(--f1-text); }
+  .text-f1-sub   { color: var(--f1-text-sub); }
+  .border-f1     { border-color: var(--f1-border); }
   .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
   .animate-shimmer { animation: shimmer 2s linear infinite; }
 }

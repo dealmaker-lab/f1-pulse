@@ -4,10 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/components/layout/theme-provider";
 import {
   LayoutDashboard, PlayCircle, Activity,
   PieChart, Users, Trophy,
-  ChevronLeft, ChevronRight, Menu, X,
+  ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
 } from "lucide-react";
 
 const navItems = [
@@ -23,6 +24,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme, toggle } = useTheme();
 
   return (
     <>
@@ -44,7 +46,7 @@ export default function Sidebar() {
         />
       )}
 
-      {/* Sidebar — F1 dark with carbon diagonal stripe */}
+      {/* Sidebar — always dark (like F1.com nav) */}
       <aside
         className={cn(
           "fixed top-0 left-0 h-full z-40 flex flex-col transition-all duration-300",
@@ -133,8 +135,36 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* Bottom: session badge + collapse */}
+        {/* Bottom: theme toggle + live badge + collapse */}
         <div className="border-t border-white/[0.06]">
+
+          {/* Theme toggle button */}
+          <div className={cn("px-2 pt-2", collapsed && "flex justify-center")}>
+            <button
+              onClick={toggle}
+              className={cn(
+                "flex items-center gap-2.5 w-full px-3 py-2.5 rounded-lg transition-all duration-200 cursor-pointer group",
+                "text-white/40 hover:text-white/75 hover:bg-white/[0.04]",
+                collapsed && "justify-center px-0 w-10 mx-auto"
+              )}
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? (
+                <Sun className="w-[18px] h-[18px] flex-shrink-0 text-white/35 group-hover:text-racing-amber transition-colors" />
+              ) : (
+                <Moon className="w-[18px] h-[18px] flex-shrink-0 text-white/35 group-hover:text-white/60 transition-colors" />
+              )}
+              {!collapsed && (
+                <span
+                  className="text-[13px] font-semibold"
+                  style={{ fontFamily: 'Titillium Web, sans-serif', letterSpacing: '0.02em' }}
+                >
+                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                </span>
+              )}
+            </button>
+          </div>
+
           {/* Live badge */}
           {!collapsed && (
             <div className="px-4 py-3 flex items-center gap-2">
@@ -144,6 +174,7 @@ export default function Sidebar() {
               </span>
             </div>
           )}
+
           {/* Collapse toggle (desktop) */}
           <div className="hidden lg:flex p-2">
             <button
