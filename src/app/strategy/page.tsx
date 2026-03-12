@@ -13,7 +13,7 @@ import {
   LineChart, Line, CartesianGrid,
 } from "recharts";
 
-const YEARS = [2020, 2021, 2022, 2023, 2024, 2025];
+const YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026];
 
 type CompareTab = "strategy" | "positions" | "pitstops";
 
