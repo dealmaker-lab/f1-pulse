@@ -68,7 +68,10 @@ export default function StrategyPage() {
 
   // State for comparison mode
   const [compareMode, setCompareMode] = useState(false);
+  const [selectedYear2, setSelectedYear2] = useState(2025);
+  const [races2, setRaces2] = useState<RaceSession[]>([]);
   const [selectedRace2, setSelectedRace2] = useState<RaceSession | null>(null);
+  const [loadingRaces2, setLoadingRaces2] = useState(false);
 
   // State for data
   const [stints1, setStints1] = useState<StintData[]>([]);
@@ -111,6 +114,27 @@ export default function StrategyPage() {
     fetchRaces();
   }, [selectedYear]);
 
+  // Fetch races for comparison year
+  useEffect(() => {
+    if (!compareMode) return;
+    const fetchRaces2 = async () => {
+      setLoadingRaces2(true);
+      try {
+        const res = await fetch(`/api/f1/sessions?year=${selectedYear2}&type=Race`);
+        if (res.ok) {
+          const data = await res.json();
+          setRaces2(data);
+          setSelectedRace2(null); // Reset selection when year changes
+        }
+      } catch (error) {
+        console.error("Failed to fetch comparison races:", error);
+      } finally {
+        setLoadingRaces2(false);
+      }
+    };
+    fetchRaces2();
+  }, [compareMode, selectedYear2]);
+
   // Fetch strategy data when race is selected
   useEffect(() => {
     if (!selectedRace) return;
@@ -128,11 +152,11 @@ export default function StrategyPage() {
         if (stintsRes.ok) setStints1(await stintsRes.json());
         if (driversRes.ok) setDrivers1(await driversRes.json());
         if (posRes.ok) setPositions1(await posRes.json());
-        if (resultsRes.ok) setRaceResults1(await resultsRes.json());
 
-        // Auto-select top 10 finishers
+        // Parse results once, then use for both state and top-10 selection
         if (resultsRes.ok) {
           const results = await resultsRes.json();
+          setRaceResults1(results);
           const top10 = results.slice(0, 10).map((r: RaceResult) => r.driver_number);
           setVisibleDrivers1(top10);
         }
@@ -163,10 +187,11 @@ export default function StrategyPage() {
         if (stintsRes.ok) setStints2(await stintsRes.json());
         if (driversRes.ok) setDrivers2(await driversRes.json());
         if (posRes.ok) setPositions2(await posRes.json());
-        if (resultsRes.ok) setRaceResults2(await resultsRes.json());
 
+        // Parse results once, then use for both state and top-10 selection
         if (resultsRes.ok) {
           const results = await resultsRes.json();
+          setRaceResults2(results);
           const top10 = results.slice(0, 10).map((r: RaceResult) => r.driver_number);
           setVisibleDrivers2(top10);
         }
@@ -194,7 +219,7 @@ export default function StrategyPage() {
       });
 
       return Array.from(driverStints.entries())
-        .filter(([dNum]) => visible.includes(dNum))
+        .filter(([dNum]) => visible.includes(dNum) && driverMap.has(dNum))
         .map(([dNum, dStints]) => {
           const driver = driverMap.get(dNum)!;
           const sortedStints = dStints.sort((a, b) => a.stint_number - b.stint_number);
@@ -262,7 +287,7 @@ export default function StrategyPage() {
       });
 
       driverStints.forEach((dStints, dNum) => {
-        if (!visible.includes(dNum)) return;
+        if (!visible.includes(dNum) || !driverMap.has(dNum)) return;
         const driver = driverMap.get(dNum)!;
         const stops = dStints.filter((s) => s.stint_number > 1);
 
@@ -382,9 +407,9 @@ export default function StrategyPage() {
             <label className="text-[10px] uppercase tracking-widest text-white/40 block mb-2">Compare with</label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-racing-blue/50 transition-colors"
+                value={selectedYear2}
+                onChange={(e) => setSelectedYear2(parseInt(e.target.value))}
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-racing-green/50 transition-colors"
               >
                 {YEARS.map((year) => (
                   <option key={year} value={year} className="bg-slate-900">
@@ -392,21 +417,27 @@ export default function StrategyPage() {
                   </option>
                 ))}
               </select>
-              <select
-                value={selectedRace2?.session_key || ""}
-                onChange={(e) => {
-                  const race = races.find((r) => r.session_key === parseInt(e.target.value));
-                  if (race) setSelectedRace2(race);
-                }}
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-racing-blue/50 transition-colors"
-              >
-                <option value="">Select a race</option>
-                {races.map((race) => (
-                  <option key={race.session_key} value={race.session_key} className="bg-slate-900">
-                    {race.session_name} ({race.circuit_short_name})
-                  </option>
-                ))}
-              </select>
+              {loadingRaces2 ? (
+                <div className="flex items-center justify-center h-10 text-white/40">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                </div>
+              ) : (
+                <select
+                  value={selectedRace2?.session_key || ""}
+                  onChange={(e) => {
+                    const race = races2.find((r) => r.session_key === parseInt(e.target.value));
+                    if (race) setSelectedRace2(race);
+                  }}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-racing-green/50 transition-colors"
+                >
+                  <option value="">Select a race</option>
+                  {races2.map((race) => (
+                    <option key={race.session_key} value={race.session_key} className="bg-slate-900">
+                      {race.session_name} ({race.circuit_short_name})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         )}
