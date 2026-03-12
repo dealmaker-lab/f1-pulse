@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0a0a0f",
+  themeColor: "#15151e",
 };
 
 export default function RootLayout({
@@ -20,9 +20,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-carbon-950 grid-bg">
+      <body className="min-h-screen bg-f1-black grid-bg">
         <Sidebar />
-        <main className="lg:ml-[240px] min-h-screen">
+        <main className="lg:ml-[220px] min-h-screen">
           <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-16 lg:pt-6">
             {children}
           </div>
