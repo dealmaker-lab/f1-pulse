@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     let url = `${BASE}/location?session_key=${sessionKey}`;
     if (driverNumber) url += `&driver_number=${driverNumber}`;
 
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    const res = await fetch(url, { cache: "no-store" });
     const data = await res.json();
     return NextResponse.json(data);
   } catch (err) {

@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   try {
     // First get results for every round to compute cumulative points
     const resultsRes = await fetch(`${JOLPICA_BASE}/${year}/results/?format=json&limit=1000`, {
-      next: { revalidate: 600 }, // 10 min cache
+      cache: "no-store",
     });
     const resultsJson = await resultsRes.json();
     const races = resultsJson?.MRData?.RaceTable?.Races || [];

@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(`${BASE}/meetings?year=${year}`, {
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
     const data = await res.json();
     return NextResponse.json(data);

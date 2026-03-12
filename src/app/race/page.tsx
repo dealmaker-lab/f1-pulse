@@ -7,6 +7,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// ===== Speed Presets =====
+const SPEED_PRESETS = [
+  { label: "0.5x", ms: 200 },
+  { label: "1x", ms: 100 },
+  { label: "2x", ms: 50 },
+  { label: "5x", ms: 20 },
+  { label: "10x", ms: 10 },
+  { label: "20x", ms: 5 },
+];
+
 // ===== Types =====
 interface DriverInfo {
   driver_number: number;
@@ -85,7 +95,7 @@ export default function RaceReplayPage() {
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(5);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1); // Index into SPEED_PRESETS
   const [currentFrame, setCurrentFrame] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("");
@@ -361,19 +371,21 @@ export default function RaceReplayPage() {
     return latest;
   }, [currentFrame, weather, timeline, totalFrames]);
 
-  // ===== Animation loop =====
+  // ===== Animation loop (time-based) =====
   useEffect(() => {
     if (!isPlaying || totalFrames === 0) return;
 
-    const step = (ts: number) => {
-      if (!lastTimeRef.current) lastTimeRef.current = ts;
-      const delta = ts - lastTimeRef.current;
+    const speedMs = SPEED_PRESETS[playbackSpeed].ms;
+    let lastFrameTime = 0;
 
-      if (delta > 16) { // ~60fps
-        lastTimeRef.current = ts;
+    const step = (ts: number) => {
+      if (!lastFrameTime) lastFrameTime = ts;
+      const delta = ts - lastFrameTime;
+
+      if (delta >= speedMs) {
+        lastFrameTime = ts;
         setCurrentFrame((prev) => {
-          const advance = Math.max(1, Math.ceil(playbackSpeed * 0.5));
-          const next = prev + advance;
+          const next = prev + 1;
           if (next >= totalFrames) { setIsPlaying(false); return totalFrames - 1; }
           return next;
         });
@@ -385,7 +397,6 @@ export default function RaceReplayPage() {
     animRef.current = requestAnimationFrame(step);
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
-      lastTimeRef.current = 0;
     };
   }, [isPlaying, playbackSpeed, totalFrames]);
 
@@ -416,7 +427,7 @@ export default function RaceReplayPage() {
             onChange={(e) => setYear(Number(e.target.value))}
             className="bg-carbon-800 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-white/80 cursor-pointer"
           >
-            {[2026, 2025, 2024, 2023].map((y) => (
+            {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
@@ -451,7 +462,7 @@ export default function RaceReplayPage() {
         <>
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-3">
             {/* Track Map */}
-            <div className="xl:col-span-3 glass-card p-3 relative overflow-hidden">
+            <div className="xl:col-span-3 glass-card p-3 relative overflow-hidden" style={{ background: "radial-gradient(ellipse at center, rgba(10,10,20,0.95) 0%, rgba(5,5,10,1) 100%)" }}>
               {/* Lap overlay */}
               <div className="absolute top-3 left-3 z-10 bg-black/70 backdrop-blur-sm rounded-xl px-3 py-2">
                 <div className="flex items-center gap-2">
@@ -481,42 +492,72 @@ export default function RaceReplayPage() {
               {/* SVG Track */}
               <div className="w-full" style={{ aspectRatio: `${svgW} / ${svgH}` }}>
                 <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-full">
-                  {/* Track outline — outer glow */}
+                  <defs>
+                    {/* Neon track glow filter */}
+                    <filter id="neonTrack">
+                      <feGaussianBlur stdDeviation="6" />
+                      <feMerge>
+                        <feMergeNode />
+                        <feMergeNode />
+                      </feMerge>
+                    </filter>
+                    {/* Neon car glow filter */}
+                    <filter id="carGlow">
+                      <feGaussianBlur stdDeviation="4" />
+                    </filter>
+                    {/* Neon car glow (selected) */}
+                    <filter id="carGlowSelected">
+                      <feGaussianBlur stdDeviation="6" />
+                    </filter>
+                  </defs>
+
+                  {/* Track layer 1: wide glow */}
                   {trackPath && (
                     <path
                       d={trackPath}
                       fill="none"
-                      stroke="rgba(59,130,246,0.06)"
-                      strokeWidth="22"
+                      stroke="rgba(59,130,246,0.15)"
+                      strokeWidth="28"
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      filter="url(#neonTrack)"
+                    />
+                  )}
+                  {/* Track layer 2: neon edge */}
+                  {trackPath && (
+                    <path
+                      d={trackPath}
+                      fill="none"
+                      stroke="rgba(59,130,246,0.4)"
+                      strokeWidth="12"
                       strokeLinejoin="round"
                       strokeLinecap="round"
                     />
                   )}
-                  {/* Track outline — main surface */}
+                  {/* Track layer 3: bright core */}
                   {trackPath && (
                     <path
                       d={trackPath}
                       fill="none"
-                      stroke="rgba(255,255,255,0.12)"
-                      strokeWidth="10"
+                      stroke="rgba(59,130,246,0.7)"
+                      strokeWidth="6"
                       strokeLinejoin="round"
                       strokeLinecap="round"
                     />
                   )}
-                  {/* Track outline — center line */}
+                  {/* Track layer 4: white center */}
                   {trackPath && (
                     <path
                       d={trackPath}
                       fill="none"
-                      stroke="rgba(255,255,255,0.03)"
-                      strokeWidth="4"
+                      stroke="rgba(255,255,255,0.5)"
+                      strokeWidth="2"
                       strokeLinejoin="round"
                       strokeLinecap="round"
-                      strokeDasharray="8 12"
                     />
                   )}
 
-                  {/* Car dots */}
+                  {/* Car dots with neon glow */}
                   {carPositions.map(({ driver, x, y }) => {
                     const color = `#${driver.team_colour || "888888"}`;
                     const isSel = selectedDriver === driver.driver_number;
@@ -527,17 +568,34 @@ export default function RaceReplayPage() {
                         onClick={() => setSelectedDriver(driver.driver_number)}
                         className="cursor-pointer"
                       >
-                        {/* Outer glow */}
-                        <circle cx={x} cy={y} r={isSel ? 22 : 12} fill={color} opacity={isSel ? 0.2 : 0.1} />
-                        {/* Car dot */}
+                        {/* Outer aura */}
                         <circle
                           cx={x} cy={y}
-                          r={isSel ? 12 : 7}
+                          r={isSel ? 18 : 14}
                           fill={color}
-                          stroke={isSel ? "#ffffff" : "#0a0a0f"}
-                          strokeWidth={isSel ? 2.5 : 1.5}
+                          opacity={0.08}
+                          filter={isSel ? "url(#carGlowSelected)" : "url(#carGlow)"}
                         />
-                        {/* Label */}
+                        {/* Inner glow ring */}
+                        <circle
+                          cx={x} cy={y}
+                          r={isSel ? 12 : 9}
+                          fill={color}
+                          opacity={0.6}
+                        />
+                        {/* Core dot */}
+                        <circle
+                          cx={x} cy={y}
+                          r={isSel ? 8 : 6}
+                          fill={color}
+                        />
+                        {/* White-hot center */}
+                        <circle
+                          cx={x} cy={y}
+                          r={isSel ? 3 : 2}
+                          fill="rgba(255,255,255,1)"
+                        />
+                        {/* Label with drop shadow */}
                         <text
                           x={x + (isSel ? 16 : 11)}
                           y={y + 4}
@@ -545,7 +603,7 @@ export default function RaceReplayPage() {
                           fontSize={isSel ? "18" : "13"}
                           fontFamily="Fira Code, monospace"
                           fontWeight="bold"
-                          style={{ textShadow: "0 0 4px rgba(0,0,0,0.8)" }}
+                          style={{ filter: `drop-shadow(0 0 6px ${color})` }}
                         >
                           {driver.name_acronym}
                         </text>
@@ -586,8 +644,8 @@ export default function RaceReplayPage() {
                       )}>
                         {entry.position <= 20 ? entry.position : "-"}
                       </span>
-                      <div className="w-0.5 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                      <span className="text-[11px] font-mono font-bold flex-1 truncate" style={{ color }}>
+                      <div className="w-0.5 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}40` }} />
+                      <span className="text-[11px] font-mono font-bold flex-1 truncate" style={{ color, textShadow: `0 0 6px ${color}` }}>
                         {entry.driver.name_acronym}
                       </span>
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tireColor }} title={entry.compound} />
@@ -629,7 +687,7 @@ export default function RaceReplayPage() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentFrame(Math.max(0, currentFrame - Math.round(totalFrames * 0.05)))}
-                  className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors cursor-pointer"
+                  className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors cursor-pointer touch-manipulation"
                   aria-label="Rewind"
                 >
                   <SkipBack className="w-4 h-4" />
@@ -637,16 +695,21 @@ export default function RaceReplayPage() {
                 <button
                   onClick={() => setIsPlaying(!isPlaying)}
                   className={cn(
-                    "p-2.5 rounded-xl transition-all cursor-pointer",
+                    "p-2.5 rounded-xl transition-all cursor-pointer touch-manipulation",
                     isPlaying ? "bg-racing-red/20 text-racing-red" : "bg-racing-blue/20 text-racing-blue"
                   )}
+                  style={{
+                    boxShadow: isPlaying
+                      ? "0 0 15px rgba(225,6,0,0.3)"
+                      : "0 0 15px rgba(59,130,246,0.3)"
+                  }}
                   aria-label={isPlaying ? "Pause" : "Play"}
                 >
                   {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                 </button>
                 <button
                   onClick={() => setCurrentFrame(Math.min(totalFrames - 1, currentFrame + Math.round(totalFrames * 0.05)))}
-                  className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors cursor-pointer"
+                  className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors cursor-pointer touch-manipulation"
                   aria-label="Forward"
                 >
                   <SkipForward className="w-4 h-4" />
@@ -661,8 +724,8 @@ export default function RaceReplayPage() {
                   max={Math.max(1, totalFrames - 1)}
                   value={currentFrame}
                   onChange={(e) => { setCurrentFrame(Number(e.target.value)); setIsPlaying(false); }}
-                  className="w-full h-2 rounded-full appearance-none bg-white/5 cursor-pointer
-                    [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+                  className="w-full h-2 rounded-full appearance-none bg-white/5 cursor-pointer touch-manipulation
+                    [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-racing-blue [&::-webkit-slider-thumb]:cursor-pointer
                     [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(59,130,246,0.5)]"
                 />
@@ -670,16 +733,16 @@ export default function RaceReplayPage() {
 
               {/* Speed */}
               <div className="flex items-center gap-0.5">
-                {[1, 2, 5, 10, 20, 50].map((s) => (
+                {SPEED_PRESETS.map((preset, idx) => (
                   <button
-                    key={s}
-                    onClick={() => setPlaybackSpeed(s)}
+                    key={idx}
+                    onClick={() => setPlaybackSpeed(idx)}
                     className={cn(
-                      "px-1.5 py-1 rounded-lg text-[9px] font-mono font-bold cursor-pointer transition-all",
-                      playbackSpeed === s ? "bg-racing-blue/20 text-racing-blue" : "text-white/20 hover:text-white/50"
+                      "px-1.5 py-1 rounded-lg text-[9px] font-mono font-bold cursor-pointer transition-all touch-manipulation",
+                      playbackSpeed === idx ? "bg-racing-blue/20 text-racing-blue" : "text-white/20 hover:text-white/50"
                     )}
                   >
-                    {s}x
+                    {preset.label}
                   </button>
                 ))}
               </div>

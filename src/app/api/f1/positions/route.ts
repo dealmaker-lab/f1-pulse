@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(`${BASE}/position?session_key=${sessionKey}`, {
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
     const data = await res.json();
     return NextResponse.json(data);

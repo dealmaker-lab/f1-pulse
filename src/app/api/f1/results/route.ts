@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
       : `${JOLPICA_BASE}/${year}/results/?format=json&limit=1000`;
 
     const res = await fetch(url, {
-      next: { revalidate: 300 },
+      cache: "no-store",
     });
     const json = await res.json();
 

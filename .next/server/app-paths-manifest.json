@@ -1,3 +1,22 @@
 {
-  "/page": "app/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/f1/location/route": "app/api/f1/location/route.js",
+  "/api/f1/meetings/route": "app/api/f1/meetings/route.js",
+  "/api/f1/positions/route": "app/api/f1/positions/route.js",
+  "/api/f1/predictions/route": "app/api/f1/predictions/route.js",
+  "/api/f1/results/route": "app/api/f1/results/route.js",
+  "/api/f1/sessions/route": "app/api/f1/sessions/route.js",
+  "/api/f1/standings/drivers/route": "app/api/f1/standings/drivers/route.js",
+  "/api/f1/standings/constructors/route": "app/api/f1/standings/constructors/route.js",
+  "/api/f1/standings/progression/route": "app/api/f1/standings/progression/route.js",
+  "/api/f1/stints/route": "app/api/f1/stints/route.js",
+  "/api/f1/weather/route": "app/api/f1/weather/route.js",
+  "/constructors/page": "app/constructors/page.js",
+  "/drivers/page": "app/drivers/page.js",
+  "/page": "app/page.js",
+  "/race/page": "app/race/page.js",
+  "/strategy/page": "app/strategy/page.js",
+  "/api/f1/laps/route": "app/api/f1/laps/route.js",
+  "/telemetry/page": "app/telemetry/page.js",
+  "/api/f1/drivers/route": "app/api/f1/drivers/route.js"
 }

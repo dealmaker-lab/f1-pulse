@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(
       `${BASE}/sessions?year=${year}&session_type=${sessionType}`,
-      { next: { revalidate: 3600 } }
+      { cache: "no-store" }
     );
     const data = await res.json();
     return NextResponse.json(data);

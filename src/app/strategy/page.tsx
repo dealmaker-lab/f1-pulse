@@ -203,7 +203,7 @@ export default function StrategyPage() {
             driverCode: driver.name_acronym,
             team: driver.team_name,
             stints: sortedStints.map((s) => ({
-              compound: s.compound || "UNKNOWN",
+              compound: (s.compound || "UNKNOWN") as import("@/types/f1").TireCompound,
               startLap: s.lap_start,
               endLap: s.lap_end,
               avgPace: 93.0, // Default; calculate from lap times if available
