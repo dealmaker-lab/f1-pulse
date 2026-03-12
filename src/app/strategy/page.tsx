@@ -123,11 +123,13 @@ export default function StrategyPage() {
         const res = await fetch(`/api/f1/sessions?year=${selectedYear2}&type=Race`);
         if (res.ok) {
           const data = await res.json();
-          setRaces2(data);
-          setSelectedRace2(null); // Reset selection when year changes
+          // Guard: ensure it's an array
+          setRaces2(Array.isArray(data) ? data : []);
+          setSelectedRace2(null);
         }
       } catch (error) {
         console.error("Failed to fetch comparison races:", error);
+        setRaces2([]);
       } finally {
         setLoadingRaces2(false);
       }
@@ -135,31 +137,43 @@ export default function StrategyPage() {
     fetchRaces2();
   }, [compareMode, selectedYear2]);
 
-  // Fetch strategy data when race is selected
+  // Fetch strategy data for primary race
   useEffect(() => {
     if (!selectedRace) return;
 
     const fetchStrategyData = async () => {
       setLoadingStrategy1(true);
+      // Reset visible drivers so old data doesn't linger
+      setVisibleDrivers1([]);
+      setStints1([]);
+      setDrivers1([]);
+      setPositions1([]);
+      setRaceResults1([]);
+
       try {
-        const [stintsRes, driversRes, posRes, resultsRes] = await Promise.all([
+        const [stintsRes, driversRes, posRes] = await Promise.all([
           fetch(`/api/f1/stints?session_key=${selectedRace.session_key}`),
           fetch(`/api/f1/drivers?session_key=${selectedRace.session_key}`),
           fetch(`/api/f1/positions?session_key=${selectedRace.session_key}`),
-          fetch(`/api/f1/results?year=${selectedYear}&round=${selectedRace.meeting_key}`),
         ]);
 
-        if (stintsRes.ok) setStints1(await stintsRes.json());
-        if (driversRes.ok) setDrivers1(await driversRes.json());
-        if (posRes.ok) setPositions1(await posRes.json());
+        const stintsRaw = stintsRes.ok ? await stintsRes.json() : [];
+        const driversRaw = driversRes.ok ? await driversRes.json() : [];
+        const posRaw = posRes.ok ? await posRes.json() : [];
 
-        // Parse results once, then use for both state and top-10 selection
-        if (resultsRes.ok) {
-          const results = await resultsRes.json();
-          setRaceResults1(results);
-          const top10 = results.slice(0, 10).map((r: RaceResult) => r.driver_number);
-          setVisibleDrivers1(top10);
-        }
+        // Guard: ensure all are arrays (API may return error objects)
+        const stintsArr: StintData[] = Array.isArray(stintsRaw) ? stintsRaw : [];
+        const driversArr: DriverData[] = Array.isArray(driversRaw) ? driversRaw : [];
+        const posArr: PositionData[] = Array.isArray(posRaw) ? posRaw : [];
+
+        setStints1(stintsArr);
+        setDrivers1(driversArr);
+        setPositions1(posArr);
+
+        // Populate visible drivers from stints — not from results (meeting_key ≠ Jolpica round)
+        const uniqueNums = Array.from(new Set(stintsArr.map((s) => s.driver_number)));
+        setVisibleDrivers1(uniqueNums);
+
       } catch (error) {
         console.error("Failed to fetch strategy data:", error);
       } finally {
@@ -168,33 +182,42 @@ export default function StrategyPage() {
     };
 
     fetchStrategyData();
-  }, [selectedRace, selectedYear]);
+  }, [selectedRace]);
 
-  // Fetch comparison race data
+  // Fetch strategy data for comparison race
   useEffect(() => {
     if (!compareMode || !selectedRace2) return;
 
     const fetchStrategyData = async () => {
       setLoadingStrategy2(true);
+      setVisibleDrivers2([]);
+      setStints2([]);
+      setDrivers2([]);
+      setPositions2([]);
+      setRaceResults2([]);
+
       try {
-        const [stintsRes, driversRes, posRes, resultsRes] = await Promise.all([
+        const [stintsRes, driversRes, posRes] = await Promise.all([
           fetch(`/api/f1/stints?session_key=${selectedRace2.session_key}`),
           fetch(`/api/f1/drivers?session_key=${selectedRace2.session_key}`),
           fetch(`/api/f1/positions?session_key=${selectedRace2.session_key}`),
-          fetch(`/api/f1/results?year=${selectedRace2.date.split("-")[0]}&round=${selectedRace2.meeting_key}`),
         ]);
 
-        if (stintsRes.ok) setStints2(await stintsRes.json());
-        if (driversRes.ok) setDrivers2(await driversRes.json());
-        if (posRes.ok) setPositions2(await posRes.json());
+        const stintsRaw = stintsRes.ok ? await stintsRes.json() : [];
+        const driversRaw = driversRes.ok ? await driversRes.json() : [];
+        const posRaw = posRes.ok ? await posRes.json() : [];
 
-        // Parse results once, then use for both state and top-10 selection
-        if (resultsRes.ok) {
-          const results = await resultsRes.json();
-          setRaceResults2(results);
-          const top10 = results.slice(0, 10).map((r: RaceResult) => r.driver_number);
-          setVisibleDrivers2(top10);
-        }
+        const stintsArr: StintData[] = Array.isArray(stintsRaw) ? stintsRaw : [];
+        const driversArr: DriverData[] = Array.isArray(driversRaw) ? driversRaw : [];
+        const posArr: PositionData[] = Array.isArray(posRaw) ? posRaw : [];
+
+        setStints2(stintsArr);
+        setDrivers2(driversArr);
+        setPositions2(posArr);
+
+        const uniqueNums = Array.from(new Set(stintsArr.map((s) => s.driver_number)));
+        setVisibleDrivers2(uniqueNums);
+
       } catch (error) {
         console.error("Failed to fetch comparison race data:", error);
       } finally {
@@ -317,11 +340,18 @@ export default function StrategyPage() {
   const pitStopData1 = buildPitStopData(stints1, drivers1, visibleDrivers1);
   const pitStopData2 = buildPitStopData(stints2, drivers2, visibleDrivers2);
 
-  const totalLaps1 = stints1.length > 0 ? Math.max(...stints1.map((s) => s.lap_end)) : 57;
-  const totalLaps2 = stints2.length > 0 ? Math.max(...stints2.map((s) => s.lap_end)) : 57;
+  const totalLaps1 = stints1.length > 0
+    ? Math.max(...stints1.map((s) => s.lap_end).filter((n) => Number.isFinite(n) && n > 0))
+    : 57;
+  const totalLaps2 = stints2.length > 0
+    ? Math.max(...stints2.map((s) => s.lap_end).filter((n) => Number.isFinite(n) && n > 0))
+    : 57;
+
+  const safeLaps1 = Number.isFinite(totalLaps1) && totalLaps1 > 0 ? totalLaps1 : 57;
+  const safeLaps2 = Number.isFinite(totalLaps2) && totalLaps2 > 0 ? totalLaps2 : 57;
 
   const raceTitle1 = selectedRace ? `${selectedRace.circuit_short_name} ${selectedYear}` : "Select Race";
-  const raceTitle2 = selectedRace2 ? `${selectedRace2.circuit_short_name} ${selectedRace2.date.split("-")[0]}` : "Select Race";
+  const raceTitle2 = selectedRace2 ? `${selectedRace2.circuit_short_name} ${selectedYear2}` : "Select Race";
   const winner1 = raceResults1.length > 0 ? raceResults1[0] : null;
   const winner2 = raceResults2.length > 0 ? raceResults2[0] : null;
 
@@ -455,7 +485,7 @@ export default function StrategyPage() {
             <div className="h-8 w-px bg-white/10 hidden sm:block" />
             <div>
               <span className="text-[10px] uppercase tracking-widest text-white/30">Laps</span>
-              <div className="text-sm font-mono mt-0.5">{totalLaps1}</div>
+              <div className="text-sm font-mono mt-0.5">{stints1.length > 0 ? safeLaps1 : "—"}</div>
             </div>
             <div className="h-8 w-px bg-white/10 hidden sm:block" />
             <div>
@@ -482,7 +512,7 @@ export default function StrategyPage() {
                 <Loader2 className="w-6 h-6 animate-spin text-racing-blue" />
               </div>
             ) : strategyData1.length > 0 ? (
-              <StrategyChart strategies={strategyData1} totalLaps={totalLaps1} />
+              <StrategyChart strategies={strategyData1} totalLaps={safeLaps1} />
             ) : (
               <div className="text-center py-8 text-white/40">No strategy data available</div>
             )}
@@ -652,7 +682,7 @@ export default function StrategyPage() {
             <div className="h-8 w-px bg-white/10 hidden sm:block" />
             <div>
               <span className="text-[10px] uppercase tracking-widest text-white/30">Laps</span>
-              <div className="text-sm font-mono mt-0.5">{totalLaps2}</div>
+              <div className="text-sm font-mono mt-0.5">{stints2.length > 0 ? safeLaps2 : "—"}</div>
             </div>
             <div className="h-8 w-px bg-white/10 hidden sm:block" />
             <div>
@@ -679,7 +709,7 @@ export default function StrategyPage() {
                 <Loader2 className="w-6 h-6 animate-spin text-racing-blue" />
               </div>
             ) : strategyData2.length > 0 ? (
-              <StrategyChart strategies={strategyData2} totalLaps={totalLaps2} />
+              <StrategyChart strategies={strategyData2} totalLaps={safeLaps2} />
             ) : (
               <div className="text-center py-8 text-white/40">No strategy data available</div>
             )}
