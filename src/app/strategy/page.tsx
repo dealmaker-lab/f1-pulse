@@ -303,7 +303,7 @@ function RaceSelector({
       <div className="text-[9px] font-black uppercase tracking-[0.2em] font-mono" style={{ color: accent }}>
         {label}
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {/* Year */}
         <div className="relative">
           <select
@@ -577,7 +577,7 @@ export default function StrategyPage() {
       {/* ── Race Selectors ── */}
       <div className={cn(
         "grid gap-3 transition-all",
-        compareMode ? "grid-cols-2" : "grid-cols-1"
+        compareMode ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
       )}>
         <RaceSelector
           label="Race A"
@@ -601,7 +601,7 @@ export default function StrategyPage() {
       {isComparing && (
         <>
           {/* Stats strip */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {(
               [
                 { accent: "#3B82F6", label: `${race1?.circuit_short_name} ${year1}`, stints: stints1, loading: loading1 },
@@ -645,7 +645,7 @@ export default function StrategyPage() {
           </div>
 
           {/* Side-by-side charts */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Race A */}
             <div className="glass-card p-5 rounded-xl border-t-2 border-[#3B82F6]/50">
               <div className="flex items-center justify-between mb-4">

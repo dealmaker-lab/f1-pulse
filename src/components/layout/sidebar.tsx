@@ -29,7 +29,8 @@ export default function Sidebar() {
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(!mobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-f1-surface border border-white/10 cursor-pointer"
+        className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-lg cursor-pointer border border-racing-red/30"
+        style={{ background: '#15151e' }}
         aria-label="Toggle navigation"
       >
         {mobileOpen ? <X className="w-5 h-5 text-white/70" /> : <Menu className="w-5 h-5 text-white/70" />}
