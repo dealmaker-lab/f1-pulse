@@ -106,14 +106,18 @@ export async function GET(req: NextRequest) {
       resolveDriverId(d2),
     ]);
 
+    console.log(`Career H2H: resolved ${d1} → ${d1Id}, ${d2} → ${d2Id}`);
+
     // Find all seasons where BOTH drivers competed
     const [d1SeasonsRes, d2SeasonsRes] = await Promise.all([
-      fetch(`${JOLPICA_BASE}/drivers/${d1Id}/seasons.json?limit=100`, { cache: "no-store" }),
-      fetch(`${JOLPICA_BASE}/drivers/${d2Id}/seasons.json?limit=100`, { cache: "no-store" }),
+      fetch(`${JOLPICA_BASE}/drivers/${d1Id}/seasons.json?limit=100`),
+      fetch(`${JOLPICA_BASE}/drivers/${d2Id}/seasons.json?limit=100`),
     ]);
 
     const d1SeasonsJson = await d1SeasonsRes.json();
     const d2SeasonsJson = await d2SeasonsRes.json();
+
+    console.log(`Seasons response: d1 total=${d1SeasonsJson?.MRData?.total}, d2 total=${d2SeasonsJson?.MRData?.total}`);
 
     const d1Seasons = new Set<number>(
       (d1SeasonsJson?.MRData?.SeasonTable?.Seasons || [])
