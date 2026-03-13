@@ -465,10 +465,17 @@ export default function DashboardPage() {
   const constructorChartData = buildConstructorData();
 
   // Session key for the circuit map
-  const heroSessionKey = displayedSession?.session_key || null;
-  const heroCircuitName = displayedSession
-    ? `${getMeetingName(displayedSession.meeting_key).replace(" Grand Prix", " GP") || displayedSession.circuit_short_name}`
-    : "";
+  // Use the selected non-Race session for the circuit map when applicable
+  const heroSessionKey =
+    sessionType !== "Race" && selectedFilteredSession
+      ? selectedFilteredSession.session_key
+      : displayedSession?.session_key || null;
+  const heroCircuitName =
+    sessionType !== "Race" && selectedFilteredSession
+      ? (getMeetingName(selectedFilteredSession.meeting_key).replace(" Grand Prix", " GP") || selectedFilteredSession.circuit_short_name || selectedFilteredSession.country_name)
+      : displayedSession
+      ? `${getMeetingName(displayedSession.meeting_key).replace(" Grand Prix", " GP") || displayedSession.circuit_short_name}`
+      : "";
 
   return (
     <div className="animate-fade-in -mx-4 sm:-mx-6 lg:-mx-8 -mt-6">
@@ -841,7 +848,7 @@ export default function DashboardPage() {
       {/* ════════════════════════════════════════════════════════════════════
           PODIUM — Selected race results with editorial hierarchy
           ════════════════════════════════════════════════════════════════════ */}
-      {displayedResult && displayedResult.results.length > 0 && (
+      {sessionType === "Race" && displayedResult && displayedResult.results.length > 0 && (
         <section className="px-4 sm:px-6 lg:px-8 py-6">
           <div className="max-w-[1600px] mx-auto">
             <div className="flex items-center justify-between mb-5">
