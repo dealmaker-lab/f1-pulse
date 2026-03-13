@@ -337,7 +337,7 @@ function RaceSelector({
                 <option value="" className="bg-[#0d0f14]">Select race…</option>
                 {races.map((r) => (
                   <option key={r.session_key} value={r.session_key} className="bg-[#0d0f14]">
-                    {r.circuit_short_name}
+                    {r.circuit_short_name} ({r.session_name})
                   </option>
                 ))}
               </select>

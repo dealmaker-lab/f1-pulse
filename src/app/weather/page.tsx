@@ -241,7 +241,7 @@ export default function WeatherPage() {
               >
                 {sessions.map((s) => (
                   <option key={s.session_key} value={s.session_key}>
-                    {s.circuit_short_name} — {s.country_name}
+                    {s.circuit_short_name} — {s.country_name} ({s.session_name})
                   </option>
                 ))}
               </select>

@@ -102,7 +102,7 @@ export default function TelemetryPage() {
   const [year, setYear] = useState(2025);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
-  const [sessionType, setSessionType] = useState<"Race" | "Qualifying">("Qualifying");
+  const [sessionType, setSessionType] = useState<string>("Qualifying");
 
   // Driver/Lap selection
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
@@ -342,8 +342,8 @@ export default function TelemetryPage() {
 
           <div>
             <label className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold block mb-1.5">Session</label>
-            <div className="flex gap-1">
-              {(["Qualifying", "Race"] as const).map((t) => (
+            <div className="flex gap-1 flex-wrap">
+              {(["Qualifying", "Race", "Sprint", "Sprint Qualifying"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => { setSessionType(t); setSelectedSession(null); }}
@@ -354,7 +354,7 @@ export default function TelemetryPage() {
                       : "border-[var(--f1-border)] text-f1-muted hover:text-f1-sub"
                   )}
                 >
-                  {t}
+                  {t === "Sprint Qualifying" ? "Sprint Q" : t}
                 </button>
               ))}
             </div>
@@ -374,7 +374,7 @@ export default function TelemetryPage() {
               >
                 {sessions.map((s) => (
                   <option key={s.session_key} value={s.session_key}>
-                    {s.circuit_short_name} — {s.country_name}
+                    {s.circuit_short_name} — {s.country_name} ({s.session_name})
                   </option>
                 ))}
               </select>
