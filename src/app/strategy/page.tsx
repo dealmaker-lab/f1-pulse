@@ -25,6 +25,7 @@ interface RaceSession {
   circuit_short_name: string;
   meeting_key: number;
   date: string;
+  date_start: string;
 }
 interface StintData {
   driver_number: number;
