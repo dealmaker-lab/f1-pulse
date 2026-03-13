@@ -36,6 +36,7 @@ interface LapInfo {
   lap_number: number;
   lap_duration: number | null;
   is_pit_out_lap: boolean;
+  date_start: string;
   duration_sector_1: number | null;
   duration_sector_2: number | null;
   duration_sector_3: number | null;
@@ -269,26 +270,12 @@ export default function TelemetryPage() {
     const lap2Info = laps2.find((l) => l.lap_number === selectedLap2);
     if (!lap1Info || !lap2Info) return null;
 
-    // Calculate lap boundaries using cumulative lap durations
-    const allDates1 = rawData1.map((d) => new Date(d.date).getTime()).sort((a, b) => a - b);
-    const allDates2 = rawData2.map((d) => new Date(d.date).getTime()).sort((a, b) => a - b);
-    if (!allDates1.length || !allDates2.length) return null;
+    // Use date_start directly from the lap data — no cumulative calculation needed
+    const start1 = new Date(lap1Info.date_start).getTime();
+    const end1 = start1 + (lap1Info.lap_duration || 90) * 1000;
 
-    let cumTime1 = 0;
-    for (const l of laps1) {
-      if (l.lap_number < selectedLap1 && l.lap_duration) cumTime1 += l.lap_duration * 1000;
-    }
-    const lapDur1Ms = (lap1Info.lap_duration || 90) * 1000;
-    const start1 = allDates1[0] + cumTime1;
-    const end1 = start1 + lapDur1Ms;
-
-    let cumTime2 = 0;
-    for (const l of laps2) {
-      if (l.lap_number < selectedLap2 && l.lap_duration) cumTime2 += l.lap_duration * 1000;
-    }
-    const lapDur2Ms = (lap2Info.lap_duration || 90) * 1000;
-    const start2 = allDates2[0] + cumTime2;
-    const end2 = start2 + lapDur2Ms;
+    const start2 = new Date(lap2Info.date_start).getTime();
+    const end2 = start2 + (lap2Info.lap_duration || 90) * 1000;
 
     const telem1 = sliceTelemetryForLap(rawData1, start1, end1);
     const telem2 = sliceTelemetryForLap(rawData2, start2, end2);
