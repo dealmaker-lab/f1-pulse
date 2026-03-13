@@ -76,6 +76,32 @@ test.describe("Telemetry", () => {
   });
 });
 
+test.describe("Weather", () => {
+  test("loads weather impact page", async ({ page }) => {
+    await page.goto("/weather");
+    await waitForPageReady(page);
+
+    await expect(page.locator("h1")).toContainText(/weather/i);
+
+    // Should have year and session selectors
+    const selects = page.locator("select");
+    await expect(selects.first()).toBeVisible({ timeout: 10_000 });
+  });
+});
+
+test.describe("Team Radio", () => {
+  test("loads radio playback page", async ({ page }) => {
+    await page.goto("/radio");
+    await waitForPageReady(page);
+
+    await expect(page.locator("h1")).toContainText(/team radio/i);
+
+    // Should have year and session selectors
+    const selects = page.locator("select");
+    await expect(selects.first()).toBeVisible({ timeout: 10_000 });
+  });
+});
+
 test.describe("Race Replay", () => {
   test("loads race page", async ({ page }) => {
     await page.goto("/race");
