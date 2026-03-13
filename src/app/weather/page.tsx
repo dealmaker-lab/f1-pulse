@@ -102,7 +102,10 @@ export default function WeatherPage() {
   }, [year]);
 
   // Filter sessions to only past sessions matching the filter, sorted chronologically (earliest first)
-  const sessions = filterPastSessions(allSessions, sessionFilter);
+  const sessions = useMemo(
+    () => filterPastSessions(allSessions, sessionFilter),
+    [allSessions, sessionFilter]
+  );
 
   // Auto-select most recent session (last in chronological order) when filter changes
   useEffect(() => {
@@ -111,7 +114,7 @@ export default function WeatherPage() {
     } else {
       setSelectedSession(null);
     }
-  }, [sessionFilter, allSessions]);
+  }, [sessions]);
 
   // Fetch weather + laps + drivers when session changes
   useEffect(() => {
