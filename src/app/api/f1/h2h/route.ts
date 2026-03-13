@@ -206,7 +206,7 @@ export async function GET(req: NextRequest) {
     } : null;
 
     return NextResponse.json({
-      year: parseInt(year),
+      year,
       driver1: driver1Info,
       driver2: driver2Info,
       raceH2H,
