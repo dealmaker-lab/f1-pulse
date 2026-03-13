@@ -150,22 +150,21 @@ export async function GET(req: NextRequest) {
     const seasonSummaries: SeasonSummary[] = [];
     const yearlyPoints: { year: number; d1: number; d2: number }[] = [];
 
-    // Process seasons in batches — each season needs 4 API calls (2 drivers × race + quali)
-    // Use small batch size to avoid Jolpica rate limits
-    const batchSize = 2;
-    for (let i = 0; i < commonSeasons.length; i += batchSize) {
-      const batch = commonSeasons.slice(i, i + batchSize);
-      const batchResults = await Promise.all(
-        batch.map(async (year) => {
-          const [d1Races, d2Races, d1Quali, d2Quali] = await Promise.all([
-            fetchDriverSeasonResults(d1Id, year),
-            fetchDriverSeasonResults(d2Id, year),
-            fetchDriverSeasonQualifying(d1Id, year).catch(() => []),
-            fetchDriverSeasonQualifying(d2Id, year).catch(() => []),
-          ]);
-          return { year, d1Races, d2Races, d1Quali, d2Quali };
-        })
-      );
+    // Process each season sequentially with only 2 parallel requests at a time
+    // to avoid Jolpica rate limits (>4 concurrent requests get HTML error pages)
+    for (let i = 0; i < commonSeasons.length; i++) {
+      const year = commonSeasons[i];
+      // Fetch race results (2 parallel)
+      const [d1Races, d2Races] = await Promise.all([
+        fetchDriverSeasonResults(d1Id, year),
+        fetchDriverSeasonResults(d2Id, year),
+      ]);
+      // Fetch qualifying (2 parallel)
+      const [d1Quali, d2Quali] = await Promise.all([
+        fetchDriverSeasonQualifying(d1Id, year).catch(() => [] as any[]),
+        fetchDriverSeasonQualifying(d2Id, year).catch(() => [] as any[]),
+      ]);
+      const batchResults = [{ year, d1Races, d2Races, d1Quali, d2Quali }];
 
       for (const { year, d1Races, d2Races, d1Quali, d2Quali } of batchResults) {
         let seasonD1Points = 0, seasonD2Points = 0;
