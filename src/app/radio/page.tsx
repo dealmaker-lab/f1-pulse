@@ -206,25 +206,55 @@ export default function RadioPage() {
 
   const YEARS = [2026, 2025, 2024, 2023];
 
+  // Track which sessions have radio data
+  const [availableSessionKeys, setAvailableSessionKeys] = useState<Set<number>>(new Set());
+
   // ===== Data Fetching =====
 
-  // Fetch sessions for the year
+  // Fetch sessions for the year, then check radio availability
   useEffect(() => {
     setLoadingSessions(true);
     setAllSessions([]);
     setSelectedSession(null);
+    setAvailableSessionKeys(new Set());
+
     fetch(`/api/f1/sessions?year=${year}`)
       .then((r) => r.json())
-      .then((data: SessionInfo[]) => {
-        if (Array.isArray(data)) {
-          const pastOnly = filterAllPastSessions(data);
-          setAllSessions(pastOnly);
-          // Auto-select most recent race session
-          const races = pastOnly.filter((s) => s.session_name === "Race");
-          if (races.length) {
-            setSelectedSession(races[races.length - 1]);
-          } else if (pastOnly.length) {
-            setSelectedSession(pastOnly[pastOnly.length - 1]);
+      .then(async (data: SessionInfo[]) => {
+        if (!Array.isArray(data)) return;
+        const pastOnly = filterAllPastSessions(data);
+
+        // Check radio availability for all sessions
+        const sessionKeys = pastOnly.map((s) => s.session_key);
+        if (sessionKeys.length > 0) {
+          try {
+            const availRes = await fetch(
+              `/api/f1/radio/availability?session_keys=${sessionKeys.join(",")}`
+            );
+            const availData = await availRes.json();
+            const availSet = new Set<number>(availData.available || []);
+            setAvailableSessionKeys(availSet);
+
+            // Only keep sessions that have radio data
+            const withRadio = pastOnly.filter((s) => availSet.has(s.session_key));
+            setAllSessions(withRadio);
+
+            // Auto-select most recent race session with radio
+            const races = withRadio.filter((s) => s.session_name === "Race");
+            if (races.length) {
+              setSelectedSession(races[races.length - 1]);
+            } else if (withRadio.length) {
+              setSelectedSession(withRadio[withRadio.length - 1]);
+            }
+          } catch {
+            // Fallback: show all sessions if availability check fails
+            setAllSessions(pastOnly);
+            const races = pastOnly.filter((s) => s.session_name === "Race");
+            if (races.length) {
+              setSelectedSession(races[races.length - 1]);
+            } else if (pastOnly.length) {
+              setSelectedSession(pastOnly[pastOnly.length - 1]);
+            }
           }
         }
       })
@@ -503,12 +533,13 @@ export default function RadioPage() {
       {loadingSessions ? (
         <div className="flex items-center justify-center py-10 gap-3">
           <Loader2 className="w-5 h-5 text-racing-red animate-spin" />
-          <span className="text-f1-sub text-sm">Loading {year} sessions...</span>
+          <span className="text-f1-sub text-sm">Checking radio availability for {year}...</span>
         </div>
       ) : filteredMeetings.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 gap-2">
-          <AlertTriangle className="w-6 h-6 text-f1-muted" />
-          <span className="text-f1-sub text-sm">No races found for {year}</span>
+          <Radio className="w-6 h-6 text-f1-muted" />
+          <span className="text-f1-sub text-sm">No radio feeds available for {year}</span>
+          <span className="text-[11px] text-f1-muted">Team radio data is available from 2023 onwards</span>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3 mb-6">
