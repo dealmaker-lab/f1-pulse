@@ -63,17 +63,27 @@ async function resolveDriverId(codeOrId: string): Promise<string> {
   return codeOrId.toLowerCase();
 }
 
+/** Safe JSON fetch that handles non-JSON responses (rate limit pages, errors) */
+async function safeFetchJson(url: string): Promise<any> {
+  const res = await fetch(url);
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    console.warn(`Non-JSON response from ${url}: ${text.substring(0, 100)}`);
+    return null;
+  }
+}
+
 /**
  * Fetch all race results for a specific driver in a specific season.
  * Returns an array of race objects with the driver's result.
  * Uses per-driver endpoint — returns ~20-24 results in a single call (no pagination needed).
  */
 async function fetchDriverSeasonResults(driverId: string, year: number): Promise<any[]> {
-  const res = await fetch(
-    `${JOLPICA_BASE}/${year}/drivers/${driverId}/results.json?limit=100`,
-    { cache: "no-store" }
+  const data = await safeFetchJson(
+    `${JOLPICA_BASE}/${year}/drivers/${driverId}/results.json?limit=100`
   );
-  const data = await res.json();
   return data?.MRData?.RaceTable?.Races || [];
 }
 
@@ -81,11 +91,9 @@ async function fetchDriverSeasonResults(driverId: string, year: number): Promise
  * Fetch all qualifying results for a specific driver in a specific season.
  */
 async function fetchDriverSeasonQualifying(driverId: string, year: number): Promise<any[]> {
-  const res = await fetch(
-    `${JOLPICA_BASE}/${year}/drivers/${driverId}/qualifying.json?limit=100`,
-    { cache: "no-store" }
+  const data = await safeFetchJson(
+    `${JOLPICA_BASE}/${year}/drivers/${driverId}/qualifying.json?limit=100`
   );
-  const data = await res.json();
   return data?.MRData?.RaceTable?.Races || [];
 }
 
@@ -109,13 +117,10 @@ export async function GET(req: NextRequest) {
     console.log(`Career H2H: resolved ${d1} → ${d1Id}, ${d2} → ${d2Id}`);
 
     // Find all seasons where BOTH drivers competed
-    const [d1SeasonsRes, d2SeasonsRes] = await Promise.all([
-      fetch(`${JOLPICA_BASE}/drivers/${d1Id}/seasons.json?limit=100`),
-      fetch(`${JOLPICA_BASE}/drivers/${d2Id}/seasons.json?limit=100`),
+    const [d1SeasonsJson, d2SeasonsJson] = await Promise.all([
+      safeFetchJson(`${JOLPICA_BASE}/drivers/${d1Id}/seasons.json?limit=100`),
+      safeFetchJson(`${JOLPICA_BASE}/drivers/${d2Id}/seasons.json?limit=100`),
     ]);
-
-    const d1SeasonsJson = await d1SeasonsRes.json();
-    const d2SeasonsJson = await d2SeasonsRes.json();
 
     console.log(`Seasons response: d1 total=${d1SeasonsJson?.MRData?.total}, d2 total=${d2SeasonsJson?.MRData?.total}`);
 
@@ -159,7 +164,8 @@ export async function GET(req: NextRequest) {
     const yearlyPoints: { year: number; d1: number; d2: number }[] = [];
 
     // Process seasons in batches — each season needs 4 API calls (2 drivers × race + quali)
-    const batchSize = 3;
+    // Use small batch size to avoid Jolpica rate limits
+    const batchSize = 2;
     for (let i = 0; i < commonSeasons.length; i += batchSize) {
       const batch = commonSeasons.slice(i, i + batchSize);
       const batchResults = await Promise.all(
