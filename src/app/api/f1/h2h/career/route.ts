@@ -16,6 +16,12 @@ function driverCode(d: any): string {
   return d?.code || d?.familyName?.substring(0, 3).toUpperCase() || "???";
 }
 
+/** Match a driver in results by code OR driverId */
+function matchesDriver(driver: any, code: string, driverId: string): boolean {
+  if (!driver) return false;
+  return driverCode(driver) === code.toUpperCase() || driver.driverId === driverId;
+}
+
 function getTeamColor(constructorId: string): string {
   const colors: Record<string, string> = {
     mercedes: "#27F4D2", ferrari: "#E8002D", red_bull: "#3671C6",
@@ -47,6 +53,34 @@ interface SeasonSummary {
   d2Team: string;
 }
 
+/**
+ * Resolve a 3-letter driver code (e.g. "VER") to a Jolpica driverId (e.g. "max_verstappen").
+ * If the input already looks like a driverId (lowercase, contains underscore or >3 chars), return as-is.
+ */
+async function resolveDriverId(codeOrId: string): Promise<string> {
+  // Already a driverId (lowercase, longer than 3 chars or contains underscore)
+  if (codeOrId.length > 3 || codeOrId.includes("_") || codeOrId === codeOrId.toLowerCase()) {
+    return codeOrId;
+  }
+
+  // It's a 3-letter code — search recent seasons for the mapping
+  const currentYear = new Date().getFullYear();
+  for (let year = currentYear; year >= currentYear - 5; year--) {
+    try {
+      const res = await fetch(`${JOLPICA_BASE}/${year}/drivers.json?limit=50`, { cache: "no-store" });
+      const data = await res.json();
+      const drivers = data?.MRData?.DriverTable?.Drivers || [];
+      const match = drivers.find((d: any) => d.code === codeOrId.toUpperCase());
+      if (match) return match.driverId;
+    } catch {
+      continue;
+    }
+  }
+
+  // Fallback: try the code as-is (lowercase)
+  return codeOrId.toLowerCase();
+}
+
 export async function GET(req: NextRequest) {
   const d1 = req.nextUrl.searchParams.get("d1");
   const d2 = req.nextUrl.searchParams.get("d2");
@@ -58,11 +92,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Resolve 3-letter codes to Jolpica driverIds
+    const [d1Id, d2Id] = await Promise.all([
+      resolveDriverId(d1),
+      resolveDriverId(d2),
+    ]);
+
     // First, find all seasons where BOTH drivers competed
     // Fetch career results for each driver from Jolpica
     const [d1SeasonsRes, d2SeasonsRes] = await Promise.all([
-      fetch(`${JOLPICA_BASE}/drivers/${d1.toLowerCase()}/seasons/?format=json&limit=100`, { cache: "no-store" }),
-      fetch(`${JOLPICA_BASE}/drivers/${d2.toLowerCase()}/seasons/?format=json&limit=100`, { cache: "no-store" }),
+      fetch(`${JOLPICA_BASE}/drivers/${d1Id}/seasons/?format=json&limit=100`, { cache: "no-store" }),
+      fetch(`${JOLPICA_BASE}/drivers/${d2Id}/seasons/?format=json&limit=100`, { cache: "no-store" }),
     ]);
 
     const d1SeasonsJson = await d1SeasonsRes.json();
@@ -129,8 +169,8 @@ export async function GET(req: NextRequest) {
 
         for (const race of races) {
           const results = race.Results || [];
-          const r1 = results.find((r: any) => driverCode(r.Driver) === d1);
-          const r2 = results.find((r: any) => driverCode(r.Driver) === d2);
+          const r1 = results.find((r: any) => matchesDriver(r.Driver, d1, d1Id));
+          const r2 = results.find((r: any) => matchesDriver(r.Driver, d2, d2Id));
 
           if (r1) {
             const pos = parseInt(r1.position);
@@ -172,8 +212,8 @@ export async function GET(req: NextRequest) {
         // Qualifying
         for (const qRace of qualifyingRaces) {
           const qResults = qRace.QualifyingResults || [];
-          const q1 = qResults.find((r: any) => driverCode(r.Driver) === d1);
-          const q2 = qResults.find((r: any) => driverCode(r.Driver) === d2);
+          const q1 = qResults.find((r: any) => matchesDriver(r.Driver, d1, d1Id));
+          const q2 = qResults.find((r: any) => matchesDriver(r.Driver, d2, d2Id));
           if (q1 && q2) {
             const p1 = parseInt(q1.position);
             const p2 = parseInt(q2.position);
