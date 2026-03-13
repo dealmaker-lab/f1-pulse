@@ -79,32 +79,36 @@ export function useLivePolling<T = any>({ url, interval = 10000, enabled = true,
 }
 
 /**
- * Checks if there's an active F1 session happening right now.
- * Returns true if the current time is within a session window.
+ * Checks if we're in an active F1 race weekend.
+ * Accepts ALL session types (FP1, FP2, FP3, Quali, Sprint, Race).
+ * Returns true if:
+ *   - A session is currently running (within start..start+3h window), OR
+ *   - We're in a race weekend (any session within ±12h of now)
  */
 export function useIsRaceWeekend(sessions: { date_start: string }[]): boolean {
   const [isActive, setIsActive] = useState(false);
 
   useEffect(() => {
-    const now = new Date();
-    const active = sessions.some((s) => {
-      const start = new Date(s.date_start);
-      const end = new Date(start.getTime() + 3 * 60 * 60 * 1000); // +3 hours
-      return now >= start && now <= end;
-    });
-    setIsActive(active);
-
-    // Re-check every 60 seconds
-    const timer = setInterval(() => {
+    const check = () => {
       const now = new Date();
-      const active = sessions.some((s) => {
+      // Check if a session is actively running
+      const liveNow = sessions.some((s) => {
         const start = new Date(s.date_start);
         const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
         return now >= start && now <= end;
       });
-      setIsActive(active);
-    }, 60000);
+      if (liveNow) { setIsActive(true); return; }
+      // Check if we're in a race weekend window (±12h from any session)
+      const nearSession = sessions.some((s) => {
+        const start = new Date(s.date_start);
+        const diff = Math.abs(now.getTime() - start.getTime());
+        return diff < 12 * 60 * 60 * 1000;
+      });
+      setIsActive(nearSession);
+    };
 
+    check();
+    const timer = setInterval(check, 30000); // re-check every 30s
     return () => clearInterval(timer);
   }, [sessions]);
 

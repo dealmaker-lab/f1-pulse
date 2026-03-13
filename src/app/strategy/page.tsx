@@ -204,13 +204,29 @@ function PositionsPanel({
       dataMap.get(lap)![d.name_acronym] = p.position;
     });
   } else {
+    // OpenF1 position data uses timestamps, not lap numbers.
+    // Map timestamps proportionally into lap numbers based on race duration.
     const timestamps = Array.from(new Set(positions.map((p) => p.date ?? "")))
       .filter(Boolean)
       .sort();
     const tsToLap = new Map<string, number>();
-    const totalLaps = stints?.length ? safeLaps(stints) : timestamps.length;
-    const step = timestamps.length > 1 ? Math.max(1, totalLaps / timestamps.length) : 1;
-    timestamps.forEach((ts, i) => tsToLap.set(ts, Math.round(i * step) + 1));
+    const totalLaps = stints?.length ? safeLaps(stints) : Math.min(timestamps.length, 57);
+
+    if (timestamps.length > 0) {
+      const startTime = new Date(timestamps[0]).getTime();
+      const endTime = new Date(timestamps[timestamps.length - 1]).getTime();
+      const raceDuration = endTime - startTime;
+
+      timestamps.forEach((ts) => {
+        if (raceDuration > 0) {
+          const elapsed = new Date(ts).getTime() - startTime;
+          const lap = Math.max(1, Math.min(totalLaps, Math.round((elapsed / raceDuration) * (totalLaps - 1)) + 1));
+          tsToLap.set(ts, lap);
+        } else {
+          tsToLap.set(ts, 1);
+        }
+      });
+    }
 
     positions.forEach((p) => {
       const d = driverMap.get(p.driver_number);
@@ -706,14 +722,14 @@ function StrategySimulator({
                   key={i}
                   className="flex items-center justify-center text-[9px] font-mono font-bold transition-all"
                   style={{
-                    width: `${(stint.laps / simData.totalLaps) * 100}%`,
-                    backgroundColor: `${COMPOUND_COLORS[stint.compound] || "#888"}30`,
-                    borderBottom: `3px solid ${COMPOUND_COLORS[stint.compound] || "#888"}`,
-                    color: COMPOUND_COLORS[stint.compound] || "#888",
+                    width: `${(stint.laps / (simData.totalLaps || 57)) * 100}%`,
+                    backgroundColor: `${COMPOUND_COLORS[stint.compound || "UNKNOWN"] || "#888"}30`,
+                    borderBottom: `3px solid ${COMPOUND_COLORS[stint.compound || "UNKNOWN"] || "#888"}`,
+                    color: COMPOUND_COLORS[stint.compound || "UNKNOWN"] || "#888",
                   }}
-                  title={`${stint.compound} · Laps ${stint.startLap}–${stint.endLap} (${stint.laps} laps)`}
+                  title={`${stint.compound || "Unknown"} · Laps ${stint.startLap}–${stint.endLap} (${stint.laps} laps)`}
                 >
-                  {stint.laps > 5 && `${stint.compound.charAt(0)} · L${stint.startLap}-${stint.endLap}`}
+                  {stint.laps > 5 && `${(stint.compound || "?").charAt(0)} · L${stint.startLap}-${stint.endLap}`}
                 </div>
               ))}
             </div>

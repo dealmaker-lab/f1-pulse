@@ -271,17 +271,22 @@ export default function DashboardPage() {
     drivers: { position: number; code: string; name: string; team: string; teamColor: string; points: number; pointsHistory: number[] }[];
   }>({ raceNames: [], drivers: [] });
 
-  // Fetch race calendar
+  // All sessions (for live weekend detection across FP, Quali, Sprint, Race)
+  const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
+
+  // Fetch race calendar + all sessions for live detection
   useEffect(() => {
     setLoading(true);
     setSelectedRound("latest");
     Promise.all([
       fetch(`/api/f1/sessions?year=${year}&type=Race`).then((r) => r.json()),
       fetch(`/api/f1/meetings?year=${year}`).then((r) => r.json()),
+      fetch(`/api/f1/sessions?year=${year}`).then((r) => r.json()),
     ])
-      .then(([sess, meets]) => {
+      .then(([sess, meets, all]) => {
         setSessions(Array.isArray(sess) ? sess : []);
         setMeetings(Array.isArray(meets) ? meets : []);
+        setAllSessions(Array.isArray(all) ? all : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -309,9 +314,30 @@ export default function DashboardPage() {
       .finally(() => setStandingsLoading(false));
   }, [year]);
 
-  // Live polling
-  const isLiveSession = useIsRaceWeekend(sessions);
+  // Live polling — detect across ALL session types (FP, Quali, Sprint, Race)
+  const isLiveSession = useIsRaceWeekend(allSessions);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Find the current or next live session from ALL sessions
+  const liveSessionInfo = useMemo(() => {
+    const now = new Date();
+    // Check if a session is currently running
+    const running = allSessions.find((s) => {
+      const start = new Date(s.date_start);
+      const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+      return now >= start && now <= end;
+    });
+    if (running) return { session: running, status: "LIVE" as const };
+    // Find the next session today
+    const upcoming = allSessions
+      .filter((s) => {
+        const start = new Date(s.date_start);
+        return start > now && start.getTime() - now.getTime() < 24 * 60 * 60 * 1000;
+      })
+      .sort((a, b) => new Date(a.date_start).getTime() - new Date(b.date_start).getTime());
+    if (upcoming.length > 0) return { session: upcoming[0], status: "NEXT" as const };
+    return null;
+  }, [allSessions]);
 
   useEffect(() => {
     if (isLiveSession) {
@@ -497,7 +523,11 @@ export default function DashboardPage() {
                     : "bg-[var(--f1-text-dim)]"
                 )}
               />
-              {isLiveSession ? "LIVE SESSION" : "NO LIVE SESSION"}
+              {isLiveSession
+                ? `LIVE — ${liveSessionInfo?.session?.session_name || "SESSION"}`
+                : liveSessionInfo?.status === "NEXT"
+                ? `NEXT — ${liveSessionInfo.session.session_name} ${new Date(liveSessionInfo.session.date_start).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}`
+                : "NO LIVE SESSION"}
             </div>
           </div>
 
