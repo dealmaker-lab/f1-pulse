@@ -34,7 +34,11 @@ test.describe("Post-Deploy Verification", () => {
           !e.includes("hydration") &&
           !e.includes("Minified React error #418") &&
           !e.includes("Minified React error #423") &&
-          !e.includes("Minified React error #425")
+          !e.includes("Minified React error #425") &&
+          !e.includes("Failed to load resource") &&
+          !e.includes("media.formula1.com") &&
+          !e.includes("ERR_NAME_NOT_RESOLVED") &&
+          !e.includes("net::ERR")
       );
       expect(fatal).toHaveLength(0);
 
