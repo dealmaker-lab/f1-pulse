@@ -6,6 +6,7 @@ import {
   AlertTriangle, BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Area, AreaChart,
@@ -112,9 +113,9 @@ function adjustColorForContrast(hex: string): string {
 export default function TelemetryPage() {
   // Session selection
   const [year, setYear] = useState(2026);
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
-  const [sessionType, setSessionType] = useState<string>("Qualifying");
+  const [sessionFilter, setSessionFilter] = useState<string>("Qualifying");
 
   // Driver/Lap selection
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
@@ -136,27 +137,36 @@ export default function TelemetryPage() {
   const [loadingTelemetry, setLoadingTelemetry] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ===== Fetch sessions =====
+  // ===== Fetch ALL sessions for the year, filter client-side by session_name =====
   useEffect(() => {
     setLoadingSessions(true);
     setError(null);
-    fetch(`/api/f1/sessions?year=${year}&type=${sessionType}`)
+    fetch(`/api/f1/sessions?year=${year}`)
       .then((r) => r.json())
       .then((data: SessionInfo[]) => {
-        const sorted = Array.isArray(data)
-          ? data.sort((a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime())
-          : [];
-        setSessions(sorted);
-        if (sorted.length) {
-          setSelectedSession(sorted[0]);
-        } else {
-          setSelectedSession(null);
-          setError(`No ${sessionType} sessions found for ${year} — try a different session type or year`);
-        }
+        const arr = Array.isArray(data) ? data : [];
+        setAllSessions(arr);
       })
       .catch(() => setError("Failed to load sessions"))
       .finally(() => setLoadingSessions(false));
-  }, [year, sessionType]);
+  }, [year]);
+
+  // Filter sessions by session_name (official F1 session names)
+  const sessions = useMemo(() => {
+    return filterPastSessions(allSessions, sessionFilter);
+  }, [allSessions, sessionFilter]);
+
+  // Auto-select most recent session when filter changes
+  useEffect(() => {
+    if (sessions.length) {
+      setSelectedSession(sessions[sessions.length - 1]);
+    } else {
+      setSelectedSession(null);
+      if (allSessions.length > 0) {
+        setError(`No ${sessionFilter} sessions found for ${year} — try a different session type or year`);
+      }
+    }
+  }, [sessions, sessionFilter, allSessions, year]);
 
   // ===== Fetch drivers for selected session =====
   useEffect(() => {
@@ -373,18 +383,18 @@ export default function TelemetryPage() {
           <div>
             <label className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold block mb-1.5">Session</label>
             <div className="flex gap-1 flex-wrap">
-              {(["Qualifying", "Race", "Sprint", "Sprint Qualifying"] as const).map((t) => (
+              {SESSION_FILTER_OPTIONS.map((t) => (
                 <button
-                  key={t}
-                  onClick={() => { setSessionType(t); setSelectedSession(null); }}
+                  key={t.value}
+                  onClick={() => { setSessionFilter(t.value); setSelectedSession(null); }}
                   className={cn(
                     "px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border",
-                    sessionType === t
+                    sessionFilter === t.value
                       ? "bg-racing-blue/15 border-racing-blue/30 text-racing-blue"
                       : "border-[var(--f1-border)] text-f1-muted hover:text-f1-sub"
                   )}
                 >
-                  {t === "Sprint Qualifying" ? "Sprint Q" : t}
+                  {t.shortLabel}
                 </button>
               ))}
             </div>

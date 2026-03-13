@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Fuel, Timer, ArrowUpDown, Loader2, GitCompare,
   ChevronDown, Flag, TrendingUp, Zap,
 } from "lucide-react";
 import { cn, getTeamColor, getTireColor } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamInfo } from "@/lib/team-logos";
+import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 import StrategyChart from "@/components/charts/strategy-chart";
 import { StrategyStint } from "@/types/f1";
 import {
@@ -327,8 +328,8 @@ function RaceSelector({
             onChange={(e) => setSessionType(e.target.value)}
             className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm font-mono text-f1 bg-[var(--f1-hover)] border border-[var(--f1-border)] outline-none focus:border-f1-sub transition-colors cursor-pointer"
           >
-            {["Race", "Qualifying", "Sprint", "Sprint Qualifying", "Practice"].map((t) => (
-              <option key={t} value={t} className="bg-[#0d0f14]">{t}</option>
+            {SESSION_FILTER_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value} className="bg-[#0d0f14]">{t.label}</option>
             ))}
           </select>
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
@@ -459,14 +460,14 @@ function DriverStrip({
 export default function StrategyPage() {
   const [year1, setYear1] = useState(2026);
   const [sessionType1, setSessionType1] = useState("Race");
-  const [races1, setRaces1] = useState<RaceSession[]>([]);
+  const [allRaces1, setAllRaces1] = useState<RaceSession[]>([]);
   const [race1, setRace1] = useState<RaceSession | null>(null);
   const [loadingRaces1, setLoadingRaces1] = useState(false);
 
   const [compareMode, setCompareMode] = useState(false);
   const [year2, setYear2] = useState(2026);
   const [sessionType2, setSessionType2] = useState("Race");
-  const [races2, setRaces2] = useState<RaceSession[]>([]);
+  const [allRaces2, setAllRaces2] = useState<RaceSession[]>([]);
   const [race2, setRace2] = useState<RaceSession | null>(null);
   const [loadingRaces2, setLoadingRaces2] = useState(false);
 
@@ -484,36 +485,68 @@ export default function StrategyPage() {
 
   const [tab, setTab] = useState<CompareTab>("strategy");
 
-  // ── Load race list 1
+  // ── Load race list 1 (fetch ALL sessions, filter client-side)
   useEffect(() => {
     setLoadingRaces1(true);
     setRace1(null);
-    fetch(`/api/f1/sessions?year=${year1}&type=${sessionType1}`)
+    fetch(`/api/f1/sessions?year=${year1}`)
       .then((r) => r.json())
       .then((data) => {
         const arr: RaceSession[] = Array.isArray(data) ? data : [];
-        setRaces1(arr);
-        if (arr.length) setRace1(arr[arr.length - 1]);
+        setAllRaces1(arr);
       })
-      .catch(() => setRaces1([]))
+      .catch(() => setAllRaces1([]))
       .finally(() => setLoadingRaces1(false));
-  }, [year1, sessionType1]);
+  }, [year1]);
 
-  // ── Load race list 2 (always fetch if compareMode, so selector is ready)
+  // Filter and sort races1 based on sessionType1
+  const races1 = useMemo(() => {
+    const filtered = filterPastSessions(allRaces1, sessionType1);
+    return filtered;
+  }, [allRaces1, sessionType1]);
+
+  // Auto-select the most recent race
+  useEffect(() => {
+    if (races1.length > 0) {
+      setRace1(races1[races1.length - 1]);
+    } else {
+      setRace1(null);
+    }
+  }, [races1]);
+
+  // ── Load race list 2 (fetch ALL sessions, filter client-side)
+  useEffect(() => {
+    if (!compareMode) {
+      setAllRaces2([]);
+      return;
+    }
+    setLoadingRaces2(true);
+    fetch(`/api/f1/sessions?year=${year2}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const arr: RaceSession[] = Array.isArray(data) ? data : [];
+        setAllRaces2(arr);
+      })
+      .catch(() => setAllRaces2([]))
+      .finally(() => setLoadingRaces2(false));
+  }, [compareMode, year2]);
+
+  // Filter and sort races2 based on sessionType2
+  const races2 = useMemo(() => {
+    if (!compareMode) return [];
+    const filtered = filterPastSessions(allRaces2, sessionType2);
+    return filtered;
+  }, [allRaces2, sessionType2, compareMode]);
+
+  // Auto-select the most recent race for race2
   useEffect(() => {
     if (!compareMode) return;
-    setLoadingRaces2(true);
-    fetch(`/api/f1/sessions?year=${year2}&type=${sessionType2}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const arr: RaceSession[] = Array.isArray(data) ? data : [];
-        setRaces2(arr);
-        // auto-select last race of year2 if nothing selected yet
-        if (!race2 && arr.length) setRace2(arr[arr.length - 1]);
-      })
-      .catch(() => setRaces2([]))
-      .finally(() => setLoadingRaces2(false));
-  }, [compareMode, year2, sessionType2]);
+    if (races2.length > 0) {
+      setRace2(races2[races2.length - 1]);
+    } else {
+      setRace2(null);
+    }
+  }, [races2, compareMode]);
 
   // ── Load race 1 data
   useEffect(() => {

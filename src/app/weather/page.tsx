@@ -12,6 +12,7 @@ import {
   ResponsiveContainer, ScatterChart, Scatter, ComposedChart, Area, Bar,
   Legend,
 } from "recharts";
+import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 
 // ===== Types =====
 interface SessionInfo {
@@ -77,8 +78,8 @@ function getWeatherAtTime(weather: WeatherData[], targetTime: number): WeatherDa
 // ===== Component =====
 export default function WeatherPage() {
   const [year, setYear] = useState(2026);
-  const [sessionType, setSessionType] = useState("Race");
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [sessionFilter, setSessionFilter] = useState("Race");
+  const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
 
   const [weather, setWeather] = useState<WeatherData[]>([]);
@@ -89,19 +90,28 @@ export default function WeatherPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch sessions
+  // Fetch ALL sessions for the year, filter client-side by session_name
   useEffect(() => {
-    fetch(`/api/f1/sessions?year=${year}&type=${sessionType}`)
+    fetch(`/api/f1/sessions?year=${year}`)
       .then((r) => r.json())
       .then((data: SessionInfo[]) => {
-        const sorted = Array.isArray(data)
-          ? data.sort((a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime())
-          : [];
-        setSessions(sorted);
-        if (sorted.length) setSelectedSession(sorted[0]);
+        const arr = Array.isArray(data) ? data : [];
+        setAllSessions(arr);
       })
       .catch(() => setError("Failed to load sessions"));
-  }, [year, sessionType]);
+  }, [year]);
+
+  // Filter sessions to only past sessions matching the filter, sorted chronologically (earliest first)
+  const sessions = filterPastSessions(allSessions, sessionFilter);
+
+  // Auto-select most recent session (last in chronological order) when filter changes
+  useEffect(() => {
+    if (sessions.length) {
+      setSelectedSession(sessions[sessions.length - 1]);
+    } else {
+      setSelectedSession(null);
+    }
+  }, [sessionFilter, allSessions]);
 
   // Fetch weather + laps + drivers when session changes
   useEffect(() => {
@@ -233,12 +243,12 @@ export default function WeatherPage() {
           <div>
             <label className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold block mb-1.5">Session</label>
             <select
-              value={sessionType}
-              onChange={(e) => { setSessionType(e.target.value); setSelectedSession(null); }}
+              value={sessionFilter}
+              onChange={(e) => { setSessionFilter(e.target.value); setSelectedSession(null); }}
               className="bg-[var(--f1-hover)] border border-[var(--f1-border)] text-f1 rounded-lg px-3 py-2 text-sm appearance-none cursor-pointer"
             >
-              {["Race", "Qualifying", "Sprint", "Sprint Qualifying", "Practice"].map((t) => (
-                <option key={t} value={t}>{t}</option>
+              {SESSION_FILTER_OPTIONS.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
               ))}
             </select>
           </div>

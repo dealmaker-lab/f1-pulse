@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamShortName, getDriverHeadshot, DRIVER_HEADSHOTS } from "@/lib/team-logos";
+import { filterAllPastSessions } from "@/lib/session-filters";
 
 // ===== Types =====
 interface SessionInfo {
@@ -105,7 +106,7 @@ const EVENT_BADGES: Record<string, { label: string; color: string; bg: string; i
   event: { label: "Event", color: "#fff", bg: "#4B5563", icon: "flag" },
 };
 
-const SESSION_TYPE_TABS = [
+const SESSION_FILTER_TABS = [
   { value: "all", label: "All" },
   { value: "Race", label: "Race" },
   { value: "Qualifying", label: "Quali" },
@@ -201,19 +202,10 @@ export default function RadioPage() {
       .then((r) => r.json())
       .then((data: SessionInfo[]) => {
         if (Array.isArray(data)) {
-          const filtered = data.filter(
-            (s) =>
-              s.session_type === "Race" ||
-              s.session_type === "Qualifying" ||
-              s.session_type === "Sprint" ||
-              s.session_type === "Sprint Qualifying"
-          );
-          filtered.sort(
-            (a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime()
-          );
-          setSessions(filtered);
-          if (filtered.length > 0) {
-            setSelectedSession(filtered[0]);
+          const pastOnly = filterAllPastSessions(data);
+          setSessions(pastOnly);
+          if (pastOnly.length) {
+            setSelectedSession(pastOnly[pastOnly.length - 1]);
           }
         }
       })
@@ -320,7 +312,7 @@ export default function RadioPage() {
   const filteredSessions = useMemo(() => {
     let filtered = sessions;
     if (sessionTypeFilter !== "all") {
-      filtered = filtered.filter((s) => s.session_type === sessionTypeFilter);
+      filtered = filtered.filter((s) => s.session_name === sessionTypeFilter);
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -455,7 +447,7 @@ export default function RadioPage() {
 
           {/* Session type tabs */}
           <div className="flex items-center gap-1 bg-[var(--f1-card)] rounded-lg border border-[var(--f1-border)] p-0.5">
-            {SESSION_TYPE_TABS.map((tab) => (
+            {SESSION_FILTER_TABS.map((tab) => (
               <button
                 key={tab.value}
                 onClick={() => setSessionTypeFilter(tab.value)}

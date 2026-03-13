@@ -252,7 +252,6 @@ function StandingRow({
 
 export default function DashboardPage() {
   const [year, setYear] = useState(2026);
-  const [sessionType, setSessionType] = useState("Race");
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [meetings, setMeetings] = useState<MeetingInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -276,7 +275,7 @@ export default function DashboardPage() {
     setLoading(true);
     setSelectedRound("latest");
     Promise.all([
-      fetch(`/api/f1/sessions?year=${year}&type=${sessionType}`).then((r) => r.json()),
+      fetch(`/api/f1/sessions?year=${year}&type=Race`).then((r) => r.json()),
       fetch(`/api/f1/meetings?year=${year}`).then((r) => r.json()),
     ])
       .then(([sess, meets]) => {
@@ -285,7 +284,7 @@ export default function DashboardPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [year, sessionType]);
+  }, [year]);
 
   // Fetch standings + results + progression
   useEffect(() => {
@@ -447,22 +446,6 @@ export default function DashboardPage() {
                     <option key={y} value={y} className="bg-[var(--f1-card)]">
                       {y}
                     </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
-              </div>
-
-              <span className="text-[var(--f1-text-dim)] text-xs">/</span>
-
-              {/* Session type selector */}
-              <div className="relative">
-                <select
-                  value={sessionType}
-                  onChange={(e) => { setSessionType(e.target.value); setSelectedRound("latest"); }}
-                  className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
-                >
-                  {["Race", "Qualifying", "Sprint", "Sprint Qualifying", "Practice"].map((t) => (
-                    <option key={t} value={t} className="bg-[var(--f1-card)]">{t}</option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
