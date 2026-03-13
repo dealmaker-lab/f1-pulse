@@ -3,12 +3,44 @@
 import { useState, useEffect } from "react";
 import { Trophy, TrendingUp, Users, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getTeamInfo, getTeamLogoUrl } from "@/lib/team-logos";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, BarChart, Bar, Cell,
 } from "recharts";
 
-const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+const YEARS = [2025, 2024, 2023, 2022, 2021, 2020];
+
+function TeamLogo({ teamName, size = "md" }: { teamName: string; size?: "sm" | "md" | "lg" }) {
+  const [imgError, setImgError] = useState(false);
+  const url = getTeamLogoUrl(teamName);
+  const info = getTeamInfo(teamName);
+  const sizeClass = size === "lg" ? "w-10 h-10" : size === "md" ? "w-7 h-7" : "w-5 h-5";
+
+  if (!url || imgError) {
+    return (
+      <div
+        className={cn(sizeClass, "rounded-md flex items-center justify-center text-[9px] font-bold")}
+        style={{ backgroundColor: `${info?.color || "#888"}20`, color: info?.color || "#888" }}
+      >
+        {(info?.shortName || teamName).substring(0, 2)}
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn(sizeClass, "flex-shrink-0")}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={teamName}
+        className="w-full h-full object-contain"
+        onError={() => setImgError(true)}
+        loading="lazy"
+      />
+    </div>
+  );
+}
 
 interface ConstructorStanding {
   position: number;
@@ -188,9 +220,9 @@ export default function ConstructorsPage() {
                 )}>
                   {c.position}
                 </span>
-                <div className="w-8 h-1 rounded-full" style={{ backgroundColor: c.teamColor }} />
+                <TeamLogo teamName={c.team} size="sm" />
               </div>
-              <div className="text-sm font-bold leading-tight">{c.team}</div>
+              <div className="text-sm font-bold leading-tight" style={{ color: c.teamColor }}>{c.team}</div>
               <div className="flex items-center justify-between mt-2">
                 <div className="font-mono text-xl font-bold" style={{ color: c.teamColor }}>{c.points}</div>
                 <div className="text-[10px] text-f1-muted font-mono">{c.wins}W</div>
@@ -318,9 +350,10 @@ export default function ConstructorsPage() {
       {team && (
         <div className="glass-card p-6">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-2 h-12 rounded-full" style={{ backgroundColor: team.teamColor }} />
+            <TeamLogo teamName={team.team} size="lg" />
+            <div className="w-1 h-12 rounded-full" style={{ backgroundColor: team.teamColor }} />
             <div>
-              <div className="text-xl font-bold">{team.team}</div>
+              <div className="text-xl font-bold" style={{ color: team.teamColor }}>{team.team}</div>
               <div className="text-sm text-f1-sub">
                 Constructor Championship Position: P{team.position} · {selectedYear} Season
               </div>

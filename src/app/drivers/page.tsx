@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Users, Trophy, Flag, Timer, TrendingUp, Loader2 } from "lucide-react";
 import { cn, getTeamColor } from "@/lib/utils";
+import { getTeamInfo, getTeamLogoUrl, getDriverHeadshot as getSharedHeadshot } from "@/lib/team-logos";
 import { DriverStanding } from "@/types/f1";
 import ChampionshipChart from "@/components/charts/championship-chart";
 import {
@@ -41,43 +42,36 @@ const CAREER_STATS: Record<string, { championships: number; wins: number; podium
   HAD: { championships: 0, wins: 0, podiums: 0, poles: 0 },
 };
 
-// Driver headshot URLs using official F1 CDN pattern
-// Format: firstname-lastname (lowercase, hyphenated)
-const DRIVER_HEADSHOTS: Record<string, string> = {
-  VER: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/M/MAXVER01_Max_Verstappen/maxver01.png.transform/1col/image.png",
-  HAM: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LEWHAM01_Lewis_Hamilton/lewham01.png.transform/1col/image.png",
-  NOR: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LANNOR01_Lando_Norris/lannor01.png.transform/1col/image.png",
-  LEC: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/C/CHALEC01_Charles_Leclerc/chalec01.png.transform/1col/image.png",
-  SAI: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/C/CARSAI01_Carlos_Sainz/carsai01.png.transform/1col/image.png",
-  PIA: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/O/OSCPIA01_Oscar_Piastri/oscpia01.png.transform/1col/image.png",
-  RUS: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/G/GEORUS01_George_Russell/georus01.png.transform/1col/image.png",
-  ALO: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/F/FERALO01_Fernando_Alonso/feralo01.png.transform/1col/image.png",
-  PER: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/S/SERPER01_Sergio_Perez/serper01.png.transform/1col/image.png",
-  STR: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LANSTR01_Lance_Stroll/lanstr01.png.transform/1col/image.png",
-  GAS: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/P/PIEGAS01_Pierre_Gasly/piegas01.png.transform/1col/image.png",
-  OCO: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/E/ESTOCO01_Esteban_Ocon/estoco01.png.transform/1col/image.png",
-  TSU: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/Y/YUKTSU01_Yuki_Tsunoda/yuktsu01.png.transform/1col/image.png",
-  ALB: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/A/ALEALB01_Alexander_Albon/alealb01.png.transform/1col/image.png",
-  HUL: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/N/NICHUL01_Nico_Hulkenberg/nichul01.png.transform/1col/image.png",
-  MAG: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/K/KEVMAG01_Kevin_Magnussen/kevmag01.png.transform/1col/image.png",
-  BOT: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/V/VALBOT01_Valtteri_Bottas/valbot01.png.transform/1col/image.png",
-  ZHO: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/G/GUAZHO01_Guanyu_Zhou/guazho01.png.transform/1col/image.png",
-  RIC: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/D/DANRIC01_Daniel_Ricciardo/danric01.png.transform/1col/image.png",
-  LAW: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LIALAW01_Liam_Lawson/lialaw01.png.transform/1col/image.png",
-  BEA: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/O/OLIBEA01_Oliver_Bearman/olibea01.png.transform/1col/image.png",
-  COL: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/F/FRACO01_Franco_Colapinto/fraco01.png.transform/1col/image.png",
-  DOO: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/J/JACDOO01_Jack_Doohan/jacdoo01.png.transform/1col/image.png",
-  ANT: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/A/ANDANT01_Andrea_Kimi_Antonelli/andant01.png.transform/1col/image.png",
-  HAD: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/I/ISAHAD01_Isack_Hadjar/isahad01.png.transform/1col/image.png",
-  BOR: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/G/GABBO01_Gabriel_Bortoleto/gabbo01.png.transform/1col/image.png",
-};
-
 function getCareerStats(code: string) {
   return CAREER_STATS[code] || { championships: 0, wins: 0, podiums: 0, poles: 0 };
 }
 
 function getHeadshot(code: string) {
-  return DRIVER_HEADSHOTS[code] || null;
+  return getSharedHeadshot(code);
+}
+
+function TeamLogo({ teamName, size = "sm" }: { teamName: string; size?: "sm" | "md" }) {
+  const [imgError, setImgError] = useState(false);
+  const url = getTeamLogoUrl(teamName);
+  const info = getTeamInfo(teamName);
+  const sizeClass = size === "md" ? "w-6 h-6" : "w-4 h-4";
+
+  if (!url || imgError) {
+    return null;
+  }
+
+  return (
+    <div className={cn(sizeClass, "flex-shrink-0")}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={teamName}
+        className="w-full h-full object-contain"
+        onError={() => setImgError(true)}
+        loading="lazy"
+      />
+    </div>
+  );
 }
 
 // Normalize stats for radar chart comparison
@@ -258,7 +252,7 @@ export default function DriversPage() {
           onChange={(e) => setYear(Number(e.target.value))}
           className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm font-mono text-f1-sub cursor-pointer"
         >
-          {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
+          {[2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
             <option key={y} value={y}>{y}</option>
           ))}
         </select>
@@ -278,8 +272,11 @@ export default function DriversPage() {
             <div className="flex justify-center mb-2">
               <DriverHeadshot code={d.driver.code} teamColor={d.driver.teamColor} size="sm" />
             </div>
-            <div className="text-xs font-bold">{d.driver.code}</div>
-            <div className="text-[9px] text-f1-muted mt-0.5 truncate">{d.driver.team.replace(" Racing", "").replace(" F1 Team", "")}</div>
+            <div className="text-xs font-bold" style={{ color: d.driver.teamColor }}>{d.driver.code}</div>
+            <div className="flex items-center justify-center gap-1 mt-0.5">
+              <TeamLogo teamName={d.driver.team} size="sm" />
+              <span className="text-[9px] text-f1-muted truncate">{d.driver.team.replace(" Racing", "").replace(" F1 Team", "")}</span>
+            </div>
           </button>
         ))}
       </div>
@@ -293,7 +290,10 @@ export default function DriversPage() {
               <DriverHeadshot code={driver.driver.code} teamColor={driver.driver.teamColor} size="lg" />
               <div>
                 <div className="text-xl font-bold">{driver.driver.name}</div>
-                <div className="text-sm text-f1-sub">{driver.driver.team}</div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <TeamLogo teamName={driver.driver.team} size="md" />
+                  <span className="text-sm" style={{ color: driver.driver.teamColor }}>{driver.driver.team}</span>
+                </div>
                 <div className="text-xs text-f1-muted font-mono mt-0.5">{driver.driver.nationality}</div>
               </div>
             </div>

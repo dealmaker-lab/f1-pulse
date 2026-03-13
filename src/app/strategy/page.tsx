@@ -6,6 +6,7 @@ import {
   ChevronDown, Flag, TrendingUp, Zap,
 } from "lucide-react";
 import { cn, getTeamColor, getTireColor } from "@/lib/utils";
+import { getTeamLogoUrl, getTeamInfo } from "@/lib/team-logos";
 import StrategyChart from "@/components/charts/strategy-chart";
 import { StrategyStint } from "@/types/f1";
 import {
@@ -13,7 +14,7 @@ import {
   LineChart, Line, CartesianGrid,
 } from "recharts";
 
-const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+const YEARS = [2025, 2024, 2023, 2022, 2021, 2020];
 
 type CompareTab = "strategy" | "positions" | "pitstops";
 
@@ -416,13 +417,20 @@ function DriverStrip({
             onDragStart={(e) => e.dataTransfer.setData("driverAcronym", d.name_acronym)}
             onClick={() => onToggle(d.driver_number)}
             title={`${d.full_name} · drag to swap`}
-            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all border cursor-grab active:cursor-grabbing"
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all border cursor-grab active:cursor-grabbing"
             style={{
               borderColor: on ? color : "rgba(255,255,255,0.08)",
               color: on ? color : "rgba(255,255,255,0.25)",
               background: on ? `${color}15` : "transparent",
             }}
           >
+            {(() => {
+              const logoUrl = getTeamLogoUrl(d.team_name);
+              return logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="" className="w-3 h-3 object-contain" />
+              ) : null;
+            })()}
             {d.name_acronym}
           </button>
         );

@@ -6,6 +6,7 @@ import {
   Calendar, MapPin, Loader2, ArrowRight, Zap, ChevronDown,
 } from "lucide-react";
 import { cn, getTeamColor } from "@/lib/utils";
+import { getTeamLogoUrl, getTeamInfo } from "@/lib/team-logos";
 import { useIsRaceWeekend } from "@/hooks/use-live-polling";
 import ChampionshipChart from "@/components/charts/championship-chart";
 import ConstructorBarChart from "@/components/charts/constructor-bar-chart";
@@ -79,7 +80,7 @@ interface RaceResultEntry {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+const YEARS = [2025, 2024, 2023, 2022, 2021, 2020];
 
 // ─── Subcomponents ─────────────────────────────────────────────────────────
 
@@ -215,18 +216,23 @@ function StandingRow({
         {position}
       </span>
 
-      {/* Team color bar */}
-      <div
-        className="w-[3px] h-5 rounded-full flex-shrink-0"
-        style={{ backgroundColor: color }}
-      />
+      {/* Team logo */}
+      {(() => {
+        const logoUrl = getTeamLogoUrl(team);
+        return logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt="" className="w-5 h-5 object-contain flex-shrink-0" loading="lazy" />
+        ) : (
+          <div className="w-[3px] h-5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+        );
+      })()}
 
       {/* Name + team */}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold truncate group-hover:text-f1 transition-colors">
           {name}
         </div>
-        <div className="text-[10px] text-[var(--f1-text-dim)] truncate">{team}</div>
+        <div className="text-[10px] truncate" style={{ color }}>{team}</div>
       </div>
 
       {/* Points */}
@@ -567,14 +573,17 @@ export default function DashboardPage() {
                     Race Winner
                   </div>
                   <div className="flex items-end gap-4">
-                    <div
-                      className="w-1 h-12 rounded-full"
-                      style={{
-                        backgroundColor:
-                          displayedResult.results[0].driver.teamColor ||
-                          getTeamColor(displayedResult.results[0].driver.team),
-                      }}
-                    />
+                    {(() => {
+                      const winnerTeam = displayedResult.results[0].driver.team;
+                      const winnerLogo = getTeamLogoUrl(winnerTeam);
+                      const winnerColor = displayedResult.results[0].driver.teamColor || getTeamColor(winnerTeam);
+                      return winnerLogo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={winnerLogo} alt={winnerTeam} className="w-10 h-10 object-contain flex-shrink-0" loading="lazy" />
+                      ) : (
+                        <div className="w-1 h-12 rounded-full" style={{ backgroundColor: winnerColor }} />
+                      );
+                    })()}
                     <div>
                       <div className="text-2xl sm:text-3xl font-display font-black uppercase tracking-tight">
                         {displayedResult.results[0].driver.name}
@@ -791,12 +800,16 @@ export default function DashboardPage() {
                   Championship Leader
                 </div>
                 <div className="flex items-center gap-3">
-                  <div
-                    className="w-1 h-10 rounded-full"
-                    style={{
-                      backgroundColor: leader.driver.teamColor || getTeamColor(leader.driver.team),
-                    }}
-                  />
+                  {(() => {
+                    const leaderLogo = getTeamLogoUrl(leader.driver.team);
+                    const leaderColor = leader.driver.teamColor || getTeamColor(leader.driver.team);
+                    return leaderLogo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={leaderLogo} alt={leader.driver.team} className="w-8 h-8 object-contain flex-shrink-0" loading="lazy" />
+                    ) : (
+                      <div className="w-1 h-10 rounded-full" style={{ backgroundColor: leaderColor }} />
+                    );
+                  })()}
                   <div>
                     <span className="text-2xl sm:text-3xl font-display font-black uppercase tracking-tight">
                       {leader.driver.name.split(" ").pop()}

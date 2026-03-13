@@ -6,6 +6,7 @@ import {
   ChevronDown, AlertTriangle, TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getTeamLogoUrl } from "@/lib/team-logos";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ScatterChart, Scatter, ComposedChart, Area, Bar,
@@ -224,7 +225,7 @@ export default function WeatherPage() {
               onChange={(e) => { setYear(Number(e.target.value)); setSelectedSession(null); }}
               className="bg-[var(--f1-hover)] border border-[var(--f1-border)] text-f1 rounded-lg px-3 py-2 text-sm appearance-none cursor-pointer"
             >
-              {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => <option key={y} value={y}>{y}</option>)}
+              {[2025, 2024, 2023, 2022, 2021, 2020].map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
 
@@ -262,11 +263,18 @@ export default function WeatherPage() {
                       key={d.driver_number}
                       onClick={() => setSelectedDriver(d)}
                       className={cn(
-                        "px-2 py-1.5 rounded-md text-[11px] font-mono font-bold transition-all duration-200 cursor-pointer border",
+                        "flex items-center gap-1 px-2 py-1.5 rounded-md text-[11px] font-mono font-bold transition-all duration-200 cursor-pointer border",
                         isSelected ? "" : "border-[var(--f1-border)] text-f1-muted hover:text-f1-sub"
                       )}
                       style={isSelected ? { backgroundColor: `${c}20`, borderColor: `${c}50`, color: c } : {}}
                     >
+                      {(() => {
+                        const logoUrl = getTeamLogoUrl(d.team_name);
+                        return logoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={logoUrl} alt="" className="w-3.5 h-3.5 object-contain" />
+                        ) : null;
+                      })()}
                       {d.name_acronym}
                     </button>
                   );

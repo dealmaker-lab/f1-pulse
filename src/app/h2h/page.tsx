@@ -1,15 +1,53 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+/* eslint-disable @next/next/no-img-element */
 import {
   Swords, Trophy, Flag, Timer, TrendingUp, ChevronDown,
   Loader2, Zap, Target, AlertTriangle, Award,
 } from "lucide-react";
 import { cn, getTeamColor } from "@/lib/utils";
+import { getTeamLogoUrl, getTeamInfo, getDriverHeadshot } from "@/lib/team-logos";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine,
 } from "recharts";
+
+function TeamLogo({ teamName, size = "sm" }: { teamName: string; size?: "sm" | "md" }) {
+  const [imgError, setImgError] = useState(false);
+  const url = getTeamLogoUrl(teamName);
+  const info = getTeamInfo(teamName);
+  const sizeClass = size === "md" ? "w-6 h-6" : "w-4 h-4";
+  if (!url || imgError) return null;
+  return (
+    <div className={cn(sizeClass, "flex-shrink-0")}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={teamName} className="w-full h-full object-contain" onError={() => setImgError(true)} loading="lazy" />
+    </div>
+  );
+}
+
+function DriverAvatar({ code, teamColor, size = "sm" }: { code: string; teamColor: string; size?: "sm" | "md" | "lg" }) {
+  const [imgError, setImgError] = useState(false);
+  const url = getDriverHeadshot(code);
+  const sizeMap = { sm: "w-8 h-8", md: "w-12 h-12", lg: "w-16 h-16" };
+  const textMap = { sm: "text-xs", md: "text-base", lg: "text-xl" };
+
+  if (!url || imgError) {
+    return (
+      <div className={cn(sizeMap[size], "rounded-full flex items-center justify-center font-mono font-bold", textMap[size])}
+        style={{ backgroundColor: `${teamColor}25`, color: teamColor }}>
+        {code.charAt(0)}
+      </div>
+    );
+  }
+  return (
+    <div className={cn(sizeMap[size], "rounded-full overflow-hidden bg-[var(--f1-hover)] flex-shrink-0")} style={{ border: `2px solid ${teamColor}40` }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt={code} className="w-full h-full object-cover object-top" onError={() => setImgError(true)} loading="lazy" />
+    </div>
+  );
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -225,7 +263,7 @@ export default function H2HPage() {
             onChange={(e) => setYear(Number(e.target.value))}
             className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
           >
-            {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
+            {[2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
               <option key={y} value={y} className="bg-[var(--f1-card)]">{y}</option>
             ))}
           </select>
@@ -238,25 +276,31 @@ export default function H2HPage() {
         {/* Driver 1 */}
         <div className="glass-card p-4 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: d1Color }} />
-          <select
-            value={d1Code}
-            onChange={(e) => setD1Code(e.target.value)}
-            className="w-full bg-transparent text-lg sm:text-xl font-display font-black uppercase tracking-tight outline-none cursor-pointer appearance-none"
-          >
-            {driverList.map((s) => (
-              <option key={s.driver.code} value={s.driver.code} className="bg-[var(--f1-card)] text-sm normal-case">
-                {s.driver.name}
-              </option>
-            ))}
-          </select>
-          {d1 && (
-            <div className="mt-1 flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: d1Color }}>
-                {d1.team}
-              </span>
-              <span className="text-[10px] font-mono text-[var(--f1-text-dim)]">P{d1.championshipPos}</span>
+          <div className="flex items-center gap-3">
+            <DriverAvatar code={d1Code} teamColor={d1Color} size="md" />
+            <div className="flex-1 min-w-0">
+              <select
+                value={d1Code}
+                onChange={(e) => setD1Code(e.target.value)}
+                className="w-full bg-transparent text-lg sm:text-xl font-display font-black uppercase tracking-tight outline-none cursor-pointer appearance-none"
+              >
+                {driverList.map((s) => (
+                  <option key={s.driver.code} value={s.driver.code} className="bg-[var(--f1-card)] text-sm normal-case">
+                    {s.driver.name}
+                  </option>
+                ))}
+              </select>
+              {d1 && (
+                <div className="mt-1 flex items-center gap-2">
+                  <TeamLogo teamName={d1.team} size="sm" />
+                  <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: d1Color }}>
+                    {d1.team}
+                  </span>
+                  <span className="text-[10px] font-mono text-[var(--f1-text-dim)]">P{d1.championshipPos}</span>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* VS badge */}
@@ -267,25 +311,31 @@ export default function H2HPage() {
         {/* Driver 2 */}
         <div className="glass-card p-4 relative overflow-hidden text-right">
           <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: d2Color }} />
-          <select
-            value={d2Code}
-            onChange={(e) => setD2Code(e.target.value)}
-            className="w-full bg-transparent text-lg sm:text-xl font-display font-black uppercase tracking-tight outline-none cursor-pointer appearance-none text-right"
-          >
-            {driverList.map((s) => (
-              <option key={s.driver.code} value={s.driver.code} className="bg-[var(--f1-card)] text-sm normal-case">
-                {s.driver.name}
-              </option>
-            ))}
-          </select>
-          {d2 && (
-            <div className="mt-1 flex items-center justify-end gap-2">
-              <span className="text-[10px] font-mono text-[var(--f1-text-dim)]">P{d2.championshipPos}</span>
-              <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: d2Color }}>
-                {d2.team}
-              </span>
+          <div className="flex items-center gap-3 flex-row-reverse">
+            <DriverAvatar code={d2Code} teamColor={d2Color} size="md" />
+            <div className="flex-1 min-w-0">
+              <select
+                value={d2Code}
+                onChange={(e) => setD2Code(e.target.value)}
+                className="w-full bg-transparent text-lg sm:text-xl font-display font-black uppercase tracking-tight outline-none cursor-pointer appearance-none text-right"
+              >
+                {driverList.map((s) => (
+                  <option key={s.driver.code} value={s.driver.code} className="bg-[var(--f1-card)] text-sm normal-case">
+                    {s.driver.name}
+                  </option>
+                ))}
+              </select>
+              {d2 && (
+                <div className="mt-1 flex items-center justify-end gap-2">
+                  <span className="text-[10px] font-mono text-[var(--f1-text-dim)]">P{d2.championshipPos}</span>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: d2Color }}>
+                    {d2.team}
+                  </span>
+                  <TeamLogo teamName={d2.team} size="sm" />
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
