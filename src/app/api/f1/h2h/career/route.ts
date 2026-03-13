@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { JOLPICA_BASE } from "@/lib/jolpica";
+import { validateDriverCode, validateYear, sanitizeError } from "@/lib/api-validation";
 
 /**
  * Career H2H API — aggregates head-to-head stats across ALL seasons where
@@ -107,13 +108,13 @@ async function fetchDriverSeasonQualifying(driverId: string, year: number): Prom
 }
 
 export async function GET(req: NextRequest) {
-  const d1 = req.nextUrl.searchParams.get("d1");
-  const d2 = req.nextUrl.searchParams.get("d2");
-  const startYear = parseInt(req.nextUrl.searchParams.get("startYear") || "1950");
-  const endYear = parseInt(req.nextUrl.searchParams.get("endYear") || String(new Date().getFullYear()));
+  const d1 = validateDriverCode(req.nextUrl.searchParams.get("d1"));
+  const d2 = validateDriverCode(req.nextUrl.searchParams.get("d2"));
+  const startYear = validateYear(req.nextUrl.searchParams.get("startYear"), 1950);
+  const endYear = validateYear(req.nextUrl.searchParams.get("endYear"), new Date().getFullYear());
 
   if (!d1 || !d2) {
-    return NextResponse.json({ error: "d1 and d2 driver codes required" }, { status: 400 });
+    return NextResponse.json({ error: "Valid d1 and d2 driver codes required" }, { status: 400 });
   }
 
   try {
@@ -314,7 +315,7 @@ export async function GET(req: NextRequest) {
       yearlyPoints,
     });
   } catch (err) {
-    console.error("Career H2H fetch error:", err);
+    console.error("Career H2H fetch error:", sanitizeError(err));
     return NextResponse.json({ error: "Failed to fetch career H2H data" }, { status: 500 });
   }
 }

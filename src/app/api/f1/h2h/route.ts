@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { JOLPICA_BASE, fetchAllRaces } from "@/lib/jolpica";
+import { validateYear, validateDriverCode, sanitizeError } from "@/lib/api-validation";
 
 interface DriverResult {
   code: string;
@@ -61,20 +62,20 @@ function parseDriver(r: any): DriverResult {
 }
 
 export async function GET(req: NextRequest) {
-  const year = req.nextUrl.searchParams.get("year") || "2025";
-  const d1 = req.nextUrl.searchParams.get("d1"); // driver code e.g. "VER"
-  const d2 = req.nextUrl.searchParams.get("d2"); // driver code e.g. "NOR"
+  const year = validateYear(req.nextUrl.searchParams.get("year"), 2025);
+  const d1 = validateDriverCode(req.nextUrl.searchParams.get("d1"));
+  const d2 = validateDriverCode(req.nextUrl.searchParams.get("d2"));
 
   if (!d1 || !d2) {
-    return NextResponse.json({ error: "d1 and d2 driver codes required" }, { status: 400 });
+    return NextResponse.json({ error: "Valid d1 and d2 driver codes required (2-4 uppercase letters)" }, { status: 400 });
   }
 
   try {
     // Fetch all race results + qualifying for the year (with pagination)
     const [races, qualifyingRaces, standingsRes] = await Promise.all([
-      fetchAllRaces(`${JOLPICA_BASE}/${year}/results/?format=json`, "Results"),
-      fetchAllRaces(`${JOLPICA_BASE}/${year}/qualifying/?format=json`, "QualifyingResults"),
-      fetch(`${JOLPICA_BASE}/${year}/driverstandings/?format=json`, { cache: "no-store" }),
+      fetchAllRaces(`${JOLPICA_BASE}/${String(year)}/results/?format=json`, "Results"),
+      fetchAllRaces(`${JOLPICA_BASE}/${String(year)}/qualifying/?format=json`, "QualifyingResults"),
+      fetch(`${JOLPICA_BASE}/${String(year)}/driverstandings/?format=json`, { cache: "no-store" }),
     ]);
 
     const standingsJson = await standingsRes.json();
@@ -235,7 +236,7 @@ export async function GET(req: NextRequest) {
       qualiGaps,
     });
   } catch (err) {
-    console.error("H2H fetch error:", err);
+    console.error("H2H fetch error:", sanitizeError(err));
     return NextResponse.json({ error: "Failed to fetch H2H data" }, { status: 500 });
   }
 }

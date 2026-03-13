@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { validateYear, sanitizeError } from "@/lib/api-validation";
 
 const JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
 
 export async function GET(req: NextRequest) {
-  const year = req.nextUrl.searchParams.get("year") || "2026";
+  const year = validateYear(req.nextUrl.searchParams.get("year"), 2026);
 
   try {
     const res = await fetch(`${JOLPICA_BASE}/${year}/driverstandings/?format=json`, {
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(standings);
   } catch (err) {
-    console.error("Failed to fetch driver standings:", err);
+    console.error("Failed to fetch driver standings:", sanitizeError(err));
     return NextResponse.json({ error: "Failed to fetch driver standings" }, { status: 500 });
   }
 }
