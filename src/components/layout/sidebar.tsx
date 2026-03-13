@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/layout/theme-provider";
 import {
   LayoutDashboard, PlayCircle, Activity, Swords,
-  PieChart, Users, Trophy, Lock,
+  PieChart, Users, Trophy, Lock, CloudRain,
   ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
 } from "lucide-react";
 
@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
   { href: "/h2h",         label: "Head to Head", icon: Swords },
   { href: "/telemetry",  label: "Telemetry",    icon: Activity },
   { href: "/strategy",   label: "Strategy",     icon: PieChart },
+  { href: "/weather",    label: "Weather",      icon: CloudRain },
   { href: "/drivers",    label: "Drivers",      icon: Users },
   { href: "/constructors", label: "Constructors", icon: Trophy },
 ];
