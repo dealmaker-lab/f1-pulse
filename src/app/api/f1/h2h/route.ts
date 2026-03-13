@@ -42,16 +42,20 @@ function getTeamColor2026(constructorId: string): string {
   return colors[constructorId] || "#888888";
 }
 
+function driverCode(d: any): string {
+  return d?.code || d?.familyName?.substring(0, 3).toUpperCase() || "???";
+}
+
 function parseDriver(r: any): DriverResult {
   return {
-    code: r.Driver?.code || r.Driver?.familyName?.substring(0, 3).toUpperCase(),
-    name: `${r.Driver?.givenName} ${r.Driver?.familyName}`,
+    code: driverCode(r.Driver),
+    name: `${r.Driver?.givenName || ""} ${r.Driver?.familyName || ""}`.trim(),
     team: r.Constructor?.name || "",
     teamColor: getTeamColor2026(r.Constructor?.constructorId || ""),
     position: parseInt(r.position),
-    grid: parseInt(r.grid),
-    points: parseFloat(r.points),
-    status: r.status,
+    grid: parseInt(r.grid) || 0,
+    points: parseFloat(r.points) || 0,
+    status: r.status || "",
     time: r.Time?.time || null,
   };
 }
@@ -92,8 +96,8 @@ export async function GET(req: NextRequest) {
 
     for (const race of races) {
       const results = race.Results || [];
-      const r1 = results.find((r: any) => (r.Driver?.code || "") === d1);
-      const r2 = results.find((r: any) => (r.Driver?.code || "") === d2);
+      const r1 = results.find((r: any) => driverCode(r.Driver) === d1);
+      const r2 = results.find((r: any) => driverCode(r.Driver) === d2);
 
       const dr1 = r1 ? parseDriver(r1) : null;
       const dr2 = r2 ? parseDriver(r2) : null;
@@ -149,8 +153,8 @@ export async function GET(req: NextRequest) {
 
     for (const qRace of qualifyingRaces) {
       const qResults = qRace.QualifyingResults || [];
-      const q1 = qResults.find((r: any) => (r.Driver?.code || "") === d1);
-      const q2 = qResults.find((r: any) => (r.Driver?.code || "") === d2);
+      const q1 = qResults.find((r: any) => driverCode(r.Driver) === d1);
+      const q2 = qResults.find((r: any) => driverCode(r.Driver) === d2);
 
       if (q1 && q2) {
         const p1 = parseInt(q1.position);
@@ -177,8 +181,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Get full driver info from standings
-    const s1 = allStandings.find((s: any) => (s.Driver?.code || "") === d1);
-    const s2 = allStandings.find((s: any) => (s.Driver?.code || "") === d2);
+    const s1 = allStandings.find((s: any) => driverCode(s.Driver) === d1);
+    const s2 = allStandings.find((s: any) => driverCode(s.Driver) === d2);
 
     const driver1Info = s1 ? {
       code: d1,

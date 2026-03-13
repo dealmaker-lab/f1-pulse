@@ -21,12 +21,13 @@ export async function GET(req: NextRequest) {
       points: parseFloat(s.points),
       wins: parseInt(s.wins),
       driver: {
-        code: s.Driver?.code || s.Driver?.familyName?.substring(0, 3).toUpperCase(),
-        name: `${s.Driver?.givenName} ${s.Driver?.familyName}`,
+        code: s.Driver?.code || s.Driver?.familyName?.substring(0, 3).toUpperCase() || "???",
+        name: `${s.Driver?.givenName || ""} ${s.Driver?.familyName || ""}`.trim(),
         number: parseInt(s.Driver?.permanentNumber) || 0,
         nationality: s.Driver?.nationality || "",
         team: s.Constructors?.[0]?.name || "",
         teamColor: getTeamColor2026(s.Constructors?.[0]?.constructorId || ""),
+        driverId: s.Driver?.driverId || "",
       },
     }));
 

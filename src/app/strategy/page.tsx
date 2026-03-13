@@ -3,11 +3,13 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Fuel, Timer, ArrowUpDown, Loader2, GitCompare,
-  ChevronDown, Flag, TrendingUp, Zap,
+  ChevronDown, Flag, TrendingUp, Zap, FlaskConical,
+  Plus, X, Play,
 } from "lucide-react";
 import { cn, getTeamColor, getTireColor } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamInfo } from "@/lib/team-logos";
 import { SESSION_FILTER_STRATEGY, filterPastSessions } from "@/lib/session-filters";
+import { OPENF1_YEARS } from "@/lib/constants";
 import StrategyChart from "@/components/charts/strategy-chart";
 import { StrategyStint } from "@/types/f1";
 import {
@@ -15,7 +17,7 @@ import {
   LineChart, Line, CartesianGrid,
 } from "recharts";
 
-const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+const YEARS = OPENF1_YEARS;
 
 type CompareTab = "strategy" | "positions" | "pitstops";
 
@@ -456,6 +458,458 @@ function DriverStrip({
   );
 }
 
+// ─── Pit Strategy Simulator ──────────────────────────────────────────────────
+
+interface SimPitStop { lap: number; compound: string }
+interface SimStint { compound: string; startLap: number; endLap: number; laps: number }
+interface SimResult {
+  totalLaps: number;
+  actual: {
+    totalTime: number;
+    pitStops: number;
+    stints: SimStint[];
+    lapTimes: { lap: number; time: number; isPitOut: boolean }[];
+  };
+  simulated?: {
+    totalTime: number;
+    pitStops: number;
+    stints: SimStint[];
+    lapTimes: { lap: number; time: number; isPitOut: boolean }[];
+    scenario: SimPitStop[];
+  };
+  delta?: number;
+  deltaFormatted?: string;
+  compoundPaces: Record<string, number>;
+  tireDegModel: Record<string, number>;
+}
+
+const COMPOUNDS = ["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET"];
+const COMPOUND_COLORS: Record<string, string> = {
+  SOFT: "#FF3333", MEDIUM: "#FFD700", HARD: "#FFFFFF",
+  INTERMEDIATE: "#39B54A", WET: "#0072DB", UNKNOWN: "#888888",
+};
+
+function StrategySimulator({
+  sessionKey, drivers, loading: parentLoading,
+}: {
+  sessionKey: number | null;
+  drivers: DriverData[];
+  loading: boolean;
+}) {
+  const [selectedDriver, setSelectedDriver] = useState<number | null>(null);
+  const [simData, setSimData] = useState<SimResult | null>(null);
+  const [simLoading, setSimLoading] = useState(false);
+  const [pitStops, setPitStops] = useState<SimPitStop[]>([]);
+  const [simResult, setSimResult] = useState<SimResult | null>(null);
+  const [simRunning, setSimRunning] = useState(false);
+
+  // Auto-select first driver
+  useEffect(() => {
+    if (drivers.length > 0 && !selectedDriver) {
+      setSelectedDriver(drivers[0].driver_number);
+    }
+  }, [drivers, selectedDriver]);
+
+  // Load actual strategy data for selected driver
+  useEffect(() => {
+    if (!sessionKey || !selectedDriver) return;
+    setSimLoading(true);
+    setSimData(null);
+    setSimResult(null);
+    setPitStops([]);
+    fetch(`/api/f1/simulate?session_key=${sessionKey}&driver_number=${selectedDriver}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.actual) {
+          setSimData(data);
+          // Pre-populate pit stops from actual strategy
+          if (data.actual.stints.length > 1) {
+            const stops = data.actual.stints.slice(0, -1).map((s: SimStint, i: number) => ({
+              lap: s.endLap,
+              compound: data.actual.stints[i + 1]?.compound || "MEDIUM",
+            }));
+            setPitStops(stops);
+          }
+        }
+      })
+      .catch(console.error)
+      .finally(() => setSimLoading(false));
+  }, [sessionKey, selectedDriver]);
+
+  // Run simulation with modified pit stops
+  const runSimulation = () => {
+    if (!sessionKey || !selectedDriver || !pitStops.length) return;
+    setSimRunning(true);
+    const scenarioJson = JSON.stringify(pitStops);
+    fetch(`/api/f1/simulate?session_key=${sessionKey}&driver_number=${selectedDriver}&scenario=${encodeURIComponent(scenarioJson)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.simulated) setSimResult(data);
+      })
+      .catch(console.error)
+      .finally(() => setSimRunning(false));
+  };
+
+  const addPitStop = () => {
+    const lastLap = pitStops.length > 0 ? pitStops[pitStops.length - 1].lap + 10 : 20;
+    setPitStops([...pitStops, { lap: Math.min(lastLap, (simData?.totalLaps || 57) - 5), compound: "MEDIUM" }]);
+  };
+
+  const removePitStop = (idx: number) => {
+    setPitStops(pitStops.filter((_, i) => i !== idx));
+  };
+
+  const updatePitStop = (idx: number, field: "lap" | "compound", value: string | number) => {
+    const updated = [...pitStops];
+    if (field === "lap") updated[idx] = { ...updated[idx], lap: Number(value) };
+    else updated[idx] = { ...updated[idx], compound: String(value) };
+    setPitStops(updated);
+  };
+
+  const driverMap = new Map(drivers.map((d) => [d.driver_number, d]));
+  const currentDriver = selectedDriver ? driverMap.get(selectedDriver) : null;
+  const driverColor = currentDriver ? getTeamColor(currentDriver.team_name) : "#3b82f6";
+
+  if (parentLoading || simLoading) {
+    return (
+      <div className="flex items-center justify-center py-16 gap-3">
+        <Loader2 className="w-5 h-5 animate-spin text-racing-amber" />
+        <span className="text-sm text-f1-muted font-mono">Loading strategy data...</span>
+      </div>
+    );
+  }
+
+  if (!sessionKey) {
+    return (
+      <div className="glass-card p-12 text-center">
+        <FlaskConical className="w-8 h-8 text-[var(--f1-text-dim)] mx-auto mb-3" />
+        <p className="text-sm text-f1-muted font-mono">Select a race above to start simulating</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Driver Selector */}
+      <div className="glass-card p-4">
+        <div className="text-[9px] uppercase tracking-widest text-f1-muted font-mono mb-3">Select Driver to Simulate</div>
+        <div className="flex flex-wrap gap-1.5">
+          {drivers.map((d) => {
+            const color = getTeamColor(d.team_name);
+            const isSelected = selectedDriver === d.driver_number;
+            return (
+              <button
+                key={d.driver_number}
+                onClick={() => setSelectedDriver(d.driver_number)}
+                className="px-2.5 py-1 rounded text-[11px] font-mono font-bold transition-all border cursor-pointer"
+                style={{
+                  borderColor: isSelected ? color : "rgba(255,255,255,0.08)",
+                  color: isSelected ? color : "rgba(255,255,255,0.4)",
+                  background: isSelected ? `${color}15` : "transparent",
+                }}
+              >
+                {d.name_acronym}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {simData && (
+        <>
+          {/* Actual Strategy */}
+          <div className="glass-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Flag className="w-4 h-4 text-racing-blue" />
+              <h3 className="text-sm font-semibold">Actual Strategy</h3>
+              <span className="ml-auto text-[10px] font-mono text-f1-muted">
+                {simData.actual.pitStops} stop{simData.actual.pitStops !== 1 ? "s" : ""} · {formatTime(simData.actual.totalTime)}
+              </span>
+            </div>
+            <div className="flex gap-1 h-8 rounded-lg overflow-hidden">
+              {simData.actual.stints.map((stint, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-center text-[9px] font-mono font-bold transition-all"
+                  style={{
+                    width: `${(stint.laps / simData.totalLaps) * 100}%`,
+                    backgroundColor: `${COMPOUND_COLORS[stint.compound] || "#888"}30`,
+                    borderBottom: `3px solid ${COMPOUND_COLORS[stint.compound] || "#888"}`,
+                    color: COMPOUND_COLORS[stint.compound] || "#888",
+                  }}
+                  title={`${stint.compound} · Laps ${stint.startLap}–${stint.endLap} (${stint.laps} laps)`}
+                >
+                  {stint.laps > 5 && `${stint.compound.charAt(0)} · L${stint.startLap}-${stint.endLap}`}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pit Stop Editor */}
+          <div className="glass-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <FlaskConical className="w-4 h-4 text-racing-amber" />
+                <h3 className="text-sm font-semibold">What If — Edit Pit Stops</h3>
+              </div>
+              <button
+                onClick={addPitStop}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold border border-[var(--f1-border)] hover:border-racing-amber/30 text-f1-muted hover:text-racing-amber transition-all"
+              >
+                <Plus className="w-3 h-3" />
+                Add Stop
+              </button>
+            </div>
+
+            {pitStops.length === 0 ? (
+              <div className="text-center py-6 text-f1-muted text-sm font-mono">
+                Add pit stops to simulate an alternative strategy
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {pitStops.map((stop, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-2 rounded-lg bg-[var(--f1-hover)]">
+                    <span className="text-[10px] font-mono text-f1-muted w-12">Stop {idx + 1}</span>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[9px] text-f1-muted">Lap:</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={simData.totalLaps - 1}
+                        value={stop.lap}
+                        onChange={(e) => updatePitStop(idx, "lap", e.target.value)}
+                        className="w-16 bg-[var(--f1-card)] border border-[var(--f1-border)] rounded px-2 py-1 text-xs font-mono text-f1 outline-none focus:border-racing-amber/50"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-[9px] text-f1-muted">Switch to:</label>
+                      <select
+                        value={stop.compound}
+                        onChange={(e) => updatePitStop(idx, "compound", e.target.value)}
+                        className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded px-2 py-1 text-xs font-mono text-f1 outline-none cursor-pointer"
+                      >
+                        {COMPOUNDS.map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COMPOUND_COLORS[stop.compound] }} />
+                    </div>
+                    <button
+                      onClick={() => removePitStop(idx)}
+                      className="ml-auto p-1 rounded hover:bg-racing-red/10 text-f1-muted hover:text-racing-red transition-all"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Simulated stint preview */}
+            {pitStops.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[9px] uppercase tracking-widest text-f1-muted font-mono mb-2">Simulated Strategy Preview</div>
+                <div className="flex gap-1 h-8 rounded-lg overflow-hidden">
+                  {(() => {
+                    const sorted = [...pitStops].sort((a, b) => a.lap - b.lap);
+                    const previewStints: { compound: string; start: number; end: number }[] = [];
+                    let prev = 1;
+                    const startComp = simData.actual.stints[0]?.compound || "MEDIUM";
+                    for (let i = 0; i < sorted.length; i++) {
+                      previewStints.push({
+                        compound: i === 0 ? startComp : sorted[i - 1].compound,
+                        start: prev,
+                        end: sorted[i].lap,
+                      });
+                      prev = sorted[i].lap + 1;
+                    }
+                    previewStints.push({
+                      compound: sorted[sorted.length - 1].compound,
+                      start: prev,
+                      end: simData.totalLaps,
+                    });
+
+                    return previewStints.map((s, i) => {
+                      const laps = s.end - s.start + 1;
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center justify-center text-[9px] font-mono font-bold"
+                          style={{
+                            width: `${(laps / simData.totalLaps) * 100}%`,
+                            backgroundColor: `${COMPOUND_COLORS[s.compound] || "#888"}30`,
+                            borderBottom: `3px solid ${COMPOUND_COLORS[s.compound] || "#888"}`,
+                            color: COMPOUND_COLORS[s.compound] || "#888",
+                          }}
+                        >
+                          {laps > 5 && `${s.compound.charAt(0)} · L${s.start}-${s.end}`}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Run button */}
+            <button
+              onClick={runSimulation}
+              disabled={pitStops.length === 0 || simRunning}
+              className={cn(
+                "mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all",
+                pitStops.length > 0
+                  ? "bg-racing-amber/15 border border-racing-amber/30 text-racing-amber hover:bg-racing-amber/25 cursor-pointer"
+                  : "bg-[var(--f1-hover)] border border-[var(--f1-border)] text-f1-muted cursor-not-allowed"
+              )}
+            >
+              {simRunning ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4" />
+              )}
+              {simRunning ? "Simulating..." : "Run Simulation"}
+            </button>
+          </div>
+
+          {/* Simulation Results */}
+          {simResult?.simulated && (
+            <div className="glass-card p-5 border-t-2 border-racing-amber/40">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-racing-amber" />
+                  <h3 className="text-sm font-semibold">Simulation Result</h3>
+                </div>
+                <div
+                  className={cn(
+                    "text-lg font-mono font-black px-3 py-1 rounded-lg",
+                    simResult.delta && simResult.delta < 0
+                      ? "text-racing-green bg-racing-green/10"
+                      : "text-racing-red bg-racing-red/10"
+                  )}
+                >
+                  {simResult.deltaFormatted}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="p-3 rounded-lg bg-[var(--f1-hover)]">
+                  <div className="text-[9px] uppercase tracking-widest text-f1-muted font-mono mb-1">Actual</div>
+                  <div className="text-lg font-mono font-bold">{formatTime(simResult.actual.totalTime)}</div>
+                  <div className="text-[10px] text-f1-muted font-mono">{simResult.actual.pitStops} stops</div>
+                </div>
+                <div className="p-3 rounded-lg bg-racing-amber/5 border border-racing-amber/20">
+                  <div className="text-[9px] uppercase tracking-widest text-racing-amber font-mono mb-1">Simulated</div>
+                  <div className="text-lg font-mono font-bold">{formatTime(simResult.simulated.totalTime)}</div>
+                  <div className="text-[10px] text-f1-muted font-mono">{simResult.simulated.pitStops} stops</div>
+                </div>
+              </div>
+
+              {/* Lap time comparison chart */}
+              <div className="w-full h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={simResult.actual.lapTimes
+                      .filter((l) => !l.isPitOut)
+                      .map((l) => ({
+                        lap: l.lap,
+                        actual: l.time,
+                        simulated: simResult.simulated!.lapTimes.find((s) => s.lap === l.lap && !s.isPitOut)?.time || null,
+                      }))
+                    }
+                    margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                    <XAxis
+                      dataKey="lap"
+                      tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 9, fontFamily: "Fira Code" }}
+                      axisLine={false} tickLine={false}
+                    />
+                    <YAxis
+                      domain={["dataMin - 2", "dataMax + 2"]}
+                      tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 9, fontFamily: "Fira Code" }}
+                      axisLine={false} tickLine={false}
+                      tickFormatter={(v) => `${v.toFixed(0)}s`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "#0d0f14",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: "10px",
+                        fontSize: "10px",
+                        fontFamily: "Fira Code",
+                      }}
+                      labelFormatter={(v) => `Lap ${v}`}
+                      formatter={(v: number, name: string) => [`${v?.toFixed(3)}s`, name]}
+                    />
+                    <Line type="monotone" dataKey="actual" stroke={driverColor} strokeWidth={1.5} dot={false} name="Actual" />
+                    <Line type="monotone" dataKey="simulated" stroke="#FFD700" strokeWidth={1.5} dot={false} strokeDasharray="5 5" name="Simulated" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="flex items-center justify-center gap-6 mt-2 text-[10px] font-mono text-f1-muted">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4 h-0.5 rounded" style={{ backgroundColor: driverColor }} />
+                  Actual
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4 h-0.5 rounded border-dashed" style={{ backgroundColor: "#FFD700" }} />
+                  Simulated
+                </div>
+              </div>
+
+              {/* Verdict */}
+              <div className="mt-4 p-3 rounded-lg bg-[var(--f1-hover)] text-center">
+                <p className="text-xs text-f1-sub">
+                  {simResult.delta && simResult.delta < -5
+                    ? `🏎️ This strategy would have been significantly faster — ${Math.abs(simResult.delta).toFixed(1)}s gained!`
+                    : simResult.delta && simResult.delta < 0
+                      ? `✅ Marginal improvement of ${Math.abs(simResult.delta).toFixed(1)}s — could have made a difference in a close battle.`
+                      : simResult.delta && simResult.delta > 5
+                        ? `❌ This strategy would have been ${simResult.delta.toFixed(1)}s slower — the actual call was better.`
+                        : `🔄 Roughly equal — within ${Math.abs(simResult.delta || 0).toFixed(1)}s of the actual strategy.`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Tire model info */}
+          <div className="glass-card p-4">
+            <div className="text-[9px] uppercase tracking-widest text-f1-muted font-mono mb-3">Tire Degradation Model</div>
+            <div className="flex flex-wrap gap-3">
+              {Object.entries(simData.compoundPaces).map(([compound, pace]) => (
+                <div key={compound} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--f1-hover)]">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COMPOUND_COLORS[compound] }} />
+                  <span className="text-[10px] font-mono font-bold" style={{ color: COMPOUND_COLORS[compound] }}>
+                    {compound}
+                  </span>
+                  <span className="text-[10px] font-mono text-f1-muted">
+                    {(pace as number).toFixed(1)}s base · +{(TIRE_DEG[compound] || 0.05).toFixed(2)}s/lap deg
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function formatTime(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = (secs % 60).toFixed(1);
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+const TIRE_DEG: Record<string, number> = {
+  SOFT: 0.08, MEDIUM: 0.05, HARD: 0.03,
+  INTERMEDIATE: 0.06, WET: 0.04, UNKNOWN: 0.05,
+};
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function StrategyPage() {
@@ -600,6 +1054,9 @@ export default function StrategyPage() {
 
   const isComparing = compareMode && !!race2;
 
+  // Simulator mode
+  const [simulatorMode, setSimulatorMode] = useState(false);
+
   const TABS = [
     { id: "strategy" as CompareTab, label: "Tire Strategy", icon: <Fuel className="w-3.5 h-3.5" /> },
     { id: "positions" as CompareTab, label: "Positions", icon: <ArrowUpDown className="w-3.5 h-3.5" /> },
@@ -619,18 +1076,32 @@ export default function StrategyPage() {
           <p className="text-sm text-f1-muted mt-1">Tire strategy · pit stops · race positions</p>
         </div>
 
-        <button
-          onClick={toggleCompare}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all",
-            compareMode
-              ? "border-racing-green/50 bg-racing-green/10 text-racing-green shadow-[0_0_20px_rgba(57,181,74,0.15)]"
-              : "border-[var(--f1-border)] bg-[var(--f1-hover)] text-f1-sub hover:text-f1 hover:border-f1"
-          )}
-        >
-          <GitCompare className="w-4 h-4" />
-          {compareMode ? "Comparing Races" : "Compare Races"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setSimulatorMode(!simulatorMode); if (!simulatorMode) setCompareMode(false); }}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all",
+              simulatorMode
+                ? "border-racing-amber/50 bg-racing-amber/10 text-racing-amber shadow-[0_0_20px_rgba(255,215,0,0.15)]"
+                : "border-[var(--f1-border)] bg-[var(--f1-hover)] text-f1-sub hover:text-f1 hover:border-f1"
+            )}
+          >
+            <FlaskConical className="w-4 h-4" />
+            {simulatorMode ? "Simulator Active" : "What If?"}
+          </button>
+          <button
+            onClick={() => { toggleCompare(); if (!compareMode) setSimulatorMode(false); }}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all",
+              compareMode
+                ? "border-racing-green/50 bg-racing-green/10 text-racing-green shadow-[0_0_20px_rgba(57,181,74,0.15)]"
+                : "border-[var(--f1-border)] bg-[var(--f1-hover)] text-f1-sub hover:text-f1 hover:border-f1"
+            )}
+          >
+            <GitCompare className="w-4 h-4" />
+            {compareMode ? "Comparing" : "Compare"}
+          </button>
+        </div>
       </div>
 
       {/* ── Race Selectors ── */}
@@ -774,8 +1245,17 @@ export default function StrategyPage() {
         </>
       )}
 
+      {/* ── Simulator mode ── */}
+      {simulatorMode && !compareMode && race1 && (
+        <StrategySimulator
+          sessionKey={race1?.session_key || null}
+          drivers={drivers1}
+          loading={loading1}
+        />
+      )}
+
       {/* ── Single race mode ── */}
-      {!compareMode && race1 && (
+      {!compareMode && !simulatorMode && race1 && (
         <div className="space-y-4">
           {/* Stats bar */}
           <div className="glass-card px-5 py-4 flex flex-wrap items-center gap-6 rounded-xl border-t-2 border-racing-blue/40">

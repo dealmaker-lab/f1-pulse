@@ -3,10 +3,11 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Activity, Gauge, Zap, CircleDot, Loader2, ChevronDown,
-  AlertTriangle, BarChart3,
+  AlertTriangle, BarChart3, Timer, Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
+import { OPENF1_YEARS } from "@/lib/constants";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Area, AreaChart,
@@ -131,6 +132,9 @@ export default function TelemetryPage() {
   const [rawData1, setRawData1] = useState<CarDataPoint[]>([]);
   const [rawData2, setRawData2] = useState<CarDataPoint[]>([]);
   const [metric, setMetric] = useState<"speed" | "throttle" | "brake" | "gear">("speed");
+
+  // View mode: "telemetry" or "sectors"
+  const [viewMode, setViewMode] = useState<"telemetry" | "sectors">("telemetry");
 
   // Loading states
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -330,6 +334,87 @@ export default function TelemetryPage() {
     };
   }, [processedData]);
 
+  // Sector comparison data
+  const sectorData = useMemo(() => {
+    if (!processedData) return null;
+    const { lap1Info, lap2Info, telem1, telem2 } = processedData;
+
+    const s1 = {
+      sector1: lap1Info.duration_sector_1,
+      sector2: lap1Info.duration_sector_2,
+      sector3: lap1Info.duration_sector_3,
+      total: lap1Info.lap_duration,
+      maxSpeed: Math.max(...telem1.map((t) => t.speed)),
+    };
+    const s2 = {
+      sector1: lap2Info.duration_sector_1,
+      sector2: lap2Info.duration_sector_2,
+      sector3: lap2Info.duration_sector_3,
+      total: lap2Info.lap_duration,
+      maxSpeed: Math.max(...telem2.map((t) => t.speed)),
+    };
+
+    const sectors = [
+      {
+        name: "Sector 1",
+        d1: s1.sector1,
+        d2: s2.sector1,
+        delta: s1.sector1 && s2.sector1 ? s1.sector1 - s2.sector1 : null,
+      },
+      {
+        name: "Sector 2",
+        d1: s1.sector2,
+        d2: s2.sector2,
+        delta: s1.sector2 && s2.sector2 ? s1.sector2 - s2.sector2 : null,
+      },
+      {
+        name: "Sector 3",
+        d1: s1.sector3,
+        d2: s2.sector3,
+        delta: s1.sector3 && s2.sector3 ? s1.sector3 - s2.sector3 : null,
+      },
+    ];
+
+    // Find all laps' sector times for the mini-table
+    const allSectors1 = laps1
+      .filter((l) => l.duration_sector_1 && l.duration_sector_2 && l.duration_sector_3 && !l.is_pit_out_lap)
+      .map((l) => ({
+        lap: l.lap_number,
+        s1: l.duration_sector_1!,
+        s2: l.duration_sector_2!,
+        s3: l.duration_sector_3!,
+        total: l.lap_duration,
+      }));
+    const allSectors2 = laps2
+      .filter((l) => l.duration_sector_1 && l.duration_sector_2 && l.duration_sector_3 && !l.is_pit_out_lap)
+      .map((l) => ({
+        lap: l.lap_number,
+        s1: l.duration_sector_1!,
+        s2: l.duration_sector_2!,
+        s3: l.duration_sector_3!,
+        total: l.lap_duration,
+      }));
+
+    // Best sector times across all laps
+    const bestS1_d1 = allSectors1.length ? Math.min(...allSectors1.map((l) => l.s1)) : null;
+    const bestS2_d1 = allSectors1.length ? Math.min(...allSectors1.map((l) => l.s2)) : null;
+    const bestS3_d1 = allSectors1.length ? Math.min(...allSectors1.map((l) => l.s3)) : null;
+    const bestS1_d2 = allSectors2.length ? Math.min(...allSectors2.map((l) => l.s1)) : null;
+    const bestS2_d2 = allSectors2.length ? Math.min(...allSectors2.map((l) => l.s2)) : null;
+    const bestS3_d2 = allSectors2.length ? Math.min(...allSectors2.map((l) => l.s3)) : null;
+
+    return {
+      sectors,
+      speedTrap: { d1: s1.maxSpeed, d2: s2.maxSpeed },
+      bestSectors: {
+        d1: { s1: bestS1_d1, s2: bestS2_d1, s3: bestS3_d1 },
+        d2: { s1: bestS1_d2, s2: bestS2_d2, s3: bestS3_d2 },
+      },
+      allSectors1,
+      allSectors2,
+    };
+  }, [processedData, laps1, laps2]);
+
   const metricConfig = {
     speed: { label: "Speed (km/h)", d1Key: "d1_speed", d2Key: "d2_speed", domain: [0, 370] },
     throttle: { label: "Throttle (%)", d1Key: "d1_throttle", d2Key: "d2_throttle", domain: [0, 100] },
@@ -341,14 +426,44 @@ export default function TelemetryPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-3">
-          <Activity className="w-7 h-7 text-racing-blue" />
-          Telemetry Deep Dive
-        </h1>
-        <p className="text-sm text-f1-muted mt-1">
-          Real telemetry data — compare any two drivers, any lap
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-3">
+            <Activity className="w-7 h-7 text-racing-blue" />
+            Telemetry Deep Dive
+          </h1>
+          <p className="text-sm text-f1-muted mt-1">
+            {viewMode === "sectors"
+              ? "Sector-by-sector breakdown with speed trap analysis"
+              : "Real telemetry data — compare any two drivers, any lap"}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 bg-[var(--f1-hover)] border border-[var(--f1-border)] p-1 rounded-xl">
+          <button
+            onClick={() => setViewMode("telemetry")}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all",
+              viewMode === "telemetry"
+                ? "bg-racing-blue/15 text-racing-blue shadow-sm"
+                : "text-f1-muted hover:text-f1-sub"
+            )}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            Telemetry
+          </button>
+          <button
+            onClick={() => setViewMode("sectors")}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all",
+              viewMode === "sectors"
+                ? "bg-racing-green/15 text-racing-green shadow-sm"
+                : "text-f1-muted hover:text-f1-sub"
+            )}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Sectors
+          </button>
+        </div>
       </div>
 
       {/* Session Selector */}
@@ -361,7 +476,7 @@ export default function TelemetryPage() {
               onChange={(e) => { setYear(Number(e.target.value)); setSelectedSession(null); }}
               className="bg-[var(--f1-hover)] border border-[var(--f1-border)] text-f1 rounded-lg px-3 py-2 text-sm appearance-none cursor-pointer"
             >
-              {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
+              {OPENF1_YEARS.map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
@@ -522,8 +637,257 @@ export default function TelemetryPage() {
         </div>
       )}
 
-      {/* Charts */}
-      {processedData && !loadingTelemetry && (
+      {/* ═══ SECTORS VIEW ═══ */}
+      {viewMode === "sectors" && processedData && sectorData && !loadingTelemetry && (
+        <>
+          {/* Sector Time Comparison */}
+          <div className="glass-card p-5">
+            <div className="flex items-center gap-2 mb-5">
+              <Timer className="w-4 h-4 text-racing-green" />
+              <h2 className="text-sm font-semibold">Sector Time Comparison</h2>
+              <span className="text-[10px] font-mono text-[var(--f1-text-dim)] ml-auto">
+                L{selectedLap1} vs L{selectedLap2}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              {sectorData.sectors.map((sector) => {
+                const d1Time = sector.d1;
+                const d2Time = sector.d2;
+                const d1Faster = sector.delta !== null && sector.delta < 0;
+                const d2Faster = sector.delta !== null && sector.delta > 0;
+
+                return (
+                  <div key={sector.name} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-f1-sub">{sector.name}</span>
+                      {sector.delta !== null && (
+                        <span
+                          className="text-[10px] font-mono font-bold px-2 py-0.5 rounded"
+                          style={{
+                            color: d1Faster ? d1Color : d2Color,
+                            backgroundColor: d1Faster ? `${d1Color}15` : `${d2Color}15`,
+                          }}
+                        >
+                          {d1Faster ? driver1?.name_acronym : driver2?.name_acronym} faster by {Math.abs(sector.delta).toFixed(3)}s
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
+                      {/* D1 */}
+                      <div className="text-right">
+                        <span
+                          className={cn("text-lg font-mono font-bold tabular-nums", d1Faster && "text-xl")}
+                          style={{ color: d1Faster ? d1Color : undefined }}
+                        >
+                          {d1Time ? d1Time.toFixed(3) + "s" : "—"}
+                        </span>
+                        <div className="text-[10px] font-mono" style={{ color: d1Color }}>{driver1?.name_acronym}</div>
+                      </div>
+
+                      {/* VS divider */}
+                      <div className="w-8 text-center text-[10px] text-[var(--f1-text-dim)]">vs</div>
+
+                      {/* D2 */}
+                      <div className="text-left">
+                        <span
+                          className={cn("text-lg font-mono font-bold tabular-nums", d2Faster && "text-xl")}
+                          style={{ color: d2Faster ? d2Color : undefined }}
+                        >
+                          {d2Time ? d2Time.toFixed(3) + "s" : "—"}
+                        </span>
+                        <div className="text-[10px] font-mono" style={{ color: d2Color }}>{driver2?.name_acronym}</div>
+                      </div>
+                    </div>
+
+                    {/* Visual delta bar */}
+                    {d1Time && d2Time && (
+                      <div className="flex h-3 rounded-full overflow-hidden bg-[var(--f1-hover)]">
+                        <div
+                          className="h-full transition-all duration-500 rounded-l-full"
+                          style={{
+                            width: `${(d2Time / (d1Time + d2Time)) * 100}%`,
+                            backgroundColor: d1Color,
+                            opacity: d1Faster ? 1 : 0.3,
+                          }}
+                        />
+                        <div
+                          className="h-full transition-all duration-500 rounded-r-full"
+                          style={{
+                            width: `${(d1Time / (d1Time + d2Time)) * 100}%`,
+                            backgroundColor: d2Color,
+                            opacity: d2Faster ? 1 : 0.3,
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Speed Trap + Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Speed Trap */}
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Gauge className="w-4 h-4 text-racing-amber" />
+                <h2 className="text-sm font-semibold">Speed Trap</h2>
+              </div>
+              <div className="flex items-center justify-around">
+                <div className="text-center">
+                  <div className="text-3xl font-mono font-black tabular-nums" style={{ color: d1Color }}>
+                    {sectorData.speedTrap.d1}
+                  </div>
+                  <div className="text-[10px] font-mono text-f1-muted mt-1">km/h</div>
+                  <div className="text-[10px] font-mono mt-0.5" style={{ color: d1Color }}>{driver1?.name_acronym}</div>
+                </div>
+                <div className="text-f1-muted text-xs">vs</div>
+                <div className="text-center">
+                  <div className="text-3xl font-mono font-black tabular-nums" style={{ color: d2Color }}>
+                    {sectorData.speedTrap.d2}
+                  </div>
+                  <div className="text-[10px] font-mono text-f1-muted mt-1">km/h</div>
+                  <div className="text-[10px] font-mono mt-0.5" style={{ color: d2Color }}>{driver2?.name_acronym}</div>
+                </div>
+              </div>
+              {sectorData.speedTrap.d1 !== sectorData.speedTrap.d2 && (
+                <div className="text-center mt-3">
+                  <span
+                    className="text-[10px] font-mono font-bold px-2 py-1 rounded"
+                    style={{
+                      color: sectorData.speedTrap.d1 > sectorData.speedTrap.d2 ? d1Color : d2Color,
+                      backgroundColor: sectorData.speedTrap.d1 > sectorData.speedTrap.d2 ? `${d1Color}15` : `${d2Color}15`,
+                    }}
+                  >
+                    +{Math.abs(sectorData.speedTrap.d1 - sectorData.speedTrap.d2)} km/h advantage
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Best Sectors (across all laps) */}
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Zap className="w-4 h-4 text-racing-green" />
+                <h2 className="text-sm font-semibold">Best Sector Times (All Laps)</h2>
+              </div>
+              <div className="space-y-3">
+                {["s1", "s2", "s3"].map((sKey, i) => {
+                  const d1Best = sectorData.bestSectors.d1[sKey as keyof typeof sectorData.bestSectors.d1];
+                  const d2Best = sectorData.bestSectors.d2[sKey as keyof typeof sectorData.bestSectors.d2];
+                  const d1Faster = d1Best !== null && d2Best !== null && d1Best < d2Best;
+                  const d2Faster = d1Best !== null && d2Best !== null && d2Best < d1Best;
+
+                  return (
+                    <div key={sKey} className="flex items-center justify-between">
+                      <span className="text-xs text-f1-muted w-16">Sector {i + 1}</span>
+                      <span
+                        className="text-sm font-mono font-bold tabular-nums"
+                        style={{ color: d1Faster ? d1Color : undefined }}
+                      >
+                        {d1Best ? d1Best.toFixed(3) : "—"}
+                      </span>
+                      <span className="text-[10px] text-[var(--f1-text-dim)]">vs</span>
+                      <span
+                        className="text-sm font-mono font-bold tabular-nums"
+                        style={{ color: d2Faster ? d2Color : undefined }}
+                      >
+                        {d2Best ? d2Best.toFixed(3) : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+                {/* Theoretical best lap */}
+                {sectorData.bestSectors.d1.s1 && sectorData.bestSectors.d1.s2 && sectorData.bestSectors.d1.s3 &&
+                 sectorData.bestSectors.d2.s1 && sectorData.bestSectors.d2.s2 && sectorData.bestSectors.d2.s3 && (
+                  <div className="pt-2 mt-2 border-t border-[var(--f1-border)]">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-f1-muted w-16 font-semibold">Ideal Lap</span>
+                      <span className="text-sm font-mono font-bold tabular-nums" style={{ color: d1Color }}>
+                        {formatLapTime(sectorData.bestSectors.d1.s1 + sectorData.bestSectors.d1.s2 + sectorData.bestSectors.d1.s3)}
+                      </span>
+                      <span className="text-[10px] text-[var(--f1-text-dim)]">vs</span>
+                      <span className="text-sm font-mono font-bold tabular-nums" style={{ color: d2Color }}>
+                        {formatLapTime(sectorData.bestSectors.d2.s1 + sectorData.bestSectors.d2.s2 + sectorData.bestSectors.d2.s3)}
+                      </span>
+                    </div>
+                    <div className="text-[9px] text-[var(--f1-text-dim)] font-mono mt-1">
+                      Theoretical best from combining fastest individual sectors
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Sector Times Per Lap Chart */}
+          {sectorData.allSectors1.length > 0 && (
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <BarChart3 className="w-4 h-4 text-racing-blue" />
+                <h2 className="text-sm font-semibold">Sector Times Across All Laps</h2>
+              </div>
+              <div className="w-full h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={sectorData.allSectors1.map((l, i) => ({
+                      lap: l.lap,
+                      d1_s1: l.s1,
+                      d1_s2: l.s2,
+                      d1_s3: l.s3,
+                      d2_s1: sectorData.allSectors2[i]?.s1 || null,
+                      d2_s2: sectorData.allSectors2[i]?.s2 || null,
+                      d2_s3: sectorData.allSectors2[i]?.s3 || null,
+                    }))}
+                    margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--f1-border)" />
+                    <XAxis
+                      dataKey="lap"
+                      tick={{ fontSize: 10, fill: "var(--f1-text-dim)", fontFamily: "Fira Code" }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "var(--f1-text-dim)", fontFamily: "Fira Code" }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v) => `${v.toFixed(1)}s`}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "var(--f1-card)",
+                        border: "1px solid var(--f1-border)",
+                        borderRadius: "12px",
+                        fontSize: "11px",
+                        fontFamily: "Fira Code",
+                      }}
+                      labelFormatter={(v) => `Lap ${v}`}
+                      formatter={(v: number, name: string) => [`${v?.toFixed(3)}s`, name.replace("d1_", `${driver1?.name_acronym} `).replace("d2_", `${driver2?.name_acronym} `).toUpperCase()]}
+                    />
+                    <Line type="monotone" dataKey="d1_s1" stroke={d1Color} strokeWidth={1.5} dot={false} strokeDasharray="5 5" name={`${driver1?.name_acronym || "D1"} S1`} />
+                    <Line type="monotone" dataKey="d1_s2" stroke={d1Color} strokeWidth={1.5} dot={false} name={`${driver1?.name_acronym || "D1"} S2`} />
+                    <Line type="monotone" dataKey="d1_s3" stroke={d1Color} strokeWidth={1.5} dot={false} strokeDasharray="1 3" name={`${driver1?.name_acronym || "D1"} S3`} />
+                    <Line type="monotone" dataKey="d2_s1" stroke={d2Color} strokeWidth={1.5} dot={false} strokeDasharray="5 5" name={`${driver2?.name_acronym || "D2"} S1`} />
+                    <Line type="monotone" dataKey="d2_s2" stroke={d2Color} strokeWidth={1.5} dot={false} name={`${driver2?.name_acronym || "D2"} S2`} />
+                    <Line type="monotone" dataKey="d2_s3" stroke={d2Color} strokeWidth={1.5} dot={false} strokeDasharray="1 3" name={`${driver2?.name_acronym || "D2"} S3`} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex items-center justify-center gap-6 mt-3 text-[10px] font-mono text-f1-muted">
+                <span>── S1 (dashed)</span>
+                <span>── S2 (solid)</span>
+                <span>── S3 (dotted)</span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ═══ TELEMETRY VIEW ═══ */}
+      {viewMode === "telemetry" && processedData && !loadingTelemetry && (
         <>
           {/* Metric selector */}
           <div className="flex gap-2 flex-wrap">
@@ -671,7 +1035,7 @@ export default function TelemetryPage() {
         </>
       )}
 
-      {/* Empty state */}
+      {/* Empty state (both views) */}
       {!processedData && !loadingTelemetry && !error && driver1 && driver2 && (
         <div className="flex flex-col items-center justify-center py-16 gap-4">
           <BarChart3 className="w-12 h-12 text-f1-muted" />

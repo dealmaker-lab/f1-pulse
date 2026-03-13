@@ -8,9 +8,11 @@ import {
 } from "lucide-react";
 import { cn, getTeamColor } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamInfo, getDriverHeadshot } from "@/lib/team-logos";
+import { HISTORICAL_YEARS, getEraForYear } from "@/lib/constants";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Cell, ReferenceLine,
+  Legend,
 } from "recharts";
 
 function TeamLogo({ teamName, size = "sm" }: { teamName: string; size?: "sm" | "md" }) {
@@ -102,6 +104,41 @@ interface StandingEntry {
   points: number;
 }
 
+// ─── Career H2H Types ──────────────────────────────────────────────────
+
+interface CareerSeasonSummary {
+  year: number;
+  d1Points: number;
+  d2Points: number;
+  d1Wins: number;
+  d2Wins: number;
+  d1AheadRace: number;
+  d2AheadRace: number;
+  racesCompared: number;
+  d1Team: string;
+  d2Team: string;
+}
+
+interface CareerH2HData {
+  d1Code: string;
+  d2Code: string;
+  commonSeasons: number[];
+  totalRaces: number;
+  stats: {
+    points: { d1: number; d2: number };
+    wins: { d1: number; d2: number };
+    podiums: { d1: number; d2: number };
+    poles: { d1: number; d2: number };
+    dnfs: { d1: number; d2: number };
+    bestFinish: { d1: number | null; d2: number | null };
+    avgFinish: { d1: number | null; d2: number | null };
+    raceH2H: { d1: number; d2: number };
+    qualiH2H: { d1: number; d2: number };
+  };
+  seasonSummaries: CareerSeasonSummary[];
+  yearlyPoints: { year: number; d1: number; d2: number }[];
+}
+
 // ─── Stat Battle Bar ────────────────────────────────────────────────────
 
 function BattleBar({
@@ -184,6 +221,11 @@ export default function H2HPage() {
   const [data, setData] = useState<H2HData | null>(null);
   const [driverList, setDriverList] = useState<StandingEntry[]>([]);
 
+  // Career mode state
+  const [careerMode, setCareerMode] = useState(false);
+  const [careerData, setCareerData] = useState<CareerH2HData | null>(null);
+  const [careerLoading, setCareerLoading] = useState(false);
+
   // Load driver list for the year
   useEffect(() => {
     fetch(`/api/f1/standings/drivers?year=${year}`)
@@ -214,6 +256,20 @@ export default function H2HPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [year, d1Code, d2Code]);
+
+  // Fetch Career H2H data when career mode is toggled
+  useEffect(() => {
+    if (!careerMode || !d1Code || !d2Code || d1Code === d2Code) return;
+    setCareerLoading(true);
+    setCareerData(null);
+    fetch(`/api/f1/h2h/career?d1=${d1Code}&d2=${d2Code}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.stats) setCareerData(d);
+      })
+      .catch(console.error)
+      .finally(() => setCareerLoading(false));
+  }, [careerMode, d1Code, d2Code]);
 
   const d1 = data?.driver1;
   const d2 = data?.driver2;
@@ -253,21 +309,49 @@ export default function H2HPage() {
             Head to Head
           </h1>
           <p className="text-sm text-f1-muted mt-1">
-            Driver battle comparison — race results, qualifying, and season stats
+            {careerMode
+              ? "Career-spanning battle — every season these drivers competed"
+              : "Driver battle comparison — race results, qualifying, and season stats"}
           </p>
         </div>
 
-        <div className="relative">
+        <div className="flex items-center gap-3">
+          {/* Career Mode Toggle */}
+          <button
+            onClick={() => setCareerMode(!careerMode)}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold border transition-all",
+              careerMode
+                ? "border-f1-red/50 bg-f1-red/10 text-f1-red shadow-[0_0_20px_rgba(225,6,0,0.15)]"
+                : "border-[var(--f1-border)] bg-[var(--f1-hover)] text-f1-sub hover:text-f1 hover:border-f1"
+            )}
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            {careerMode ? "Career Mode" : "Career H2H"}
+          </button>
+
+          {!careerMode && <div className="relative">
           <select
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
             className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
           >
-            {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
-              <option key={y} value={y} className="bg-[var(--f1-card)]">{y}</option>
-            ))}
+            {(() => {
+              let lastEra = "";
+              return HISTORICAL_YEARS.map((y) => {
+                const era = getEraForYear(y);
+                const showEra = era !== lastEra;
+                lastEra = era;
+                return (
+                  <option key={y} value={y} className="bg-[var(--f1-card)]">
+                    {showEra ? `── ${era} ── ` : ""}{y}
+                  </option>
+                );
+              });
+            })()}
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+        </div>}
         </div>
       </div>
 
@@ -355,8 +439,164 @@ export default function H2HPage() {
         </div>
       )}
 
-      {/* ═══ Battle Stats ═══ */}
-      {data && !loading && d1Code !== d2Code && (
+      {/* ═══ Career H2H Panel ═══ */}
+      {careerMode && careerLoading && (
+        <div className="glass-card p-16 flex flex-col items-center justify-center gap-3">
+          <Loader2 className="w-6 h-6 text-f1-red animate-spin" />
+          <span className="text-xs text-f1-muted font-mono">Loading career data across all seasons...</span>
+          <span className="text-[10px] text-[var(--f1-text-dim)] font-mono">This may take a moment for long careers</span>
+        </div>
+      )}
+
+      {careerMode && careerData && !careerLoading && d1Code !== d2Code && (
+        <>
+          {/* Career overview banner */}
+          <div className="glass-card p-5 border-t-2 border-f1-red/30">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.2em] font-mono text-f1-red font-bold mb-1">Career Spanning Rivalry</div>
+                <div className="text-sm text-f1-sub">
+                  <span className="font-bold" style={{ color: d1Color }}>{d1Code}</span>
+                  <span className="text-f1-muted mx-2">vs</span>
+                  <span className="font-bold" style={{ color: d2Color }}>{d2Code}</span>
+                  <span className="text-f1-muted ml-3">·</span>
+                  <span className="text-f1-muted ml-3 font-mono text-xs">
+                    {careerData.commonSeasons.length} common season{careerData.commonSeasons.length !== 1 ? "s" : ""} · {careerData.totalRaces} races compared
+                  </span>
+                </div>
+                <div className="text-[10px] text-[var(--f1-text-dim)] font-mono mt-1">
+                  {careerData.commonSeasons[0]} – {careerData.commonSeasons[careerData.commonSeasons.length - 1]}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* H2H Record */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="glass-card p-5 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: d1Color }} />
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--f1-text-dim)] mb-1">Career Race H2H</div>
+              <div className="text-4xl sm:text-5xl font-display font-black" style={{ color: d1Color }}>
+                {careerData.stats.raceH2H.d1}
+              </div>
+              <div className="text-[10px] font-mono text-f1-muted mt-1">races ahead</div>
+            </div>
+            <div className="glass-card p-5 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: d2Color }} />
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--f1-text-dim)] mb-1">Career Race H2H</div>
+              <div className="text-4xl sm:text-5xl font-display font-black" style={{ color: d2Color }}>
+                {careerData.stats.raceH2H.d2}
+              </div>
+              <div className="text-[10px] font-mono text-f1-muted mt-1">races ahead</div>
+            </div>
+          </div>
+
+          {/* Career battle bars */}
+          <div className="glass-card p-5 space-y-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-display font-bold uppercase" style={{ color: d1Color }}>{d1Code}</span>
+              <span className="text-[9px] font-mono text-[var(--f1-text-dim)] uppercase tracking-wider">Career Stats</span>
+              <span className="text-xs font-display font-bold uppercase" style={{ color: d2Color }}>{d2Code}</span>
+            </div>
+            <BattleBar label="Total Points" d1Val={careerData.stats.points.d1} d2Val={careerData.stats.points.d2} d1Color={d1Color} d2Color={d2Color} icon={Trophy} />
+            <BattleBar label="Wins" d1Val={careerData.stats.wins.d1} d2Val={careerData.stats.wins.d2} d1Color={d1Color} d2Color={d2Color} icon={Flag} />
+            <BattleBar label="Podiums" d1Val={careerData.stats.podiums.d1} d2Val={careerData.stats.podiums.d2} d1Color={d1Color} d2Color={d2Color} icon={Award} />
+            <BattleBar label="Poles" d1Val={careerData.stats.poles.d1} d2Val={careerData.stats.poles.d2} d1Color={d1Color} d2Color={d2Color} icon={Zap} />
+            <BattleBar label="Quali H2H" d1Val={careerData.stats.qualiH2H.d1} d2Val={careerData.stats.qualiH2H.d2} d1Color={d1Color} d2Color={d2Color} icon={Timer} />
+            <BattleBar label="Avg Finish" d1Val={careerData.stats.avgFinish.d1} d2Val={careerData.stats.avgFinish.d2} d1Color={d1Color} d2Color={d2Color} icon={Target} format="decimal" lowerIsBetter />
+            <BattleBar label="DNFs" d1Val={careerData.stats.dnfs.d1} d2Val={careerData.stats.dnfs.d2} d1Color={d1Color} d2Color={d2Color} icon={AlertTriangle} lowerIsBetter />
+          </div>
+
+          {/* Points by Season chart */}
+          {careerData.yearlyPoints.length > 0 && (
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="w-4 h-4 text-f1-red/60" />
+                <h2 className="text-sm font-semibold">Points by Season</h2>
+              </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={careerData.yearlyPoints} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--f1-border)" />
+                  <XAxis
+                    dataKey="year"
+                    tick={{ fontSize: 10, fill: "var(--f1-text-dim)" }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={50}
+                  />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--f1-text-dim)" }} width={40} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--f1-card)",
+                      border: "1px solid var(--f1-border)",
+                      borderRadius: "12px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: "11px" }} />
+                  <Bar dataKey="d1" name={d1Code} fill={d1Color} opacity={0.85} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="d2" name={d2Code} fill={d2Color} opacity={0.85} radius={[3, 3, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Season-by-Season Breakdown */}
+          <div className="glass-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Flag className="w-4 h-4 text-f1-red/60" />
+              <h2 className="text-sm font-semibold">Season by Season</h2>
+            </div>
+            <div className="space-y-1">
+              {careerData.seasonSummaries.map((season) => {
+                const d1Won = season.d1AheadRace > season.d2AheadRace;
+                const d2Won = season.d2AheadRace > season.d1AheadRace;
+                return (
+                  <div key={season.year} className="flex items-center gap-2 py-2 px-3 rounded-lg hover:bg-[var(--f1-hover)] transition-colors">
+                    <span className="text-sm font-mono font-bold w-12 flex-shrink-0" style={{ color: d1Won ? d1Color : d2Won ? d2Color : undefined }}>
+                      {season.year}
+                    </span>
+
+                    <div className="w-16 text-center flex-shrink-0">
+                      <span className="text-xs font-mono" style={{ color: d1Color }}>{season.d1Points} pts</span>
+                    </div>
+
+                    <div className="flex-1 flex h-2 rounded-full overflow-hidden bg-[var(--f1-hover)]">
+                      <div
+                        className="h-full rounded-l-full transition-all"
+                        style={{
+                          width: `${(season.d1AheadRace / Math.max(season.d1AheadRace + season.d2AheadRace, 1)) * 100}%`,
+                          backgroundColor: d1Color,
+                          opacity: d1Won ? 1 : 0.4,
+                        }}
+                      />
+                      <div
+                        className="h-full rounded-r-full transition-all"
+                        style={{
+                          width: `${(season.d2AheadRace / Math.max(season.d1AheadRace + season.d2AheadRace, 1)) * 100}%`,
+                          backgroundColor: d2Color,
+                          opacity: d2Won ? 1 : 0.4,
+                        }}
+                      />
+                    </div>
+
+                    <div className="w-16 text-center flex-shrink-0">
+                      <span className="text-xs font-mono" style={{ color: d2Color }}>{season.d2Points} pts</span>
+                    </div>
+
+                    <span className="text-[10px] font-mono text-[var(--f1-text-dim)] w-10 text-right flex-shrink-0">
+                      {season.racesCompared}R
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ═══ Season Battle Stats ═══ */}
+      {!careerMode && data && !loading && d1Code !== d2Code && (
         <>
           {/* H2H Record — big numbers */}
           <div className="grid grid-cols-2 gap-3">
