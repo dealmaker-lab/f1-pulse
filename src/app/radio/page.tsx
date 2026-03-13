@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Radio, Play, Pause, Volume2, VolumeX, Loader2, ChevronDown,
   AlertTriangle, Clock, MapPin, User, Flag, SkipForward, SkipBack,
+  Shield, Zap, CircleAlert, Timer, TriangleAlert, CircleDot, Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,18 @@ interface DriverOption {
   headshotUrl?: string;
 }
 
+interface ContextEvent {
+  type: string;
+  message: string;
+  flag?: string;
+}
+
+interface MessageContext {
+  events: ContextEvent[];
+  gapToLeader: string | null;
+  interval: string | null;
+}
+
 interface RadioMessage {
   date: string;
   driverNumber: number;
@@ -39,6 +52,7 @@ interface RadioMessage {
   lapNumber: number | null;
   position: number | null;
   lapTime: number | null;
+  context?: MessageContext;
 }
 
 // ===== Helpers =====
@@ -68,6 +82,20 @@ function getPositionBadge(pos: number | null): string {
   if (pos === 3) return "🥉";
   return `P${pos}`;
 }
+
+const EVENT_BADGES: Record<string, { label: string; color: string; bg: string }> = {
+  yellow_flag: { label: "Yellow Flag", color: "#000", bg: "#FFD700" },
+  red_flag: { label: "Red Flag", color: "#fff", bg: "#DC2626" },
+  green_flag: { label: "Green Flag", color: "#fff", bg: "#16A34A" },
+  safety_car: { label: "Safety Car", color: "#000", bg: "#FFA500" },
+  vsc: { label: "VSC", color: "#000", bg: "#FBBF24" },
+  drs: { label: "DRS", color: "#fff", bg: "#7C3AED" },
+  pit: { label: "Pit Stop", color: "#fff", bg: "#2563EB" },
+  track_limits: { label: "Track Limits", color: "#fff", bg: "#6B7280" },
+  incident: { label: "Incident", color: "#fff", bg: "#EF4444" },
+  chequered: { label: "Chequered Flag", color: "#000", bg: "#E5E7EB" },
+  event: { label: "Event", color: "#fff", bg: "#4B5563" },
+};
 
 // ===== Component =====
 export default function RadioPage() {
@@ -113,8 +141,8 @@ export default function RadioPage() {
               new Date(a.date_start).getTime()
           );
           setSessions(filtered);
-          // Auto-select most recent
-          if (filtered.length > 0 && !selectedSession) {
+          // Always auto-select the most recent session when sessions load
+          if (filtered.length > 0) {
             setSelectedSession(filtered[0]);
           }
         }
@@ -640,6 +668,46 @@ export default function RadioPage() {
                                 </>
                               )}
                             </div>
+
+                            {/* On-track context */}
+                            {msg.context && (msg.context.events.length > 0 || msg.context.gapToLeader || msg.context.interval) && (
+                              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                {msg.context.events.map((evt, i) => {
+                                  const badge = EVENT_BADGES[evt.type] || EVENT_BADGES.event;
+                                  return (
+                                    <span
+                                      key={i}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                                      style={{ backgroundColor: badge.bg, color: badge.color }}
+                                      title={evt.message}
+                                    >
+                                      {evt.type === "safety_car" && <Shield className="w-2.5 h-2.5" />}
+                                      {evt.type === "yellow_flag" && <TriangleAlert className="w-2.5 h-2.5" />}
+                                      {evt.type === "red_flag" && <CircleAlert className="w-2.5 h-2.5" />}
+                                      {evt.type === "incident" && <Zap className="w-2.5 h-2.5" />}
+                                      {evt.type === "vsc" && <Timer className="w-2.5 h-2.5" />}
+                                      {evt.type === "pit" && <CircleDot className="w-2.5 h-2.5" />}
+                                      {badge.label}
+                                    </span>
+                                  );
+                                })}
+                                {msg.context.gapToLeader && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-[var(--f1-border)] text-f1-sub"
+                                  >
+                                    <Gauge className="w-2.5 h-2.5" />
+                                    Gap: {msg.context.gapToLeader}s
+                                  </span>
+                                )}
+                                {msg.context.interval && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-[var(--f1-border)] text-f1-sub"
+                                  >
+                                    Int: {msg.context.interval}s
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           {/* Play indicator */}
