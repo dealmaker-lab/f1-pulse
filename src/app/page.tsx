@@ -492,14 +492,14 @@ export default function DashboardPage() {
 
         <div className="relative max-w-[1600px] mx-auto">
           {/* Top bar: year + race selectors + live indicator */}
-          <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
-            <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-3">
+            <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-3">
               {/* Year selector */}
               <div className="relative">
                 <select
                   value={year}
                   onChange={(e) => setYear(Number(e.target.value))}
-                  className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
+                  className="w-full appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-2.5 pr-7 sm:pl-3 sm:pr-8 py-1.5 text-xs sm:text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
                 >
                   {YEARS.map((y) => (
                     <option key={y} value={y} className="bg-[var(--f1-card)]">
@@ -507,28 +507,24 @@ export default function DashboardPage() {
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+                <ChevronDown className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-3 sm:w-3.5 h-3 sm:h-3.5 text-f1-muted pointer-events-none" />
               </div>
-
-              <span className="text-[var(--f1-text-dim)] text-xs">/</span>
 
               {/* Session Type selector */}
               <div className="relative">
                 <select
                   value={sessionType}
                   onChange={(e) => setSessionType(e.target.value)}
-                  className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
+                  className="w-full appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-2.5 pr-7 sm:pl-3 sm:pr-8 py-1.5 text-xs sm:text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
                 >
                   {SESSION_FILTER_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value} className="bg-[var(--f1-card)]">
-                      {opt.label}
+                      {opt.shortLabel}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+                <ChevronDown className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-3 sm:w-3.5 h-3 sm:h-3.5 text-f1-muted pointer-events-none" />
               </div>
-
-              <span className="text-[var(--f1-text-dim)] text-xs">/</span>
 
               {/* Race/Session selector */}
               <div className="relative">
@@ -540,10 +536,10 @@ export default function DashboardPage() {
                         const val = e.target.value;
                         setSelectedRound(val === "latest" ? "latest" : Number(val));
                       }}
-                      className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none max-w-[200px] sm:max-w-[280px]"
+                      className="w-full appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-2.5 pr-7 sm:pl-3 sm:pr-8 py-1.5 text-xs sm:text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none sm:max-w-[280px]"
                     >
                       <option value="latest" className="bg-[var(--f1-card)]">
-                        Latest Race
+                        Latest
                       </option>
                       {raceOptions.map((r) => (
                         <option key={r.round} value={r.round} className="bg-[var(--f1-card)]">
@@ -551,17 +547,17 @@ export default function DashboardPage() {
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+                    <ChevronDown className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-3 sm:w-3.5 h-3 sm:h-3.5 text-f1-muted pointer-events-none" />
                   </>
                 ) : (
                   <>
                     <select
                       value={selectedFilteredSession?.session_key || ""}
                       onChange={(e) => setSelectedSessionKey(Number(e.target.value))}
-                      className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none max-w-[200px] sm:max-w-[280px]"
+                      className="w-full appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-2.5 pr-7 sm:pl-3 sm:pr-8 py-1.5 text-xs sm:text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none sm:max-w-[280px]"
                     >
                       {filteredSessions.length === 0 && (
-                        <option value="" className="bg-[var(--f1-card)]">No {sessionType} sessions yet</option>
+                        <option value="" className="bg-[var(--f1-card)]">No sessions</option>
                       )}
                       {filteredSessions.map((s) => {
                         const meetName = getMeetingName(s.meeting_key);
@@ -570,24 +566,20 @@ export default function DashboardPage() {
                           : s.circuit_short_name || s.country_name;
                         return (
                           <option key={s.session_key} value={s.session_key} className="bg-[var(--f1-card)]">
-                            {label} — {s.session_name}
+                            {label}
                           </option>
                         );
                       })}
                     </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+                    <ChevronDown className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 w-3 sm:w-3.5 h-3 sm:h-3.5 text-f1-muted pointer-events-none" />
                   </>
                 )}
               </div>
-
-              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)]">
-                Season
-              </span>
             </div>
 
             <div
               className={cn(
-                "flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-full border",
+                "flex items-center gap-2 text-[10px] sm:text-xs font-mono px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border self-start sm:self-auto",
                 isLiveSession
                   ? "text-racing-green border-racing-green/20 bg-racing-green/5"
                   : "text-f1-muted border-[var(--f1-border)] bg-[var(--f1-hover)]"
@@ -595,7 +587,7 @@ export default function DashboardPage() {
             >
               <div
                 className={cn(
-                  "w-1.5 h-1.5 rounded-full",
+                  "w-1.5 h-1.5 rounded-full flex-shrink-0",
                   isLiveSession
                     ? "bg-racing-green animate-pulse shadow-[0_0_8px_rgba(0,210,190,0.6)]"
                     : "bg-[var(--f1-text-dim)]"
@@ -664,7 +656,7 @@ export default function DashboardPage() {
               </h1>
 
               {/* Subtext */}
-              <div className="mt-4 flex items-center gap-4 text-sm text-f1-muted">
+              <div className="mt-3 sm:mt-4 flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-f1-muted">
                 {sessionType !== "Race" && selectedFilteredSession ? (
                   <>
                     <span className="flex items-center gap-1.5">
@@ -710,42 +702,42 @@ export default function DashboardPage() {
 
               {/* Winner callout OR session action links */}
               {sessionType !== "Race" && selectedFilteredSession ? (
-                <div className="mt-8">
-                  <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)] mb-3">
+                <div className="mt-5 sm:mt-8">
+                  <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)] mb-2 sm:mb-3">
                     Analyze This Session
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                     <Link
                       href="/telemetry"
-                      className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-4 py-2.5 hover:border-racing-blue/30 transition-colors group"
+                      className="flex items-center gap-1.5 sm:gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-3 py-2 sm:px-4 sm:py-2.5 hover:border-racing-blue/30 transition-colors group"
                     >
-                      <Zap className="w-3.5 h-3.5 text-racing-blue" />
-                      <span className="text-xs font-semibold">Telemetry</span>
-                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-racing-blue transition-colors" />
+                      <Zap className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-racing-blue flex-shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-semibold">Telemetry</span>
+                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-racing-blue transition-colors hidden sm:block" />
                     </Link>
                     <Link
                       href="/strategy"
-                      className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-4 py-2.5 hover:border-racing-green/30 transition-colors group"
+                      className="flex items-center gap-1.5 sm:gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-3 py-2 sm:px-4 sm:py-2.5 hover:border-racing-green/30 transition-colors group"
                     >
-                      <Flag className="w-3.5 h-3.5 text-racing-green" />
-                      <span className="text-xs font-semibold">Strategy</span>
-                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-racing-green transition-colors" />
+                      <Flag className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-racing-green flex-shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-semibold">Strategy</span>
+                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-racing-green transition-colors hidden sm:block" />
                     </Link>
                     <Link
                       href="/weather"
-                      className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-4 py-2.5 hover:border-racing-amber/30 transition-colors group"
+                      className="flex items-center gap-1.5 sm:gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-3 py-2 sm:px-4 sm:py-2.5 hover:border-racing-amber/30 transition-colors group"
                     >
-                      <Timer className="w-3.5 h-3.5 text-racing-amber" />
-                      <span className="text-xs font-semibold">Weather</span>
-                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-racing-amber transition-colors" />
+                      <Timer className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-racing-amber flex-shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-semibold">Weather</span>
+                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-racing-amber transition-colors hidden sm:block" />
                     </Link>
                     <Link
                       href="/radio"
-                      className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-4 py-2.5 hover:border-f1-red/30 transition-colors group"
+                      className="flex items-center gap-1.5 sm:gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-3 py-2 sm:px-4 sm:py-2.5 hover:border-f1-red/30 transition-colors group"
                     >
-                      <Trophy className="w-3.5 h-3.5 text-f1-red/70" />
-                      <span className="text-xs font-semibold">Radio</span>
-                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-f1-red transition-colors" />
+                      <Trophy className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-f1-red/70 flex-shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-semibold">Radio</span>
+                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-f1-red transition-colors hidden sm:block" />
                     </Link>
                   </div>
                 </div>

@@ -1178,38 +1178,38 @@ export default function StrategyPage() {
     <div className="space-y-5 animate-fade-in">
 
       {/* ── Header ── */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap items-start justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Zap className="w-7 h-7 text-racing-green" />
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2 sm:gap-3">
+            <Zap className="w-5 sm:w-7 h-5 sm:h-7 text-racing-green flex-shrink-0" />
             Strategy Analyzer
           </h1>
-          <p className="text-sm text-f1-muted mt-1">Tire strategy · pit stops · race positions</p>
+          <p className="text-xs sm:text-sm text-f1-muted mt-1">Tire strategy · pit stops · race positions</p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => { setSimulatorMode(!simulatorMode); if (!simulatorMode) setCompareMode(false); }}
             className={cn(
-              "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all",
+              "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all",
               simulatorMode
                 ? "border-racing-amber/50 bg-racing-amber/10 text-racing-amber shadow-[0_0_20px_rgba(255,215,0,0.15)]"
                 : "border-[var(--f1-border)] bg-[var(--f1-hover)] text-f1-sub hover:text-f1 hover:border-f1"
             )}
           >
-            <FlaskConical className="w-4 h-4" />
-            {simulatorMode ? "Simulator Active" : "What If?"}
+            <FlaskConical className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
+            {simulatorMode ? "Simulator" : "What If?"}
           </button>
           <button
             onClick={() => { toggleCompare(); if (!compareMode) setSimulatorMode(false); }}
             className={cn(
-              "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all",
+              "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all",
               compareMode
                 ? "border-racing-green/50 bg-racing-green/10 text-racing-green shadow-[0_0_20px_rgba(57,181,74,0.15)]"
                 : "border-[var(--f1-border)] bg-[var(--f1-hover)] text-f1-sub hover:text-f1 hover:border-f1"
             )}
           >
-            <GitCompare className="w-4 h-4" />
+            <GitCompare className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
             {compareMode ? "Comparing" : "Compare"}
           </button>
         </div>
@@ -1269,20 +1269,21 @@ export default function StrategyPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 bg-[var(--f1-hover)] border border-[var(--f1-border)] p-1 rounded-xl w-fit">
+          <div className="flex items-center gap-0.5 sm:gap-1 bg-[var(--f1-hover)] border border-[var(--f1-border)] p-0.5 sm:p-1 rounded-xl w-fit">
             {TABS.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all",
+                  "flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-all",
                   tab === t.id
                     ? "bg-[var(--f1-hover)] text-f1 shadow-sm"
                     : "text-f1-muted hover:text-f1-sub"
                 )}
               >
                 {t.icon}
-                {t.label}
+                <span className="hidden xs:inline sm:inline">{t.label}</span>
+                <span className="xs:hidden sm:hidden">{t.id === "strategy" ? "Tyres" : t.id === "positions" ? "Pos" : "Pits"}</span>
               </button>
             ))}
           </div>

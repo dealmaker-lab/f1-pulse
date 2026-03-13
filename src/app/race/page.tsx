@@ -437,24 +437,26 @@ export default function RaceReplayPage() {
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Header + Selectors */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Flag className="w-7 h-7 text-racing-red" />
-            Race Replay
-          </h1>
-          <p className="text-sm text-f1-muted mt-1">
-            {meetingName
-              ? `${meetingName} · ${selectedSession?.circuit_short_name}, ${selectedSession?.country_name}`
-              : "Select a year and race to replay"}
-          </p>
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2 sm:gap-3">
+              <Flag className="w-5 sm:w-7 h-5 sm:h-7 text-racing-red flex-shrink-0" />
+              Race Replay
+            </h1>
+            <p className="text-xs sm:text-sm text-f1-muted mt-1 truncate">
+              {meetingName
+                ? `${meetingName} · ${selectedSession?.circuit_short_name}, ${selectedSession?.country_name}`
+                : "Select a year and race to replay"}
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="grid grid-cols-3 gap-2">
           <select
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm font-mono text-f1-sub cursor-pointer"
+            className="w-full bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-2 sm:px-3 py-2 text-xs sm:text-sm font-mono text-f1-sub cursor-pointer"
           >
             {OPENF1_YEARS.map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -463,10 +465,10 @@ export default function RaceReplayPage() {
           <select
             value={sessionType}
             onChange={(e) => setSessionType(e.target.value)}
-            className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm font-mono text-f1-sub cursor-pointer"
+            className="w-full bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-2 sm:px-3 py-2 text-xs sm:text-sm font-mono text-f1-sub cursor-pointer"
           >
             {SESSION_FILTER_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <option key={opt.value} value={opt.value}>{opt.shortLabel}</option>
             ))}
           </select>
           <select
@@ -475,10 +477,10 @@ export default function RaceReplayPage() {
               const s = sessions.find((s) => s.session_key === Number(e.target.value));
               if (s) setSelectedSession(s);
             }}
-            className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm text-f1-sub cursor-pointer max-w-[300px]"
+            className="w-full bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-2 sm:px-3 py-2 text-xs sm:text-sm text-f1-sub cursor-pointer truncate"
           >
             {sessions.length === 0 && (
-              <option value="">No {sessionType} sessions yet</option>
+              <option value="">No sessions</option>
             )}
             {sessions.map((s) => (
               <option key={s.session_key} value={s.session_key}>
@@ -505,28 +507,27 @@ export default function RaceReplayPage() {
             {/* Track Map */}
             <div className="xl:col-span-3 glass-card p-3 relative overflow-hidden" style={{ background: "radial-gradient(ellipse at center, rgba(10,10,20,0.95) 0%, rgba(5,5,10,1) 100%)" }}>
               {/* Lap overlay */}
-              <div className="absolute top-3 left-3 z-10 bg-black/70 backdrop-blur-sm rounded-xl px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-white/30 text-[10px] font-mono">LAP</span>
-                  <span className="text-2xl font-mono font-black text-racing-blue glow-text">{estimatedLap}</span>
-                  <span className="text-white/15 text-sm font-mono">/58</span>
+              <div className="absolute top-2 sm:top-3 left-2 sm:left-3 z-10 bg-black/70 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 sm:px-3 py-1.5 sm:py-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-white/30 text-[8px] sm:text-[10px] font-mono">LAP</span>
+                  <span className="text-lg sm:text-2xl font-mono font-black text-racing-blue glow-text">{estimatedLap}</span>
+                  <span className="text-white/15 text-xs sm:text-sm font-mono">/58</span>
                 </div>
-                <div className="text-[9px] font-mono text-white/20 mt-0.5">{progressPct}% complete</div>
-
+                <div className="text-[8px] sm:text-[9px] font-mono text-white/20 mt-0.5">{progressPct}%</div>
               </div>
 
-              {/* Weather overlay */}
+              {/* Weather overlay — hidden on very small screens */}
               {currentWeather && (
-                <div className="absolute top-3 right-3 z-10 bg-black/70 backdrop-blur-sm rounded-xl px-3 py-2">
-                  <div className="text-[9px] font-semibold text-white/30 uppercase tracking-widest mb-1">Weather</div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] font-mono text-white/50">
-                    <span className="flex items-center gap-1"><Thermometer className="w-3 h-3 text-orange-400" />{currentWeather.track_temperature?.toFixed(1)}° trk</span>
-                    <span className="flex items-center gap-1"><Cloud className="w-3 h-3 text-blue-300" />{currentWeather.air_temperature?.toFixed(1)}° air</span>
-                    <span className="flex items-center gap-1"><Droplets className="w-3 h-3 text-cyan-400" />{currentWeather.humidity}%</span>
-                    <span className="flex items-center gap-1"><Wind className="w-3 h-3 text-green-400" />{currentWeather.wind_speed?.toFixed(1)} km/h</span>
+                <div className="absolute top-2 sm:top-3 right-2 sm:right-3 z-10 bg-black/70 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 hidden xs:block">
+                  <div className="text-[8px] sm:text-[9px] font-semibold text-white/30 uppercase tracking-widest mb-0.5 sm:mb-1">Weather</div>
+                  <div className="grid grid-cols-2 gap-x-2 sm:gap-x-4 gap-y-0.5 text-[9px] sm:text-[10px] font-mono text-white/50">
+                    <span className="flex items-center gap-1"><Thermometer className="w-2.5 sm:w-3 h-2.5 sm:h-3 text-orange-400" />{currentWeather.track_temperature?.toFixed(1)}°</span>
+                    <span className="flex items-center gap-1"><Cloud className="w-2.5 sm:w-3 h-2.5 sm:h-3 text-blue-300" />{currentWeather.air_temperature?.toFixed(1)}°</span>
+                    <span className="flex items-center gap-1"><Droplets className="w-2.5 sm:w-3 h-2.5 sm:h-3 text-cyan-400" />{currentWeather.humidity}%</span>
+                    <span className="flex items-center gap-1"><Wind className="w-2.5 sm:w-3 h-2.5 sm:h-3 text-green-400" />{currentWeather.wind_speed?.toFixed(1)}</span>
                   </div>
                   {currentWeather.rainfall > 0 && (
-                    <div className="text-[10px] font-mono font-bold text-blue-400 mt-1 animate-pulse">RAIN</div>
+                    <div className="text-[9px] sm:text-[10px] font-mono font-bold text-blue-400 mt-1 animate-pulse">RAIN</div>
                   )}
                 </div>
               )}
@@ -724,8 +725,8 @@ export default function RaceReplayPage() {
           })()}
 
           {/* Playback Controls */}
-          <div className="glass-card px-4 py-3">
-            <div className="flex items-center gap-3">
+          <div className="glass-card px-3 sm:px-4 py-2.5 sm:py-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentFrame(Math.max(0, currentFrame - Math.round(totalFrames * 0.05)))}
@@ -773,15 +774,16 @@ export default function RaceReplayPage() {
                 />
               </div>
 
-              {/* Speed */}
-              <div className="flex items-center gap-0.5">
+              {/* Speed — show fewer presets on mobile */}
+              <div className="flex items-center gap-0.5 flex-shrink-0">
                 {SPEED_PRESETS.map((preset, idx) => (
                   <button
                     key={idx}
                     onClick={() => setPlaybackSpeed(idx)}
                     className={cn(
-                      "px-1.5 py-1 rounded-lg text-[9px] font-mono font-bold cursor-pointer transition-all touch-manipulation",
-                      playbackSpeed === idx ? "bg-racing-blue/20 text-racing-blue" : "text-[var(--f1-text-dim)] hover:text-f1-sub"
+                      "px-1 sm:px-1.5 py-1 rounded-lg text-[8px] sm:text-[9px] font-mono font-bold cursor-pointer transition-all touch-manipulation",
+                      playbackSpeed === idx ? "bg-racing-blue/20 text-racing-blue" : "text-[var(--f1-text-dim)] hover:text-f1-sub",
+                      idx > 3 && "hidden sm:block"
                     )}
                   >
                     {preset.label}
