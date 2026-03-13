@@ -1,19 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/layout/theme-provider";
 import {
   LayoutDashboard, PlayCircle, Activity, Swords,
-  PieChart, Users, Trophy,
+  PieChart, Users, Trophy, Lock,
   ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
 } from "lucide-react";
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  liveLocked?: boolean;
+}
+
+const navItems: NavItem[] = [
   { href: "/",            label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/race",        label: "Race Replay",  icon: PlayCircle },
+  { href: "/race",        label: "Race Replay",  icon: PlayCircle, liveLocked: true },
   { href: "/h2h",         label: "Head to Head", icon: Swords },
   { href: "/telemetry",  label: "Telemetry",    icon: Activity },
   { href: "/strategy",   label: "Strategy",     icon: PieChart },
@@ -26,6 +33,22 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggle } = useTheme();
+  const [raceLive, setRaceLive] = useState(false);
+
+  useEffect(() => {
+    fetch("https://api.openf1.org/v1/sessions?session_type=Race&year=2025")
+      .then((r) => r.json())
+      .then((sessions: { date_start: string; date_end: string }[]) => {
+        const now = Date.now();
+        const live = sessions.some((s) => {
+          const start = new Date(s.date_start).getTime();
+          const end = new Date(s.date_end).getTime() + 30 * 60 * 1000;
+          return now >= start && now <= end;
+        });
+        setRaceLive(live);
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <>
@@ -120,14 +143,26 @@ export default function Sidebar() {
                 )} />
 
                 {!collapsed && (
-                  <span
-                    className={cn(
-                      "text-[13px] font-semibold truncate",
-                      isActive ? "text-white" : ""
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={cn(
+                        "text-[13px] font-semibold truncate",
+                        isActive ? "text-white" : ""
+                      )}
+                      style={{ fontFamily: 'Titillium Web, sans-serif', letterSpacing: '0.02em' }}
+                    >
+                      {item.label}
+                    </span>
+                    {item.liveLocked && (
+                      raceLive ? (
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-racing-red/20 text-racing-red border border-racing-red/30">
+                          <span className="w-1 h-1 rounded-full bg-racing-red animate-pulse" />
+                          Live
+                        </span>
+                      ) : (
+                        <Lock className="w-3 h-3 text-white/20 flex-shrink-0" />
+                      )
                     )}
-                    style={{ fontFamily: 'Titillium Web, sans-serif', letterSpacing: '0.02em' }}
-                  >
-                    {item.label}
                   </span>
                 )}
               </Link>
