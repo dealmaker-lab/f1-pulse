@@ -14,6 +14,7 @@ import { DriverStanding, ConstructorStanding } from "@/types/f1";
 import PredictionPanel from "@/components/predictions/prediction-panel";
 import CircuitMap from "@/components/circuit-map/circuit-map";
 import { HISTORICAL_YEARS } from "@/lib/constants";
+import { SESSION_FILTER_OPTIONS, filterPastSessions, VALID_SESSION_NAMES } from "@/lib/session-filters";
 import Link from "next/link";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -259,6 +260,9 @@ export default function DashboardPage() {
   const [selectedDriver, setSelectedDriver] = useState("VER");
   const [activeTab, setActiveTab] = useState<"drivers" | "constructors">("drivers");
 
+  // Session type filter — "Race" shows Ergast results, others show OpenF1 sessions
+  const [sessionType, setSessionType] = useState<string>("Race");
+
   // Race selector — "all" means season overview, otherwise a specific round
   const [selectedRound, setSelectedRound] = useState<"latest" | number>("latest");
 
@@ -313,6 +317,27 @@ export default function DashboardPage() {
       .catch(console.error)
       .finally(() => setStandingsLoading(false));
   }, [year]);
+
+  // Sessions filtered by the selected session type (for non-Race browsing)
+  const filteredSessions = useMemo(() => {
+    if (sessionType === "Race") return [];
+    return filterPastSessions(allSessions, sessionType);
+  }, [allSessions, sessionType]);
+
+  // Selected non-race session for detail view
+  const [selectedSessionKey, setSelectedSessionKey] = useState<number | null>(null);
+  const selectedFilteredSession = useMemo(() => {
+    if (!filteredSessions.length) return null;
+    if (selectedSessionKey) {
+      return filteredSessions.find((s) => s.session_key === selectedSessionKey) || filteredSessions[filteredSessions.length - 1];
+    }
+    return filteredSessions[filteredSessions.length - 1];
+  }, [filteredSessions, selectedSessionKey]);
+
+  // Reset session selection when type changes
+  useEffect(() => {
+    setSelectedSessionKey(null);
+  }, [sessionType]);
 
   // Live polling — detect across ALL session types (FP, Quali, Sprint, Race)
   const isLiveSession = useIsRaceWeekend(allSessions);
@@ -480,26 +505,72 @@ export default function DashboardPage() {
 
               <span className="text-[var(--f1-text-dim)] text-xs">/</span>
 
-              {/* Race/Circuit selector */}
+              {/* Session Type selector */}
               <div className="relative">
                 <select
-                  value={selectedRound === "latest" ? "latest" : selectedRound}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedRound(val === "latest" ? "latest" : Number(val));
-                  }}
-                  className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none max-w-[200px] sm:max-w-[280px]"
+                  value={sessionType}
+                  onChange={(e) => setSessionType(e.target.value)}
+                  className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
                 >
-                  <option value="latest" className="bg-[var(--f1-card)]">
-                    Latest Race
-                  </option>
-                  {raceOptions.map((r) => (
-                    <option key={r.round} value={r.round} className="bg-[var(--f1-card)]">
-                      {r.label}
+                  {SESSION_FILTER_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value} className="bg-[var(--f1-card)]">
+                      {opt.label}
                     </option>
                   ))}
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+              </div>
+
+              <span className="text-[var(--f1-text-dim)] text-xs">/</span>
+
+              {/* Race/Session selector */}
+              <div className="relative">
+                {sessionType === "Race" ? (
+                  <>
+                    <select
+                      value={selectedRound === "latest" ? "latest" : selectedRound}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedRound(val === "latest" ? "latest" : Number(val));
+                      }}
+                      className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none max-w-[200px] sm:max-w-[280px]"
+                    >
+                      <option value="latest" className="bg-[var(--f1-card)]">
+                        Latest Race
+                      </option>
+                      {raceOptions.map((r) => (
+                        <option key={r.round} value={r.round} className="bg-[var(--f1-card)]">
+                          {r.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+                  </>
+                ) : (
+                  <>
+                    <select
+                      value={selectedFilteredSession?.session_key || ""}
+                      onChange={(e) => setSelectedSessionKey(Number(e.target.value))}
+                      className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none max-w-[200px] sm:max-w-[280px]"
+                    >
+                      {filteredSessions.length === 0 && (
+                        <option value="" className="bg-[var(--f1-card)]">No {sessionType} sessions yet</option>
+                      )}
+                      {filteredSessions.map((s) => {
+                        const meetName = getMeetingName(s.meeting_key);
+                        const label = meetName
+                          ? meetName.replace(" Grand Prix", " GP")
+                          : s.circuit_short_name || s.country_name;
+                        return (
+                          <option key={s.session_key} value={s.session_key} className="bg-[var(--f1-card)]">
+                            {label} — {s.session_name}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+                  </>
+                )}
               </div>
 
               <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)]">
@@ -537,7 +608,9 @@ export default function DashboardPage() {
             <div>
               {/* Tiny label */}
               <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-f1-red/70 mb-3">
-                {displayedResult
+                {sessionType !== "Race" && selectedFilteredSession
+                  ? `${selectedFilteredSession.session_name} Session`
+                  : displayedResult
                   ? `Round ${displayedResult.round} Result`
                   : nextRace
                   ? "Coming Up"
@@ -546,7 +619,18 @@ export default function DashboardPage() {
 
               {/* Huge race name */}
               <h1 className="text-3xl sm:text-5xl lg:text-6xl font-display font-black uppercase tracking-tight leading-[0.95]">
-                {displayedResult ? (
+                {sessionType !== "Race" && selectedFilteredSession ? (
+                  <>
+                    <span className="text-f1">
+                      {(getMeetingName(selectedFilteredSession.meeting_key) || selectedFilteredSession.circuit_short_name || selectedFilteredSession.country_name)
+                        .replace(" Grand Prix", "")}
+                    </span>
+                    <br />
+                    <span className="text-f1-red glow-text">
+                      {SESSION_FILTER_OPTIONS.find((o) => o.value === sessionType)?.shortLabel || sessionType}
+                    </span>
+                  </>
+                ) : displayedResult ? (
                   <>
                     <span className="text-f1">
                       {displayedResult.raceName.replace(" Grand Prix", "")}
@@ -574,7 +658,28 @@ export default function DashboardPage() {
 
               {/* Subtext */}
               <div className="mt-4 flex items-center gap-4 text-sm text-f1-muted">
-                {displayedResult && (
+                {sessionType !== "Race" && selectedFilteredSession ? (
+                  <>
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                      {selectedFilteredSession.circuit_short_name || selectedFilteredSession.country_name}
+                    </span>
+                    <span className="text-[var(--f1-text-dim)]">|</span>
+                    <span className="font-mono text-xs">
+                      {new Date(selectedFilteredSession.date_start).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                      {" "}
+                      {new Date(selectedFilteredSession.date_start).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                      })}
+                    </span>
+                  </>
+                ) : displayedResult ? (
                   <>
                     <span className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5" />
@@ -589,16 +694,55 @@ export default function DashboardPage() {
                       })}
                     </span>
                   </>
-                )}
-                {!displayedResult && (
+                ) : (
                   <span className="font-mono text-xs">
                     Round {pastRaces.length}/{sessions.length || "—"}
                   </span>
                 )}
               </div>
 
-              {/* Winner callout */}
-              {displayedResult && displayedResult.results[0] && (
+              {/* Winner callout OR session action links */}
+              {sessionType !== "Race" && selectedFilteredSession ? (
+                <div className="mt-8">
+                  <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)] mb-3">
+                    Analyze This Session
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href="/telemetry"
+                      className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-4 py-2.5 hover:border-racing-blue/30 transition-colors group"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-racing-blue" />
+                      <span className="text-xs font-semibold">Telemetry</span>
+                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-racing-blue transition-colors" />
+                    </Link>
+                    <Link
+                      href="/strategy"
+                      className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-4 py-2.5 hover:border-racing-green/30 transition-colors group"
+                    >
+                      <Flag className="w-3.5 h-3.5 text-racing-green" />
+                      <span className="text-xs font-semibold">Strategy</span>
+                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-racing-green transition-colors" />
+                    </Link>
+                    <Link
+                      href="/weather"
+                      className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-4 py-2.5 hover:border-racing-amber/30 transition-colors group"
+                    >
+                      <Timer className="w-3.5 h-3.5 text-racing-amber" />
+                      <span className="text-xs font-semibold">Weather</span>
+                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-racing-amber transition-colors" />
+                    </Link>
+                    <Link
+                      href="/radio"
+                      className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-4 py-2.5 hover:border-f1-red/30 transition-colors group"
+                    >
+                      <Trophy className="w-3.5 h-3.5 text-f1-red/70" />
+                      <span className="text-xs font-semibold">Radio</span>
+                      <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-f1-red transition-colors" />
+                    </Link>
+                  </div>
+                </div>
+              ) : displayedResult && displayedResult.results[0] && (
                 <div className="mt-8">
                   <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)] mb-2">
                     Race Winner

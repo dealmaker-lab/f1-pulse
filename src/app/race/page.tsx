@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OPENF1_YEARS } from "@/lib/constants";
+import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 
 // ===== Speed Presets =====
 const SPEED_PRESETS = [
@@ -85,6 +86,8 @@ const TIRE_COLORS: Record<string, string> = {
 export default function RaceReplayPage() {
   // Data state
   const [year, setYear] = useState(2025);
+  const [sessionType, setSessionType] = useState<string>("Race");
+  const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [meetings, setMeetings] = useState<MeetingInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
@@ -112,27 +115,34 @@ export default function RaceReplayPage() {
     [meetings]
   );
 
-  // ===== Fetch sessions + meetings for year =====
+  // ===== Fetch ALL sessions + meetings for year =====
   useEffect(() => {
     setDataReady(false);
     setSelectedSession(null);
 
     Promise.all([
-      fetch(`/api/f1/sessions?year=${year}&type=Race`).then((r) => r.json()),
+      fetch(`/api/f1/sessions?year=${year}`).then((r) => r.json()),
       fetch(`/api/f1/meetings?year=${year}`).then((r) => r.json()),
     ]).then(([sessData, meetData]) => {
-      const sess = Array.isArray(sessData) ? sessData : [];
+      const all = Array.isArray(sessData) ? sessData : [];
       const meets = Array.isArray(meetData) ? meetData : [];
-      setSessions(sess);
+      setAllSessions(all);
       setMeetings(meets);
-
-      // Auto-select the latest past race
-      const now = new Date();
-      const pastRaces = sess.filter((s: SessionInfo) => new Date(s.date_start) < now);
-      if (pastRaces.length > 0) setSelectedSession(pastRaces[pastRaces.length - 1]);
-      else if (sess.length > 0) setSelectedSession(sess[0]);
     }).catch(console.error);
   }, [year]);
+
+  // ===== Filter sessions by session type =====
+  useEffect(() => {
+    const filtered = filterPastSessions(allSessions, sessionType);
+    setSessions(filtered);
+
+    // Auto-select the latest past session
+    if (filtered.length > 0) {
+      setSelectedSession(filtered[filtered.length - 1]);
+    } else {
+      setSelectedSession(null);
+    }
+  }, [allSessions, sessionType]);
 
   // ===== Load race data when session selected =====
   useEffect(() => {
@@ -451,6 +461,15 @@ export default function RaceReplayPage() {
             ))}
           </select>
           <select
+            value={sessionType}
+            onChange={(e) => setSessionType(e.target.value)}
+            className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm font-mono text-f1-sub cursor-pointer"
+          >
+            {SESSION_FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <select
             value={selectedSession?.session_key || ""}
             onChange={(e) => {
               const s = sessions.find((s) => s.session_key === Number(e.target.value));
@@ -458,6 +477,9 @@ export default function RaceReplayPage() {
             }}
             className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm text-f1-sub cursor-pointer max-w-[300px]"
           >
+            {sessions.length === 0 && (
+              <option value="">No {sessionType} sessions yet</option>
+            )}
             {sessions.map((s) => (
               <option key={s.session_key} value={s.session_key}>
                 {getMeetingName(s.meeting_key) || s.session_name} — {s.circuit_short_name}

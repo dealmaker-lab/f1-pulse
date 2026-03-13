@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { cn, getTeamColor, getTireColor } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamInfo } from "@/lib/team-logos";
-import { SESSION_FILTER_STRATEGY, filterPastSessions } from "@/lib/session-filters";
+import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 import { OPENF1_YEARS } from "@/lib/constants";
 import StrategyChart from "@/components/charts/strategy-chart";
 import { StrategyStint } from "@/types/f1";
@@ -191,52 +191,73 @@ function PositionsPanel({
       return d.name_acronym;
     });
 
-  // OpenF1 position data has 'date' timestamps, not 'lap' numbers.
+  // Build a smooth position-per-lap chart by forward-filling.
+  // OpenF1 position data only records *changes*, so raw data is sparse.
+  // We map every event into its nearest lap, then fill gaps so every driver
+  // has a position on every lap → smooth, readable line chart.
   const dataMap = new Map<number, any>();
   const hasLapField = positions.length > 0 && typeof positions[0].lap === "number";
+  const totalLaps = stints?.length ? safeLaps(stints) : 57;
+
+  // Step 1: collect the last-known position per driver per lap
+  const driverLapPos = new Map<number, Map<number, number>>(); // driver → (lap → position)
 
   if (hasLapField) {
     positions.forEach((p) => {
-      const d = driverMap.get(p.driver_number);
-      if (!d || !visible.includes(p.driver_number)) return;
+      if (!visible.includes(p.driver_number) || !driverMap.has(p.driver_number)) return;
       const lap = p.lap!;
-      if (!dataMap.has(lap)) dataMap.set(lap, { lap });
-      dataMap.get(lap)![d.name_acronym] = p.position;
+      if (!driverLapPos.has(p.driver_number)) driverLapPos.set(p.driver_number, new Map());
+      driverLapPos.get(p.driver_number)!.set(lap, p.position);
     });
   } else {
-    // OpenF1 position data uses timestamps, not lap numbers.
-    // Map timestamps proportionally into lap numbers based on race duration.
+    // Map timestamps → lap numbers proportionally, take last position per lap
     const timestamps = Array.from(new Set(positions.map((p) => p.date ?? "")))
       .filter(Boolean)
       .sort();
-    const tsToLap = new Map<string, number>();
-    const totalLaps = stints?.length ? safeLaps(stints) : Math.min(timestamps.length, 57);
 
     if (timestamps.length > 0) {
       const startTime = new Date(timestamps[0]).getTime();
       const endTime = new Date(timestamps[timestamps.length - 1]).getTime();
       const raceDuration = endTime - startTime;
 
-      timestamps.forEach((ts) => {
+      positions.forEach((p) => {
+        if (!visible.includes(p.driver_number) || !driverMap.has(p.driver_number)) return;
+        const ts = p.date ?? "";
+        if (!ts) return;
+        let lap: number;
         if (raceDuration > 0) {
           const elapsed = new Date(ts).getTime() - startTime;
-          const lap = Math.max(1, Math.min(totalLaps, Math.round((elapsed / raceDuration) * (totalLaps - 1)) + 1));
-          tsToLap.set(ts, lap);
+          lap = Math.max(1, Math.min(totalLaps, Math.round((elapsed / raceDuration) * (totalLaps - 1)) + 1));
         } else {
-          tsToLap.set(ts, 1);
+          lap = 1;
         }
+        if (!driverLapPos.has(p.driver_number)) driverLapPos.set(p.driver_number, new Map());
+        // Always overwrite — later timestamps within the same lap win
+        driverLapPos.get(p.driver_number)!.set(lap, p.position);
       });
     }
-
-    positions.forEach((p) => {
-      const d = driverMap.get(p.driver_number);
-      if (!d || !visible.includes(p.driver_number)) return;
-      const lap = tsToLap.get(p.date ?? "") ?? 0;
-      if (lap <= 0) return;
-      if (!dataMap.has(lap)) dataMap.set(lap, { lap });
-      dataMap.get(lap)![d.name_acronym] = p.position;
-    });
   }
+
+  // Step 2: forward-fill — for every lap 1..totalLaps, carry forward
+  // the last known position so there are no gaps in the chart.
+  for (let lap = 1; lap <= totalLaps; lap++) {
+    dataMap.set(lap, { lap });
+  }
+
+  driverLapPos.forEach((lapMap, driverNum) => {
+    const d = driverMap.get(driverNum);
+    if (!d) return;
+    const code = d.name_acronym;
+    let lastPos: number | null = null;
+    for (let lap = 1; lap <= totalLaps; lap++) {
+      if (lapMap.has(lap)) {
+        lastPos = lapMap.get(lap)!;
+      }
+      if (lastPos !== null) {
+        dataMap.get(lap)![code] = lastPos;
+      }
+    }
+  });
 
   const data = Array.from(dataMap.values()).sort((a, b) => (a.lap ?? 0) - (b.lap ?? 0));
 
@@ -421,7 +442,7 @@ function RaceSelector({
             onChange={(e) => setSessionType(e.target.value)}
             className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm font-mono text-f1 bg-[var(--f1-hover)] border border-[var(--f1-border)] outline-none focus:border-f1-sub transition-colors cursor-pointer"
           >
-            {SESSION_FILTER_STRATEGY.map((t) => (
+            {SESSION_FILTER_OPTIONS.map((t) => (
               <option key={t.value} value={t.value} className="bg-[#0d0f14]">{t.label}</option>
             ))}
           </select>
