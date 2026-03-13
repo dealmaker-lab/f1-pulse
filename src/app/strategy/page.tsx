@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { cn, getTeamColor, getTireColor } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamInfo } from "@/lib/team-logos";
-import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
+import { SESSION_FILTER_STRATEGY, filterPastSessions } from "@/lib/session-filters";
 import StrategyChart from "@/components/charts/strategy-chart";
 import { StrategyStint } from "@/types/f1";
 import {
@@ -329,7 +329,7 @@ function RaceSelector({
             onChange={(e) => setSessionType(e.target.value)}
             className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm font-mono text-f1 bg-[var(--f1-hover)] border border-[var(--f1-border)] outline-none focus:border-f1-sub transition-colors cursor-pointer"
           >
-            {SESSION_FILTER_OPTIONS.map((t) => (
+            {SESSION_FILTER_STRATEGY.map((t) => (
               <option key={t.value} value={t.value} className="bg-[#0d0f14]">{t.label}</option>
             ))}
           </select>

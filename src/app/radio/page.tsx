@@ -112,6 +112,9 @@ const SESSION_FILTER_TABS = [
   { value: "Qualifying", label: "Quali" },
   { value: "Sprint", label: "Sprint" },
   { value: "Sprint Qualifying", label: "Sprint Q" },
+  { value: "Practice 1", label: "FP1" },
+  { value: "Practice 2", label: "FP2" },
+  { value: "Practice 3", label: "FP3" },
 ];
 
 // ===== Sub-components =====

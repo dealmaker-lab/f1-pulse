@@ -34,6 +34,12 @@ export const SESSION_FILTER_COMPETITIVE: SessionFilterOption[] =
     ["Race", "Qualifying", "Sprint", "Sprint Qualifying"].includes(o.value)
   );
 
+/** Race + Sprint only — sessions with actual pit-stop strategy */
+export const SESSION_FILTER_STRATEGY: SessionFilterOption[] =
+  SESSION_FILTER_OPTIONS.filter((o) =>
+    ["Race", "Sprint"].includes(o.value)
+  );
+
 /**
  * Filter sessions to only those that have already occurred,
  * matching the given `session_name`, sorted chronologically
