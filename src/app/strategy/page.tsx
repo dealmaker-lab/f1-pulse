@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Component, ErrorInfo, ReactNode } from "react";
 import {
   Fuel, Timer, ArrowUpDown, Loader2, GitCompare,
   ChevronDown, Flag, TrendingUp, Zap, FlaskConical,
-  Plus, X, Play,
+  Plus, X, Play, AlertTriangle,
 } from "lucide-react";
 import { cn, getTeamColor, getTireColor } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamInfo } from "@/lib/team-logos";
@@ -31,7 +31,7 @@ interface RaceSession {
 }
 interface StintData {
   driver_number: number;
-  compound: string;
+  compound: string | null;
   lap_start: number;
   lap_end: number;
   stint_number: number;
@@ -44,15 +44,61 @@ interface DriverData {
   team_colour: string;
 }
 interface PositionData {
-  lap: number;
+  date?: string;
+  driver_number: number;
+  position: number;
+  lap?: number;
   [key: string]: any;
+}
+
+// ─── Error Boundary ──────────────────────────────────────────────────────────
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallbackLabel?: string;
+}
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class PanelErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(`[Strategy] ${this.props.fallbackLabel ?? "Panel"} error:`, error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-48 gap-2 text-f1-muted">
+          <AlertTriangle className="w-6 h-6 text-racing-amber" />
+          <span className="text-xs font-mono">
+            {this.props.fallbackLabel ?? "Panel"} unavailable
+          </span>
+          <button
+            onClick={() => this.setState({ hasError: false })}
+            className="text-[10px] font-mono text-racing-blue hover:underline"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function safeLaps(stints: StintData[], fallback = 57): number {
-  if (!stints.length) return fallback;
-  const vals = stints.map((s) => s.lap_end).filter(Number.isFinite);
+  if (!stints || !stints.length) return fallback;
+  const vals = stints.map((s) => s.lap_end).filter((v) => typeof v === "number" && Number.isFinite(v) && v > 0);
   const m = vals.length ? Math.max(...vals) : 0;
   return m > 0 ? m : fallback;
 }
@@ -60,9 +106,12 @@ function safeLaps(stints: StintData[], fallback = 57): number {
 function topTyre(stints: StintData[]): string {
   const counts: Record<string, number> = {};
   stints.forEach((s) => {
-    counts[s.compound] = (counts[s.compound] || 0) + (s.lap_end - s.lap_start + 1);
+    const compound = s.compound || "UNKNOWN";
+    const laps = Math.max(0, (s.lap_end ?? 0) - (s.lap_start ?? 0) + 1);
+    counts[compound] = (counts[compound] || 0) + laps;
   });
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  const entries = Object.entries(counts).filter(([k]) => k !== "UNKNOWN");
+  const top = entries.sort((a, b) => b[1] - a[1])[0];
   return top ? top[0] : "—";
 }
 
@@ -95,16 +144,17 @@ function StrategyPanel({
     .map(([n, ss]) => {
       const d = driverMap.get(n)!;
       return {
-        driverCode: d.name_acronym,
-        team: d.team_name,
+        driverCode: d.name_acronym ?? "???",
+        team: d.team_name ?? "",
         stints: ss
+          .filter((s) => typeof s.lap_start === "number" && typeof s.lap_end === "number" && s.lap_end >= s.lap_start)
           .sort((a, b) => a.stint_number - b.stint_number)
           .map((s) => ({
             compound: (s.compound || "UNKNOWN") as import("@/types/f1").TireCompound,
             startLap: s.lap_start,
             endLap: s.lap_end,
             avgPace: 93.0,
-            laps: s.lap_end - s.lap_start + 1,
+            laps: Math.max(1, s.lap_end - s.lap_start + 1),
           })),
       };
     })
@@ -127,9 +177,9 @@ function StrategyPanel({
 }
 
 function PositionsPanel({
-  positions, drivers, visible, loading,
+  positions, drivers, visible, loading, stints,
 }: {
-  positions: PositionData[]; drivers: DriverData[]; visible: number[]; loading: boolean;
+  positions: PositionData[]; drivers: DriverData[]; visible: number[]; loading: boolean; stints?: StintData[];
 }) {
   const driverMap = new Map(drivers.map((d) => [d.driver_number, d]));
   const colorMap: Record<string, string> = {};
@@ -137,18 +187,42 @@ function PositionsPanel({
     .filter((n) => visible.includes(n as number) && driverMap.has(n as number))
     .map((n) => {
       const d = driverMap.get(n as number)!;
-      colorMap[d.name_acronym] = getTeamColor(d.team_name);
+      colorMap[d.name_acronym] = getTeamColor(d.team_name ?? "");
       return d.name_acronym;
     });
 
+  // OpenF1 position data has 'date' timestamps, not 'lap' numbers.
   const dataMap = new Map<number, any>();
-  positions.forEach((p: any) => {
-    const d = driverMap.get(p.driver_number);
-    if (!d || !visible.includes(p.driver_number)) return;
-    if (!dataMap.has(p.lap)) dataMap.set(p.lap, { lap: p.lap });
-    dataMap.get(p.lap)![d.name_acronym] = p.position;
-  });
-  const data = Array.from(dataMap.values()).sort((a, b) => a.lap - b.lap);
+  const hasLapField = positions.length > 0 && typeof positions[0].lap === "number";
+
+  if (hasLapField) {
+    positions.forEach((p) => {
+      const d = driverMap.get(p.driver_number);
+      if (!d || !visible.includes(p.driver_number)) return;
+      const lap = p.lap!;
+      if (!dataMap.has(lap)) dataMap.set(lap, { lap });
+      dataMap.get(lap)![d.name_acronym] = p.position;
+    });
+  } else {
+    const timestamps = Array.from(new Set(positions.map((p) => p.date ?? "")))
+      .filter(Boolean)
+      .sort();
+    const tsToLap = new Map<string, number>();
+    const totalLaps = stints?.length ? safeLaps(stints) : timestamps.length;
+    const step = timestamps.length > 1 ? Math.max(1, totalLaps / timestamps.length) : 1;
+    timestamps.forEach((ts, i) => tsToLap.set(ts, Math.round(i * step) + 1));
+
+    positions.forEach((p) => {
+      const d = driverMap.get(p.driver_number);
+      if (!d || !visible.includes(p.driver_number)) return;
+      const lap = tsToLap.get(p.date ?? "") ?? 0;
+      if (lap <= 0) return;
+      if (!dataMap.has(lap)) dataMap.set(lap, { lap });
+      dataMap.get(lap)![d.name_acronym] = p.position;
+    });
+  }
+
+  const data = Array.from(dataMap.values()).sort((a, b) => (a.lap ?? 0) - (b.lap ?? 0));
 
   if (loading)
     return (
@@ -1187,14 +1261,20 @@ export default function StrategyPage() {
                 <span className="text-[9px] text-f1-muted font-mono">{visible1.length} drivers</span>
               </div>
               {tab === "strategy" && (
-                <StrategyPanel stints={stints1} drivers={drivers1} visible={visible1}
-                  totalLaps={safeLaps(stints1)} loading={loading1} />
+                <PanelErrorBoundary fallbackLabel="Tire Strategy (Race A)">
+                  <StrategyPanel stints={stints1} drivers={drivers1} visible={visible1}
+                    totalLaps={safeLaps(stints1)} loading={loading1} />
+                </PanelErrorBoundary>
               )}
               {tab === "positions" && (
-                <PositionsPanel positions={positions1} drivers={drivers1} visible={visible1} loading={loading1} />
+                <PanelErrorBoundary fallbackLabel="Positions (Race A)">
+                  <PositionsPanel positions={positions1} drivers={drivers1} visible={visible1} loading={loading1} stints={stints1} />
+                </PanelErrorBoundary>
               )}
               {tab === "pitstops" && (
-                <PitStopsPanel stints={stints1} drivers={drivers1} visible={visible1} loading={loading1} />
+                <PanelErrorBoundary fallbackLabel="Pit Stops (Race A)">
+                  <PitStopsPanel stints={stints1} drivers={drivers1} visible={visible1} loading={loading1} />
+                </PanelErrorBoundary>
               )}
               <div className="mt-4">
                 <DriverStrip
@@ -1219,14 +1299,20 @@ export default function StrategyPage() {
                 <span className="text-[9px] text-f1-muted font-mono">{visible2.length} drivers</span>
               </div>
               {tab === "strategy" && (
-                <StrategyPanel stints={stints2} drivers={drivers2} visible={visible2}
-                  totalLaps={safeLaps(stints2)} loading={loading2} />
+                <PanelErrorBoundary fallbackLabel="Tire Strategy (Race B)">
+                  <StrategyPanel stints={stints2} drivers={drivers2} visible={visible2}
+                    totalLaps={safeLaps(stints2)} loading={loading2} />
+                </PanelErrorBoundary>
               )}
               {tab === "positions" && (
-                <PositionsPanel positions={positions2} drivers={drivers2} visible={visible2} loading={loading2} />
+                <PanelErrorBoundary fallbackLabel="Positions (Race B)">
+                  <PositionsPanel positions={positions2} drivers={drivers2} visible={visible2} loading={loading2} stints={stints2} />
+                </PanelErrorBoundary>
               )}
               {tab === "pitstops" && (
-                <PitStopsPanel stints={stints2} drivers={drivers2} visible={visible2} loading={loading2} />
+                <PanelErrorBoundary fallbackLabel="Pit Stops (Race B)">
+                  <PitStopsPanel stints={stints2} drivers={drivers2} visible={visible2} loading={loading2} />
+                </PanelErrorBoundary>
               )}
               <div className="mt-4">
                 <DriverStrip
@@ -1247,11 +1333,13 @@ export default function StrategyPage() {
 
       {/* ── Simulator mode ── */}
       {simulatorMode && !compareMode && race1 && (
-        <StrategySimulator
-          sessionKey={race1?.session_key || null}
-          drivers={drivers1}
-          loading={loading1}
-        />
+        <PanelErrorBoundary fallbackLabel="Strategy Simulator">
+          <StrategySimulator
+            sessionKey={race1?.session_key || null}
+            drivers={drivers1}
+            loading={loading1}
+          />
+        </PanelErrorBoundary>
       )}
 
       {/* ── Single race mode ── */}
@@ -1277,10 +1365,12 @@ export default function StrategyPage() {
               <h2 className="text-sm font-bold">Tire Strategy</h2>
               {loading1 && <Loader2 className="w-3.5 h-3.5 animate-spin text-f1-muted ml-auto" />}
             </div>
-            <StrategyPanel
-              stints={stints1} drivers={drivers1} visible={visible1}
-              totalLaps={safeLaps(stints1)} loading={loading1}
-            />
+            <PanelErrorBoundary fallbackLabel="Tire Strategy">
+              <StrategyPanel
+                stints={stints1} drivers={drivers1} visible={visible1}
+                totalLaps={safeLaps(stints1)} loading={loading1}
+              />
+            </PanelErrorBoundary>
           </div>
 
           {/* Position + Pit Stops */}
@@ -1291,9 +1381,11 @@ export default function StrategyPage() {
                 <h2 className="text-sm font-bold">Position Changes</h2>
                 {loading1 && <Loader2 className="w-3.5 h-3.5 animate-spin text-f1-muted ml-auto" />}
               </div>
-              <PositionsPanel
-                positions={positions1} drivers={drivers1} visible={visible1} loading={loading1}
-              />
+              <PanelErrorBoundary fallbackLabel="Positions">
+                <PositionsPanel
+                  positions={positions1} drivers={drivers1} visible={visible1} loading={loading1} stints={stints1}
+                />
+              </PanelErrorBoundary>
             </div>
             <div className="glass-card p-5 rounded-xl">
               <div className="flex items-center gap-2 mb-4">
@@ -1301,9 +1393,11 @@ export default function StrategyPage() {
                 <h2 className="text-sm font-bold">Pit Stops</h2>
                 {loading1 && <Loader2 className="w-3.5 h-3.5 animate-spin text-f1-muted ml-auto" />}
               </div>
-              <PitStopsPanel
-                stints={stints1} drivers={drivers1} visible={visible1} loading={loading1}
-              />
+              <PanelErrorBoundary fallbackLabel="Pit Stops">
+                <PitStopsPanel
+                  stints={stints1} drivers={drivers1} visible={visible1} loading={loading1}
+                />
+              </PanelErrorBoundary>
             </div>
           </div>
 

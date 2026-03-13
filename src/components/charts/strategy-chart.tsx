@@ -9,6 +9,7 @@ interface Props {
 }
 
 export default function StrategyChart({ strategies, totalLaps }: Props) {
+  const safeTotalLaps = totalLaps > 0 ? totalLaps : 57;
   const barHeight = 32;
   const rowGap = 6;
   const leftPad = 56;
@@ -20,14 +21,14 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
       <div className="min-w-[600px]">
         {/* Lap scale header */}
         <div className="flex items-center mb-2" style={{ paddingLeft: leftPad }}>
-          {Array.from({ length: Math.ceil(totalLaps / 10) + 1 }, (_, i) => {
+          {Array.from({ length: Math.ceil(safeTotalLaps / 10) + 1 }, (_, i) => {
             const lap = i * 10;
-            if (lap > totalLaps) return null;
+            if (lap > safeTotalLaps) return null;
             return (
               <span
                 key={lap}
                 className="text-[10px] font-mono text-f1-muted absolute"
-                style={{ left: `${leftPad + (lap / totalLaps) * 100}%` }}
+                style={{ left: `${leftPad + (lap / safeTotalLaps) * 100}%` }}
               >
                 {lap}
               </span>
@@ -42,7 +43,7 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
               {/* Driver code */}
               <div
                 className="w-12 text-right font-mono text-xs font-bold flex-shrink-0"
-                style={{ color: getTeamColor(driver.team) }}
+                style={{ color: getTeamColor(driver.team ?? "") }}
               >
                 {driver.driverCode}
               </div>
@@ -50,7 +51,9 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
               {/* Stint bars */}
               <div className="flex-1 flex relative" style={{ height: barHeight }}>
                 {driver.stints.map((stint, i) => {
-                  const widthPct = (stint.laps / totalLaps) * 100;
+                  const compound = stint.compound || "UNKNOWN";
+                  const laps = stint.laps > 0 ? stint.laps : 1;
+                  const widthPct = Math.min(100, (laps / safeTotalLaps) * 100);
                   return (
                     <div
                       key={i}
@@ -58,16 +61,16 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
                       style={{
                         width: `${widthPct}%`,
                         height: barHeight,
-                        backgroundColor: getTireColor(stint.compound),
-                        color: stint.compound === "HARD" ? "#1a1a2e" : "#fff",
+                        backgroundColor: getTireColor(compound),
+                        color: compound === "HARD" ? "#1a1a2e" : "#fff",
                         opacity: 0.85,
                         borderRadius: i === 0 ? "6px 0 0 6px" : i === driver.stints.length - 1 ? "0 6px 6px 0" : "0",
                         borderRight: i < driver.stints.length - 1 ? "2px solid #0a0a0f" : "none",
                       }}
-                      title={`${stint.compound} | Laps ${stint.startLap}-${stint.endLap} | Avg: ${stint.avgPace.toFixed(1)}s`}
+                      title={`${compound} | Laps ${stint.startLap ?? "?"}-${stint.endLap ?? "?"} | Avg: ${(stint.avgPace ?? 0).toFixed(1)}s`}
                     >
                       <span className="drop-shadow-sm">
-                        {stint.laps > 8 ? `${stint.compound.charAt(0)} · ${stint.laps}L` : stint.compound.charAt(0)}
+                        {laps > 8 ? `${compound.charAt(0)} · ${laps}L` : compound.charAt(0)}
                       </span>
                     </div>
                   );
