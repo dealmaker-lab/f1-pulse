@@ -116,6 +116,214 @@ function generateContextDescription(
   return parts.join(". ") + ".";
 }
 
+/**
+ * Generate a realistic F1-style radio transcript based on context data.
+ * Alternates between "engineer" and "driver" style messages using a seeded pattern.
+ * Returns { speaker: "engineer"|"driver", text: string }.
+ */
+function generateRadioTranscript(
+  events: { type: string; message: string; flag?: string }[],
+  gap: { gapToLeader: string | null; interval: string | null },
+  position: number | null,
+  driverCode: string,
+  lapNumber: number | null,
+  lapTime: number | null,
+  messageIndex: number
+): { speaker: "engineer" | "driver"; text: string } | null {
+  // Use message index to create natural back-and-forth pattern
+  // ~60% engineer (even indices + multiples of 3), ~40% driver
+  const isEngineer = messageIndex % 3 !== 2;
+
+  const engineerMessages: string[] = [];
+  const driverMessages: string[] = [];
+
+  // Event-based transcripts
+  for (const evt of events) {
+    switch (evt.type) {
+      case "safety_car":
+        engineerMessages.push(
+          "Safety car, safety car. Delta positive, stay above the delta.",
+          "Safety car deployed, close up to the car ahead.",
+        );
+        driverMessages.push(
+          "Copy, safety car. How long do we think?",
+          "Understood. Are we boxing under the safety car?",
+        );
+        break;
+      case "vsc":
+        engineerMessages.push(
+          "VSC, VSC. Reduce speed, follow the delta.",
+          "Virtual safety car. Slow down and maintain delta positive.",
+        );
+        driverMessages.push(
+          "Copy, VSC.",
+          "Roger. Slowing down now.",
+        );
+        break;
+      case "yellow_flag":
+        engineerMessages.push(
+          "Yellow flag, yellow flag. No overtaking.",
+          `Caution ahead. Yellow flag. ${evt.message || "Stay alert."}`,
+        );
+        driverMessages.push(
+          "Copy, yellow.",
+          "Seen it, slowing down.",
+        );
+        break;
+      case "red_flag":
+        engineerMessages.push(
+          "Red flag, red flag. Session stopped. Slow down and come back to the pits.",
+        );
+        driverMessages.push(
+          "Copy, red flag. Heading in.",
+          "What happened?",
+        );
+        break;
+      case "pit":
+        engineerMessages.push(
+          "Box this lap, box box box.",
+          "Okay we're boxing this lap. Box, box.",
+          "Stay out, stay out. We'll extend this stint.",
+        );
+        driverMessages.push(
+          "Copy, boxing.",
+          "These tyres are done, I need to box.",
+          "How much longer on these tyres?",
+        );
+        break;
+      case "drs":
+        if (evt.message?.toLowerCase().includes("enabled")) {
+          engineerMessages.push(
+            "DRS enabled. You have DRS available.",
+            "DRS is active. Push now.",
+          );
+          driverMessages.push(
+            "Copy, DRS. Let's go.",
+          );
+        }
+        break;
+      case "incident":
+        engineerMessages.push(
+          `Incident ahead. ${evt.message || "Stay alert, keep it clean."}`,
+          "Incident reported. Be careful through that section.",
+        );
+        driverMessages.push(
+          "What happened ahead?",
+          "There's debris on the track.",
+        );
+        break;
+      case "track_limits":
+        engineerMessages.push(
+          "Track limits warning. You need to stay within the white lines.",
+          `Track limits — ${evt.message || "lap time deleted"}.`,
+        );
+        driverMessages.push(
+          "Come on, I was within the limits there!",
+          "Copy, I'll watch the track limits.",
+        );
+        break;
+      case "chequered":
+        engineerMessages.push(
+          `Chequered flag, P${position || "?"}! Great job today, well done.`,
+          `That's the chequered flag. P${position || "?"}. Brilliant drive.`,
+        );
+        driverMessages.push(
+          position && position <= 3
+            ? "YES! Get in there! What a race!"
+            : position && position <= 10
+              ? "Good points today. Thanks everyone."
+              : "Thanks guys. Tough one today.",
+        );
+        break;
+    }
+  }
+
+  // Position & gap based transcripts
+  if (position && events.length === 0) {
+    const gapNum = gap.interval ? parseFloat(gap.interval) : null;
+    const gapToLeaderNum = gap.gapToLeader ? parseFloat(gap.gapToLeader) : null;
+
+    if (position === 1) {
+      engineerMessages.push(
+        gapNum && gapNum > 5
+          ? `You're leading by ${gap.gapToLeader} seconds. Manage the gap, look after the tyres.`
+          : gapNum && gapNum < 2
+            ? `Car behind is ${gap.interval}s. Keep pushing, defend the position.`
+            : "You're P1. Keep it clean, bring it home.",
+      );
+      driverMessages.push(
+        "How's the gap behind?",
+        "Tyres feeling good. I can push if needed.",
+        "Copy, managing the pace.",
+      );
+    } else if (position <= 3) {
+      engineerMessages.push(
+        gapNum && gapNum < 1
+          ? `You're P${position}, ${gap.interval}s to the car ahead. DRS range, let's get him.`
+          : `P${position}. Gap ahead is ${gap.interval || gap.gapToLeader || "stable"}. Good pace.`,
+      );
+      driverMessages.push(
+        gapNum && gapNum < 1.5
+          ? "I'm quicker than him, I can see him."
+          : "Copy. What's the plan?",
+      );
+    } else if (position <= 10) {
+      engineerMessages.push(
+        `You're P${position}. ${
+          gapNum && gapNum < 2
+            ? `Gap ahead ${gap.interval}s. Points are in play, push now.`
+            : "Focus on your own race, good pace."
+        }`,
+      );
+      driverMessages.push(
+        gapNum && gapNum < 1
+          ? "I'm all over him, I need to get past."
+          : "Copy, pushing.",
+      );
+    } else {
+      engineerMessages.push(
+        `P${position}. ${gapToLeaderNum && gapToLeaderNum > 30
+          ? "Long stint ahead, manage the tyres."
+          : "Keep pushing, look for opportunities."}`,
+      );
+      driverMessages.push(
+        "Where's the pace? I'm struggling here.",
+        "Copy, giving it everything.",
+      );
+    }
+  }
+
+  // Lap time based
+  if (lapTime && events.length === 0 && !position) {
+    const mins = Math.floor(lapTime / 60);
+    const secs = (lapTime % 60).toFixed(3);
+    const timeStr = mins > 0 ? `${mins}:${parseFloat(secs) < 10 ? "0" : ""}${secs}` : `${secs}`;
+    engineerMessages.push(
+      `Lap time ${timeStr}. Good lap, keep it consistent.`,
+    );
+    driverMessages.push(
+      "Car feels good this lap.",
+    );
+  }
+
+  // Fallback
+  if (engineerMessages.length === 0 && driverMessages.length === 0) {
+    return null;
+  }
+
+  if (isEngineer && engineerMessages.length > 0) {
+    const text = engineerMessages[messageIndex % engineerMessages.length];
+    return { speaker: "engineer", text };
+  } else if (!isEngineer && driverMessages.length > 0) {
+    const text = driverMessages[messageIndex % driverMessages.length];
+    return { speaker: "driver", text };
+  } else if (engineerMessages.length > 0) {
+    return { speaker: "engineer", text: engineerMessages[0] };
+  } else {
+    return { speaker: "driver", text: driverMessages[0] };
+  }
+}
+
 /** Find the closest interval entry for a driver near a timestamp */
 function findInterval(
   intervals: any[],
@@ -246,7 +454,8 @@ export async function GET(req: NextRequest) {
     const rcEvents = Array.isArray(raceControl) ? raceControl : [];
     const ivData = Array.isArray(intervals) ? intervals : [];
 
-    // Map radio messages to lap numbers + context
+    // Map radio messages to lap numbers + context + transcript
+    let messageIdx = 0;
     const enrichedRadio = Array.isArray(radio)
       ? radio.map((r: any) => {
           const radioTime = new Date(r.date).getTime();
@@ -282,6 +491,13 @@ export async function GET(req: NextRequest) {
           const pos = lapData?.position ?? null;
           const description = generateContextDescription(nearbyEvents, gap, pos, driverCode);
 
+          // Generate radio-style transcript
+          const transcript = generateRadioTranscript(
+            nearbyEvents, gap, pos, driverCode,
+            lapNumber, lapData?.lap_duration ?? null,
+            messageIdx++
+          );
+
           return {
             date: r.date,
             driverNumber: r.driver_number,
@@ -300,6 +516,9 @@ export async function GET(req: NextRequest) {
               interval: gap.interval,
               description,
             },
+            transcript: transcript
+              ? { speaker: transcript.speaker, text: transcript.text }
+              : null,
           };
         })
       : [];

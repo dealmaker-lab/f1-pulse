@@ -5,7 +5,8 @@ import {
   Radio, Play, Pause, Volume2, VolumeX, Loader2, ChevronDown,
   AlertTriangle, Clock, Flag, SkipForward, SkipBack, Search, X,
   Shield, Zap, CircleAlert, Timer, TriangleAlert, CircleDot, Gauge,
-  Filter, Users, Mic, MapPin, ChevronRight,
+  Filter, Users, Mic, MapPin, ChevronRight, MessageSquare, List,
+  Headphones, Wifi,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamShortName, getDriverHeadshot, DRIVER_HEADSHOTS } from "@/lib/team-logos";
@@ -45,6 +46,11 @@ interface MessageContext {
   description?: string;
 }
 
+interface RadioTranscript {
+  speaker: "engineer" | "driver";
+  text: string;
+}
+
 interface RadioMessage {
   date: string;
   driverNumber: number;
@@ -58,6 +64,7 @@ interface RadioMessage {
   position: number | null;
   lapTime: number | null;
   context?: MessageContext;
+  transcript?: RadioTranscript | null;
 }
 
 /** A GP weekend grouped with all its sessions */
@@ -186,6 +193,7 @@ export default function RadioPage() {
   const [loading, setLoading] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState<"timeline" | "chat">("chat");
 
   // Audio state
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
@@ -594,9 +602,38 @@ export default function RadioPage() {
             {selectedSession.session_name}
           </span>
           {messages.length > 0 && (
-            <span className="text-xs text-f1-muted ml-auto">
+            <span className="text-xs text-f1-muted">
               {messages.length} messages
             </span>
+          )}
+          {/* View mode toggle */}
+          {messages.length > 0 && (
+            <div className="flex items-center gap-0.5 ml-auto bg-[var(--f1-card)] rounded-lg border border-[var(--f1-border)] p-0.5">
+              <button
+                onClick={() => setViewMode("chat")}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  viewMode === "chat"
+                    ? "bg-racing-red text-white"
+                    : "text-f1-sub hover:text-f1 hover:bg-[var(--f1-hover)]"
+                )}
+              >
+                <MessageSquare className="w-3 h-3" />
+                <span className="hidden sm:inline">Live Feed</span>
+              </button>
+              <button
+                onClick={() => setViewMode("timeline")}
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer",
+                  viewMode === "timeline"
+                    ? "bg-racing-red text-white"
+                    : "text-f1-sub hover:text-f1 hover:bg-[var(--f1-hover)]"
+                )}
+              >
+                <List className="w-3 h-3" />
+                <span className="hidden sm:inline">Timeline</span>
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -836,8 +873,210 @@ export default function RadioPage() {
         </div>
       )}
 
+      {/* ===== CHAT VIEW (LIVE FEED) ===== */}
+      {!loading && filteredMessages.length > 0 && viewMode === "chat" && (
+        <div className="relative">
+          {/* Pit wall header bar */}
+          <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-[var(--f1-card)] border border-[var(--f1-border)]">
+            <div className="relative">
+              <Wifi className="w-3.5 h-3.5 text-green-400" />
+              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            </div>
+            <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest">PIT WALL — LIVE RADIO FEED</span>
+            <span className="text-[10px] text-f1-muted ml-auto font-mono">
+              {filteredMessages.length} transmissions
+            </span>
+          </div>
+
+          {/* Chat messages */}
+          <div className="space-y-3">
+            {filteredMessages.map((msg, idx) => {
+              const isCurrentlyPlaying = playingIdx === idx;
+              const isEngineer = msg.transcript?.speaker === "engineer" || !msg.transcript;
+              const hasTranscript = msg.transcript?.text;
+
+              return (
+                <div
+                  key={`chat-${msg.date}-${msg.driverNumber}`}
+                  ref={(el) => { if (el) messageRefs.current.set(idx, el); }}
+                  className={cn(
+                    "flex gap-3 transition-all duration-300",
+                    isEngineer ? "flex-row" : "flex-row-reverse"
+                  )}
+                >
+                  {/* Avatar */}
+                  <div className="flex-shrink-0 flex flex-col items-center gap-1">
+                    {isEngineer ? (
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${msg.teamColor}20`, border: `2px solid ${msg.teamColor}50` }}
+                      >
+                        <Headphones className="w-4 h-4" style={{ color: msg.teamColor }} />
+                      </div>
+                    ) : (
+                      <DriverHeadshot
+                        code={msg.driverCode}
+                        teamColor={msg.teamColor}
+                        headshotUrl={msg.headshotUrl}
+                        size="sm"
+                      />
+                    )}
+                    <span className="text-[8px] font-bold text-f1-muted uppercase tracking-wider">
+                      {isEngineer ? "ENG" : msg.driverCode}
+                    </span>
+                  </div>
+
+                  {/* Chat bubble */}
+                  <div
+                    className={cn(
+                      "flex-1 max-w-[85%] sm:max-w-[75%] rounded-2xl p-3 sm:p-4 border cursor-pointer transition-all duration-200 group relative",
+                      isEngineer ? "rounded-tl-sm" : "rounded-tr-sm",
+                      isCurrentlyPlaying ? "ring-1" : "hover:brightness-110"
+                    )}
+                    style={{
+                      backgroundColor: isCurrentlyPlaying
+                        ? `${msg.teamColor}12`
+                        : "var(--f1-card)",
+                      borderColor: isCurrentlyPlaying
+                        ? msg.teamColor
+                        : `${msg.teamColor}25`,
+                      ...(isCurrentlyPlaying ? { ringColor: msg.teamColor } : {}),
+                    }}
+                    onClick={() => playMessage(idx)}
+                  >
+                    {/* Speaker label + timestamp */}
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-[10px] font-black uppercase tracking-wider"
+                          style={{ color: msg.teamColor }}
+                        >
+                          {isEngineer ? `${getTeamShortName(msg.team)} Engineer` : msg.driverName}
+                        </span>
+                        {msg.position && (
+                          <span
+                            className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                            style={{
+                              color: getPositionColor(msg.position) || msg.teamColor,
+                              backgroundColor: `${getPositionColor(msg.position) || msg.teamColor}15`,
+                            }}
+                          >
+                            {getPositionBadge(msg.position)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] text-f1-muted">
+                        {msg.lapNumber && (
+                          <span className="font-mono">L{msg.lapNumber}</span>
+                        )}
+                        <span className="font-mono">{formatTime(msg.date)}</span>
+                      </div>
+                    </div>
+
+                    {/* Transcript text */}
+                    {hasTranscript && (
+                      <p className="text-sm text-f1 leading-relaxed mb-2">
+                        &ldquo;{msg.transcript!.text}&rdquo;
+                      </p>
+                    )}
+
+                    {/* Audio waveform player */}
+                    <div
+                      className={cn(
+                        "flex items-center gap-2 rounded-xl px-3 py-2 transition-all",
+                      )}
+                      style={{
+                        backgroundColor: isCurrentlyPlaying
+                          ? `${msg.teamColor}18`
+                          : "var(--f1-hover)",
+                      }}
+                    >
+                      {/* Play/pause button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isCurrentlyPlaying) togglePlayPause();
+                          else playMessage(idx);
+                        }}
+                        className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer"
+                        style={{
+                          backgroundColor: isCurrentlyPlaying ? msg.teamColor : `${msg.teamColor}30`,
+                        }}
+                      >
+                        {isCurrentlyPlaying && isPlaying ? (
+                          <Pause className="w-3 h-3 text-white" />
+                        ) : (
+                          <Play className="w-3 h-3 ml-0.5" style={{ color: isCurrentlyPlaying ? "#fff" : msg.teamColor }} />
+                        )}
+                      </button>
+
+                      {/* Waveform visualization */}
+                      <div className="flex-1 flex items-center gap-[2px] h-6">
+                        {Array.from({ length: 28 }).map((_, i) => {
+                          const barProgress = isCurrentlyPlaying ? (audioProgress / 100) * 28 : 0;
+                          const isPast = i < barProgress;
+                          // Generate a pseudo-random height based on index
+                          const seed = (i * 7 + 3) % 11;
+                          const height = 30 + seed * 7;
+                          return (
+                            <div
+                              key={i}
+                              className="flex-1 rounded-full transition-all duration-150"
+                              style={{
+                                height: `${height}%`,
+                                backgroundColor: isPast
+                                  ? msg.teamColor
+                                  : isCurrentlyPlaying
+                                    ? `${msg.teamColor}30`
+                                    : "var(--f1-border)",
+                                opacity: isCurrentlyPlaying && isPlaying && Math.abs(i - barProgress) < 2 ? 1 : isPast ? 0.8 : 0.4,
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {/* Duration */}
+                      <span className="text-[10px] text-f1-muted font-mono flex-shrink-0">
+                        {isCurrentlyPlaying && audioRef.current?.duration
+                          ? `${Math.floor(audioRef.current.currentTime)}/${Math.floor(audioRef.current.duration)}s`
+                          : ""}
+                      </span>
+                    </div>
+
+                    {/* Context badges */}
+                    {msg.context && (msg.context.events.length > 0 || msg.context.gapToLeader) && (
+                      <div className="flex flex-wrap items-center gap-1 mt-2">
+                        {msg.context.events.map((evt, i) => {
+                          const badge = EVENT_BADGES[evt.type] || EVENT_BADGES.event;
+                          return (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider"
+                              style={{ backgroundColor: badge.bg, color: badge.color }}
+                              title={evt.message}
+                            >
+                              {badge.label}
+                            </span>
+                          );
+                        })}
+                        {msg.context.gapToLeader && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold border border-[var(--f1-border)] text-f1-sub">
+                            Gap: {msg.context.gapToLeader}s
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ===== MESSAGE TIMELINE ===== */}
-      {!loading && filteredMessages.length > 0 && (
+      {!loading && filteredMessages.length > 0 && viewMode === "timeline" && (
         <div className="relative">
           {/* Vertical timeline line */}
           <div className="absolute left-4 sm:left-6 top-0 bottom-0 w-px bg-[var(--f1-border)]" />
