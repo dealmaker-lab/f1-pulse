@@ -1,0 +1,57 @@
+name: E2E Tests (Post-Deploy)
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Wait for Vercel deploy
+        if: github.event_name == 'push'
+        run: sleep 60
+
+      - name: Run post-deploy tests (production)
+        if: github.event_name == 'push'
+        run: npx playwright test e2e/post-deploy.spec.ts --project=chromium-dark --project=chromium-light
+        env:
+          BASE_URL: https://patootu-f1.vercel.app
+
+      - name: Run smoke tests (PR preview)
+        if: github.event_name == 'pull_request'
+        run: npx playwright test e2e/smoke.spec.ts --project=chromium-dark
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots
+          path: e2e/screenshots/
+          retention-days: 7
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
