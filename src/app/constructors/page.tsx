@@ -9,7 +9,7 @@ import {
   ResponsiveContainer, Legend, BarChart, Bar, Cell,
 } from "recharts";
 
-const YEARS = [2025, 2024, 2023, 2022, 2021, 2020];
+const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
 
 function TeamLogo({ teamName, size = "md" }: { teamName: string; size?: "sm" | "md" | "lg" }) {
   const [imgError, setImgError] = useState(false);
@@ -59,7 +59,7 @@ interface ProgressionData {
 }
 
 export default function ConstructorsPage() {
-  const [selectedYear, setSelectedYear] = useState(2025);
+  const [selectedYear, setSelectedYear] = useState(2026);
   const [standings, setStandings] = useState<ConstructorStanding[]>([]);
   const [progression, setProgression] = useState<ProgressionData | null>(null);
   const [loadingStandings, setLoadingStandings] = useState(false);

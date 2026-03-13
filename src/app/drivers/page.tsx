@@ -124,7 +124,7 @@ function DriverHeadshot({ code, teamColor, size = "sm" }: { code: string; teamCo
 }
 
 export default function DriversPage() {
-  const [year, setYear] = useState(2025);
+  const [year, setYear] = useState(2026);
   const [standings, setStandings] = useState<DriverStanding[]>([]);
   const [raceNames, setRaceNames] = useState<string[]>([]);
   const [selectedDriver, setSelectedDriver] = useState("VER");
@@ -252,7 +252,7 @@ export default function DriversPage() {
           onChange={(e) => setYear(Number(e.target.value))}
           className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm font-mono text-f1-sub cursor-pointer"
         >
-          {[2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
+          {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
             <option key={y} value={y}>{y}</option>
           ))}
         </select>

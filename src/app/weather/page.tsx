@@ -76,7 +76,8 @@ function getWeatherAtTime(weather: WeatherData[], targetTime: number): WeatherDa
 
 // ===== Component =====
 export default function WeatherPage() {
-  const [year, setYear] = useState(2025);
+  const [year, setYear] = useState(2026);
+  const [sessionType, setSessionType] = useState("Race");
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
 
@@ -90,7 +91,7 @@ export default function WeatherPage() {
 
   // Fetch sessions
   useEffect(() => {
-    fetch(`/api/f1/sessions?year=${year}&type=Race`)
+    fetch(`/api/f1/sessions?year=${year}&type=${sessionType}`)
       .then((r) => r.json())
       .then((data: SessionInfo[]) => {
         const sorted = Array.isArray(data)
@@ -100,7 +101,7 @@ export default function WeatherPage() {
         if (sorted.length) setSelectedSession(sorted[0]);
       })
       .catch(() => setError("Failed to load sessions"));
-  }, [year]);
+  }, [year, sessionType]);
 
   // Fetch weather + laps + drivers when session changes
   useEffect(() => {
@@ -225,7 +226,20 @@ export default function WeatherPage() {
               onChange={(e) => { setYear(Number(e.target.value)); setSelectedSession(null); }}
               className="bg-[var(--f1-hover)] border border-[var(--f1-border)] text-f1 rounded-lg px-3 py-2 text-sm appearance-none cursor-pointer"
             >
-              {[2025, 2024, 2023, 2022, 2021, 2020].map((y) => <option key={y} value={y}>{y}</option>)}
+              {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold block mb-1.5">Session</label>
+            <select
+              value={sessionType}
+              onChange={(e) => { setSessionType(e.target.value); setSelectedSession(null); }}
+              className="bg-[var(--f1-hover)] border border-[var(--f1-border)] text-f1 rounded-lg px-3 py-2 text-sm appearance-none cursor-pointer"
+            >
+              {["Race", "Qualifying", "Sprint", "Sprint Qualifying", "Practice"].map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
             </select>
           </div>
 

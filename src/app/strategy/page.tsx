@@ -14,7 +14,7 @@ import {
   LineChart, Line, CartesianGrid,
 } from "recharts";
 
-const YEARS = [2025, 2024, 2023, 2022, 2021, 2020];
+const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
 
 type CompareTab = "strategy" | "positions" | "pitstops";
 
@@ -283,11 +283,12 @@ function PitStopsPanel({
 // ─── Race selector card ───────────────────────────────────────────────────────
 
 function RaceSelector({
-  label, accent, year, setYear, races, loading,
+  label, accent, year, setYear, sessionType, setSessionType, races, loading,
   selected, setSelected,
 }: {
   label: string; accent: string;
   year: number; setYear: (y: number) => void;
+  sessionType: string; setSessionType: (t: string) => void;
   races: RaceSession[]; loading: boolean;
   selected: RaceSession | null; setSelected: (r: RaceSession) => void;
 }) {
@@ -304,7 +305,7 @@ function RaceSelector({
       <div className="text-[9px] font-black uppercase tracking-[0.2em] font-mono" style={{ color: accent }}>
         {label}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
         {/* Year */}
         <div className="relative">
           <select
@@ -314,6 +315,20 @@ function RaceSelector({
           >
             {YEARS.map((y) => (
               <option key={y} value={y} className="bg-[#0d0f14]">{y}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+        </div>
+
+        {/* Session Type */}
+        <div className="relative">
+          <select
+            value={sessionType}
+            onChange={(e) => setSessionType(e.target.value)}
+            className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm font-mono text-f1 bg-[var(--f1-hover)] border border-[var(--f1-border)] outline-none focus:border-f1-sub transition-colors cursor-pointer"
+          >
+            {["Race", "Qualifying", "Sprint", "Sprint Qualifying", "Practice"].map((t) => (
+              <option key={t} value={t} className="bg-[#0d0f14]">{t}</option>
             ))}
           </select>
           <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
@@ -442,13 +457,15 @@ function DriverStrip({
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function StrategyPage() {
-  const [year1, setYear1] = useState(2025);
+  const [year1, setYear1] = useState(2026);
+  const [sessionType1, setSessionType1] = useState("Race");
   const [races1, setRaces1] = useState<RaceSession[]>([]);
   const [race1, setRace1] = useState<RaceSession | null>(null);
   const [loadingRaces1, setLoadingRaces1] = useState(false);
 
   const [compareMode, setCompareMode] = useState(false);
-  const [year2, setYear2] = useState(2025);
+  const [year2, setYear2] = useState(2026);
+  const [sessionType2, setSessionType2] = useState("Race");
   const [races2, setRaces2] = useState<RaceSession[]>([]);
   const [race2, setRace2] = useState<RaceSession | null>(null);
   const [loadingRaces2, setLoadingRaces2] = useState(false);
@@ -471,7 +488,7 @@ export default function StrategyPage() {
   useEffect(() => {
     setLoadingRaces1(true);
     setRace1(null);
-    fetch(`/api/f1/sessions?year=${year1}&type=Race`)
+    fetch(`/api/f1/sessions?year=${year1}&type=${sessionType1}`)
       .then((r) => r.json())
       .then((data) => {
         const arr: RaceSession[] = Array.isArray(data) ? data : [];
@@ -480,13 +497,13 @@ export default function StrategyPage() {
       })
       .catch(() => setRaces1([]))
       .finally(() => setLoadingRaces1(false));
-  }, [year1]);
+  }, [year1, sessionType1]);
 
   // ── Load race list 2 (always fetch if compareMode, so selector is ready)
   useEffect(() => {
     if (!compareMode) return;
     setLoadingRaces2(true);
-    fetch(`/api/f1/sessions?year=${year2}&type=Race`)
+    fetch(`/api/f1/sessions?year=${year2}&type=${sessionType2}`)
       .then((r) => r.json())
       .then((data) => {
         const arr: RaceSession[] = Array.isArray(data) ? data : [];
@@ -496,7 +513,7 @@ export default function StrategyPage() {
       })
       .catch(() => setRaces2([]))
       .finally(() => setLoadingRaces2(false));
-  }, [compareMode, year2]);
+  }, [compareMode, year2, sessionType2]);
 
   // ── Load race 1 data
   useEffect(() => {
@@ -591,6 +608,7 @@ export default function StrategyPage() {
           label="Race A"
           accent="#3B82F6"
           year={year1} setYear={setYear1}
+          sessionType={sessionType1} setSessionType={setSessionType1}
           races={races1} loading={loadingRaces1}
           selected={race1} setSelected={setRace1}
         />
@@ -599,6 +617,7 @@ export default function StrategyPage() {
             label="Race B"
             accent="#39B54A"
             year={year2} setYear={setYear2}
+            sessionType={sessionType2} setSessionType={setSessionType2}
             races={races2} loading={loadingRaces2}
             selected={race2} setSelected={setRace2}
           />

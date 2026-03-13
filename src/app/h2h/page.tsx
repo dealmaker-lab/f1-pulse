@@ -177,7 +177,7 @@ function BattleBar({
 // ─── Main Page ──────────────────────────────────────────────────────────
 
 export default function H2HPage() {
-  const [year, setYear] = useState(2025);
+  const [year, setYear] = useState(2026);
   const [d1Code, setD1Code] = useState("VER");
   const [d2Code, setD2Code] = useState("NOR");
   const [loading, setLoading] = useState(false);
@@ -263,7 +263,7 @@ export default function H2HPage() {
             onChange={(e) => setYear(Number(e.target.value))}
             className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
           >
-            {[2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
+            {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
               <option key={y} value={y} className="bg-[var(--f1-card)]">{y}</option>
             ))}
           </select>

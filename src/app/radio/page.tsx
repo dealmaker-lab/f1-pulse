@@ -168,7 +168,7 @@ function TeamLogo({ teamName, size = "sm" }: { teamName: string; size?: "xs" | "
 
 // ===== Main Component =====
 export default function RadioPage() {
-  const [year, setYear] = useState(2025);
+  const [year, setYear] = useState(2026);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   const [messages, setMessages] = useState<RadioMessage[]>([]);
@@ -190,7 +190,7 @@ export default function RadioPage() {
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
   const messageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  const YEARS = [2025, 2024, 2023, 2022, 2021, 2020];
+  const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
 
   // ===== Data Fetching =====
 
