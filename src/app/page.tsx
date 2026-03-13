@@ -77,6 +77,10 @@ interface RaceResultEntry {
   }[];
 }
 
+// ─── Constants ─────────────────────────────────────────────────────────────
+
+const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+
 // ─── Subcomponents ─────────────────────────────────────────────────────────
 
 /** Podium position card for the latest result hero */
@@ -241,12 +245,15 @@ function StandingRow({
 // ─── Main Page ─────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(2025);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [meetings, setMeetings] = useState<MeetingInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDriver, setSelectedDriver] = useState("RUS");
+  const [selectedDriver, setSelectedDriver] = useState("VER");
   const [activeTab, setActiveTab] = useState<"drivers" | "constructors">("drivers");
+
+  // Race selector — "all" means season overview, otherwise a specific round
+  const [selectedRound, setSelectedRound] = useState<"latest" | number>("latest");
 
   const [driverStandings, setDriverStandings] = useState<ApiDriverStanding[]>([]);
   const [constructorStandings, setConstructorStandings] = useState<ApiConstructorStanding[]>([]);
@@ -260,6 +267,7 @@ export default function DashboardPage() {
   // Fetch race calendar
   useEffect(() => {
     setLoading(true);
+    setSelectedRound("latest");
     Promise.all([
       fetch(`/api/f1/sessions?year=${year}&type=Race`).then((r) => r.json()),
       fetch(`/api/f1/meetings?year=${year}`).then((r) => r.json()),
@@ -323,9 +331,38 @@ export default function DashboardPage() {
   const now = new Date();
   const pastRaces = sessions.filter((s) => new Date(s.date_start) < now);
   const upcomingRaces = sessions.filter((s) => new Date(s.date_start) >= now);
-  const latestRace = pastRaces[pastRaces.length - 1];
   const nextRace = upcomingRaces[0];
-  const latestResult = raceResults.length > 0 ? raceResults[raceResults.length - 1] : null;
+
+  // Build race options for the dropdown
+  const raceOptions = useMemo(() => {
+    if (!raceResults.length) return [];
+    return raceResults.map((r) => ({
+      round: r.round,
+      label: `R${String(r.round).padStart(2, "0")} — ${r.raceName.replace(" Grand Prix", " GP")}`,
+      country: r.country,
+      circuit: r.circuit,
+    }));
+  }, [raceResults]);
+
+  // The displayed race result — either the selected round or latest
+  const displayedResult = useMemo(() => {
+    if (!raceResults.length) return null;
+    if (selectedRound === "latest") {
+      return raceResults[raceResults.length - 1];
+    }
+    return raceResults.find((r) => r.round === selectedRound) || null;
+  }, [raceResults, selectedRound]);
+
+  // Map the displayed race to a session for the circuit map
+  const displayedSession = useMemo(() => {
+    if (!displayedResult || !sessions.length) return null;
+    // Try to match by country/circuit
+    return sessions.find((s) =>
+      s.country_name?.toLowerCase().includes(displayedResult.country?.toLowerCase() || "") ||
+      s.circuit_short_name?.toLowerCase().includes(displayedResult.circuit?.toLowerCase().split(" ")[0] || "")
+    ) || sessions[sessions.length - 1];
+  }, [displayedResult, sessions]);
+
   const leader = driverStandings[0];
   const secondPlace = driverStandings[1];
   const pointsGap = leader && secondPlace ? leader.points - secondPlace.points : 0;
@@ -370,9 +407,9 @@ export default function DashboardPage() {
   const constructorChartData = buildConstructorData();
 
   // Session key for the circuit map
-  const heroSessionKey = latestRace?.session_key || null;
-  const heroCircuitName = latestRace
-    ? `${getMeetingName(latestRace.meeting_key).replace(" Grand Prix", " GP") || latestRace.circuit_short_name}`
+  const heroSessionKey = displayedSession?.session_key || null;
+  const heroCircuitName = displayedSession
+    ? `${getMeetingName(displayedSession.meeting_key).replace(" Grand Prix", " GP") || displayedSession.circuit_short_name}`
     : "";
 
   return (
@@ -389,16 +426,17 @@ export default function DashboardPage() {
         </div>
 
         <div className="relative max-w-[1600px] mx-auto">
-          {/* Top bar: year selector + live indicator */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
+          {/* Top bar: year + race selectors + live indicator */}
+          <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Year selector */}
               <div className="relative">
                 <select
                   value={year}
                   onChange={(e) => setYear(Number(e.target.value))}
                   className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
                 >
-                  {[2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018].map((y) => (
+                  {YEARS.map((y) => (
                     <option key={y} value={y} className="bg-[var(--f1-card)]">
                       {y}
                     </option>
@@ -406,6 +444,31 @@ export default function DashboardPage() {
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
               </div>
+
+              <span className="text-[var(--f1-text-dim)] text-xs">/</span>
+
+              {/* Race/Circuit selector */}
+              <div className="relative">
+                <select
+                  value={selectedRound === "latest" ? "latest" : selectedRound}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedRound(val === "latest" ? "latest" : Number(val));
+                  }}
+                  className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none max-w-[280px]"
+                >
+                  <option value="latest" className="bg-[var(--f1-card)]">
+                    Latest Race
+                  </option>
+                  {raceOptions.map((r) => (
+                    <option key={r.round} value={r.round} className="bg-[var(--f1-card)]">
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+              </div>
+
               <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)]">
                 Season
               </span>
@@ -437,15 +500,19 @@ export default function DashboardPage() {
             <div>
               {/* Tiny label */}
               <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-f1-red/70 mb-3">
-                {latestResult ? "Latest Result" : nextRace ? "Coming Up" : `${year} Season`}
+                {displayedResult
+                  ? `Round ${displayedResult.round} Result`
+                  : nextRace
+                  ? "Coming Up"
+                  : `${year} Season`}
               </div>
 
               {/* Huge race name */}
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-display font-black uppercase tracking-tight leading-[0.95]">
-                {latestResult ? (
+                {displayedResult ? (
                   <>
                     <span className="text-f1">
-                      {latestResult.raceName.replace(" Grand Prix", "")}
+                      {displayedResult.raceName.replace(" Grand Prix", "")}
                     </span>
                     <br />
                     <span className="text-f1-red glow-text">GP</span>
@@ -470,22 +537,31 @@ export default function DashboardPage() {
 
               {/* Subtext */}
               <div className="mt-4 flex items-center gap-4 text-sm text-f1-muted">
-                {latestRace && (
+                {displayedResult && (
                   <>
                     <span className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5" />
-                      {latestRace.circuit_short_name}, {latestRace.country_name}
+                      {displayedResult.circuit}, {displayedResult.country}
                     </span>
                     <span className="text-[var(--f1-text-dim)]">|</span>
+                    <span className="font-mono text-xs">
+                      {new Date(displayedResult.date).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </span>
                   </>
                 )}
-                <span className="font-mono text-xs">
-                  Round {pastRaces.length}/{sessions.length || "—"}
-                </span>
+                {!displayedResult && (
+                  <span className="font-mono text-xs">
+                    Round {pastRaces.length}/{sessions.length || "—"}
+                  </span>
+                )}
               </div>
 
               {/* Winner callout */}
-              {latestResult && latestResult.results[0] && (
+              {displayedResult && displayedResult.results[0] && (
                 <div className="mt-8">
                   <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)] mb-2">
                     Race Winner
@@ -495,23 +571,23 @@ export default function DashboardPage() {
                       className="w-1 h-12 rounded-full"
                       style={{
                         backgroundColor:
-                          latestResult.results[0].driver.teamColor ||
-                          getTeamColor(latestResult.results[0].driver.team),
+                          displayedResult.results[0].driver.teamColor ||
+                          getTeamColor(displayedResult.results[0].driver.team),
                       }}
                     />
                     <div>
                       <div className="text-2xl sm:text-3xl font-display font-black uppercase tracking-tight">
-                        {latestResult.results[0].driver.name}
+                        {displayedResult.results[0].driver.name}
                       </div>
                       <div
                         className="text-xs font-semibold uppercase tracking-wider mt-0.5"
                         style={{
                           color:
-                            latestResult.results[0].driver.teamColor ||
-                            getTeamColor(latestResult.results[0].driver.team),
+                            displayedResult.results[0].driver.teamColor ||
+                            getTeamColor(displayedResult.results[0].driver.team),
                         }}
                       >
-                        {latestResult.results[0].driver.team}
+                        {displayedResult.results[0].driver.team}
                       </div>
                     </div>
                   </div>
@@ -579,29 +655,26 @@ export default function DashboardPage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          PODIUM — Latest race results with editorial hierarchy
+          PODIUM — Selected race results with editorial hierarchy
           ════════════════════════════════════════════════════════════════════ */}
-      {latestResult && latestResult.results.length > 0 && (
+      {displayedResult && displayedResult.results.length > 0 && (
         <section className="px-4 sm:px-6 lg:px-8 py-6">
           <div className="max-w-[1600px] mx-auto">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <Flag className="w-4 h-4 text-f1-red/60" />
                 <h2 className="text-f1-sm uppercase tracking-wider text-f1-muted">
-                  Race Result
+                  Race Result — {displayedResult.raceName.replace(" Grand Prix", " GP")}
                 </h2>
               </div>
-              <Link
-                href="/race"
-                className="text-[10px] font-mono uppercase tracking-widest text-[var(--f1-text-dim)] hover:text-f1-red transition-colors flex items-center gap-1"
-              >
-                Full Results <ChevronRight className="w-3 h-3" />
-              </Link>
+              <span className="text-[10px] font-mono text-[var(--f1-text-dim)]">
+                {displayedResult.results.length} classified
+              </span>
             </div>
 
             {/* Podium cards — P1 gets hero treatment */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {latestResult.results.slice(0, 3).map((r) => (
+              {displayedResult.results.slice(0, 3).map((r) => (
                 <PodiumCard
                   key={r.driver.code}
                   position={r.position}
@@ -614,7 +687,7 @@ export default function DashboardPage() {
 
             {/* P4-P10 compact strip */}
             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-              {latestResult.results.slice(3, 10).map((r) => {
+              {displayedResult.results.slice(3, 10).map((r) => {
                 const color = r.driver.teamColor || getTeamColor(r.driver.team);
                 const gainedPositions = r.grid - r.position;
                 return (
@@ -644,6 +717,35 @@ export default function DashboardPage() {
                 );
               })}
             </div>
+
+            {/* Full classification P11-P20 (collapsible) */}
+            {displayedResult.results.length > 10 && (
+              <details className="mt-3">
+                <summary className="text-[10px] font-mono uppercase tracking-widest text-[var(--f1-text-dim)] cursor-pointer hover:text-f1-muted transition-colors py-2">
+                  Show full classification ({displayedResult.results.length - 10} more)
+                </summary>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2 mt-2">
+                  {displayedResult.results.slice(10).map((r) => {
+                    const color = r.driver.teamColor || getTeamColor(r.driver.team);
+                    return (
+                      <div
+                        key={r.driver.code}
+                        className="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-[var(--f1-hover)] border border-[var(--f1-border)] opacity-70"
+                      >
+                        <span className="text-[11px] font-display font-black text-[var(--f1-text-dim)] w-5">
+                          {r.position}
+                        </span>
+                        <div className="w-[2px] h-3.5 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="text-[11px] font-bold flex-1">{r.driver.code}</span>
+                        <span className="text-[9px] font-mono text-[var(--f1-text-dim)]">
+                          {r.status !== "Finished" && r.status !== "+1 Lap" ? r.status.substring(0, 3).toUpperCase() : ""}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
           </div>
         </section>
       )}
@@ -853,11 +955,21 @@ export default function DashboardPage() {
                     const name = getMeetingName(race.meeting_key) || race.circuit_short_name;
 
                     return (
-                      <Link
+                      <button
                         key={race.session_key}
-                        href="/race"
+                        onClick={() => {
+                          // Find the matching round from results
+                          const matchingResult = raceResults.find(
+                            (r) =>
+                              r.country?.toLowerCase() === race.country_name?.toLowerCase() ||
+                              r.circuit?.toLowerCase().includes(race.circuit_short_name?.toLowerCase())
+                          );
+                          if (matchingResult) {
+                            setSelectedRound(matchingResult.round);
+                          }
+                        }}
                         className={cn(
-                          "flex-shrink-0 snap-start flex flex-col items-center group transition-all duration-300",
+                          "flex-shrink-0 snap-start flex flex-col items-center group transition-all duration-300 cursor-pointer",
                           isNext ? "w-[120px]" : "w-[60px] sm:w-[70px]",
                           !isPast && !isNext && "opacity-40"
                         )}
@@ -906,7 +1018,7 @@ export default function DashboardPage() {
                             Next
                           </div>
                         )}
-                      </Link>
+                      </button>
                     );
                   })}
                 </div>
@@ -923,7 +1035,7 @@ export default function DashboardPage() {
                     if (nextIdx === -1) return i >= sessions.length - 5;
                     return i >= Math.max(0, nextIdx - 2) && i <= nextIdx + 2;
                   })
-                  .map((race, idx) => {
+                  .map((race) => {
                     const isPast = new Date(race.date_start) < now;
                     const isNext = nextRace?.session_key === race.session_key;
                     const name = getMeetingName(race.meeting_key) || race.circuit_short_name;
@@ -932,11 +1044,21 @@ export default function DashboardPage() {
                     );
 
                     return (
-                      <Link
+                      <button
                         key={race.session_key}
-                        href="/race"
+                        onClick={() => {
+                          const matchingResult = raceResults.find(
+                            (r) =>
+                              r.country?.toLowerCase() === race.country_name?.toLowerCase() ||
+                              r.circuit?.toLowerCase().includes(race.circuit_short_name?.toLowerCase())
+                          );
+                          if (matchingResult) {
+                            setSelectedRound(matchingResult.round);
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }
+                        }}
                         className={cn(
-                          "p-3 rounded-xl border transition-all duration-300 group",
+                          "p-3 rounded-xl border transition-all duration-300 group text-left cursor-pointer",
                           isNext
                             ? "border-f1-red/20 bg-f1-red/[0.04]"
                             : isPast
@@ -974,7 +1096,7 @@ export default function DashboardPage() {
                             day: "numeric",
                           })}
                         </div>
-                      </Link>
+                      </button>
                     );
                   })}
               </div>

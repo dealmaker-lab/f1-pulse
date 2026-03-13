@@ -13,7 +13,7 @@ import {
   LineChart, Line, CartesianGrid,
 } from "recharts";
 
-const YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026];
+const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
 
 type CompareTab = "strategy" | "positions" | "pitstops";
 
@@ -440,7 +440,7 @@ export default function StrategyPage() {
   const [loadingRaces1, setLoadingRaces1] = useState(false);
 
   const [compareMode, setCompareMode] = useState(false);
-  const [year2, setYear2] = useState(2024);
+  const [year2, setYear2] = useState(2025);
   const [races2, setRaces2] = useState<RaceSession[]>([]);
   const [race2, setRace2] = useState<RaceSession | null>(null);
   const [loadingRaces2, setLoadingRaces2] = useState(false);

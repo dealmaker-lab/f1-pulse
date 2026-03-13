@@ -99,7 +99,7 @@ function sliceTelemetryForLap(
 // ===== Component =====
 export default function TelemetryPage() {
   // Session selection
-  const [year, setYear] = useState(2024);
+  const [year, setYear] = useState(2025);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   const [sessionType, setSessionType] = useState<"Race" | "Qualifying">("Qualifying");
@@ -334,7 +334,7 @@ export default function TelemetryPage() {
               onChange={(e) => { setYear(Number(e.target.value)); setSelectedSession(null); }}
               className="bg-[var(--f1-hover)] border border-[var(--f1-border)] text-f1 rounded-lg px-3 py-2 text-sm appearance-none cursor-pointer"
             >
-              {[2024, 2023].map((y) => (
+              {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>

@@ -8,7 +8,7 @@ import {
   ResponsiveContainer, Legend, BarChart, Bar, Cell,
 } from "recharts";
 
-const YEARS = [2020, 2021, 2022, 2023, 2024, 2025];
+const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
 
 interface ConstructorStanding {
   position: number;
