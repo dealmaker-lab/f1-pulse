@@ -96,10 +96,22 @@ function sliceTelemetryForLap(
     }));
 }
 
+/** When two drivers share the same team color, shift hue + lighten to keep charts readable */
+function adjustColorForContrast(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  // Shift towards a lighter, rotated variant
+  const nr = Math.min(255, r + 80);
+  const ng = Math.min(255, g + 60);
+  const nb = Math.min(255, b + 40);
+  return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
+}
+
 // ===== Component =====
 export default function TelemetryPage() {
   // Session selection
-  const [year, setYear] = useState(2025);
+  const [year, setYear] = useState(2026);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   const [sessionType, setSessionType] = useState<string>("Qualifying");
@@ -135,7 +147,12 @@ export default function TelemetryPage() {
           ? data.sort((a, b) => new Date(b.date_start).getTime() - new Date(a.date_start).getTime())
           : [];
         setSessions(sorted);
-        if (sorted.length) setSelectedSession(sorted[0]);
+        if (sorted.length) {
+          setSelectedSession(sorted[0]);
+        } else {
+          setSelectedSession(null);
+          setError(`No ${sessionType} sessions found for ${year} — try a different session type or year`);
+        }
       })
       .catch(() => setError("Failed to load sessions"))
       .finally(() => setLoadingSessions(false));
@@ -212,14 +229,25 @@ export default function TelemetryPage() {
     setError(null);
 
     Promise.all([
-      fetch(`/api/f1/car-data?session_key=${selectedSession.session_key}&driver_number=${driver1.driver_number}`).then((r) => r.json()),
-      fetch(`/api/f1/car-data?session_key=${selectedSession.session_key}&driver_number=${driver2.driver_number}`).then((r) => r.json()),
+      fetch(`/api/f1/car-data?session_key=${selectedSession.session_key}&driver_number=${driver1.driver_number}`)
+        .then((r) => r.ok ? r.json() : []),
+      fetch(`/api/f1/car-data?session_key=${selectedSession.session_key}&driver_number=${driver2.driver_number}`)
+        .then((r) => r.ok ? r.json() : []),
     ])
       .then(([d1, d2]) => {
-        setRawData1(Array.isArray(d1) ? d1 : []);
-        setRawData2(Array.isArray(d2) ? d2 : []);
+        const data1 = Array.isArray(d1) ? d1 : [];
+        const data2 = Array.isArray(d2) ? d2 : [];
+        setRawData1(data1);
+        setRawData2(data2);
+        if (!data1.length && !data2.length) {
+          setError("No telemetry data available for this session — data may not have been published yet");
+        } else if (!data1.length) {
+          setError(`No telemetry data for ${driver1.name_acronym} — may have retired or data is unavailable`);
+        } else if (!data2.length) {
+          setError(`No telemetry data for ${driver2.name_acronym} — may have retired or data is unavailable`);
+        }
       })
-      .catch(() => setError("Failed to load telemetry data"))
+      .catch(() => setError("Failed to load telemetry data — try a different session"))
       .finally(() => setLoadingTelemetry(false));
   }, [selectedSession, driver1, driver2]);
 
@@ -279,9 +307,11 @@ export default function TelemetryPage() {
     return { merged, telem1, telem2, lap1Info, lap2Info };
   }, [rawData1, rawData2, selectedLap1, selectedLap2, laps1, laps2]);
 
-  // Colors
+  // Colors — offset driver 2 when same team to avoid identical chart lines
   const d1Color = driver1 ? `#${driver1.team_colour || "3b82f6"}` : "#3b82f6";
-  const d2Color = driver2 ? `#${driver2.team_colour || "ef4444"}` : "#ef4444";
+  const d2RawColor = driver2 ? `#${driver2.team_colour || "ef4444"}` : "#ef4444";
+  const sameTeam = driver1 && driver2 && driver1.team_name === driver2.team_name;
+  const d2Color = sameTeam ? adjustColorForContrast(d2RawColor) : d2RawColor;
 
   // Stats
   const stats = useMemo(() => {
@@ -394,60 +424,88 @@ export default function TelemetryPage() {
           {[
             { driver: driver1, setDriver: setDriver1, label: "Driver 1", laps: laps1, selectedLap: selectedLap1, setLap: setSelectedLap1, color: d1Color },
             { driver: driver2, setDriver: setDriver2, label: "Driver 2", laps: laps2, selectedLap: selectedLap2, setLap: setSelectedLap2, color: d2Color },
-          ].map((slot) => (
-            <div key={slot.label} className="glass-card p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold">{slot.label}</span>
-                {slot.driver && (
-                  <span className="text-xs font-bold font-mono px-2 py-0.5 rounded" style={{ color: slot.color, backgroundColor: `${slot.color}15` }}>
-                    {slot.driver.name_acronym}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {drivers.map((d) => {
-                  const c = `#${d.team_colour || "888"}`;
-                  const isSelected = slot.driver?.driver_number === d.driver_number;
-                  return (
-                    <button
-                      key={d.driver_number}
-                      onClick={() => slot.setDriver(d)}
-                      className={cn(
-                        "px-2 py-1 rounded-md text-[11px] font-mono font-bold transition-all duration-200 cursor-pointer border",
-                        isSelected ? "border-opacity-50" : "border-[var(--f1-border)] text-f1-muted hover:text-f1-sub hover:border-f1"
-                      )}
-                      style={isSelected ? { backgroundColor: `${c}20`, borderColor: `${c}50`, color: c } : {}}
-                    >
-                      {d.name_acronym}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {slot.laps.length > 0 && (
-                <div>
-                  <label className="text-[9px] uppercase tracking-widest text-f1-muted font-semibold block mb-1">
-                    Lap (fastest auto-selected)
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={slot.selectedLap || ""}
-                      onChange={(e) => slot.setLap(Number(e.target.value))}
-                      className="w-full bg-[var(--f1-hover)] border border-[var(--f1-border)] text-f1 rounded-lg px-3 py-1.5 text-xs font-mono appearance-none cursor-pointer pr-8"
-                    >
-                      {slot.laps.map((l) => (
-                        <option key={l.lap_number} value={l.lap_number}>
-                          Lap {l.lap_number} — {formatLapTime(l.lap_duration)}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+          ].map((slot) => {
+            const otherDriver = slot.label === "Driver 1" ? driver2 : driver1;
+            const maxLap = slot.laps.length ? Math.max(...slot.laps.map((l) => l.lap_number)) : 0;
+            return (
+              <div key={slot.label} className="glass-card p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold">{slot.label}</span>
+                  <div className="flex items-center gap-2">
+                    {slot.driver && maxLap > 0 && maxLap < 50 && (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-racing-red/10 text-racing-red border border-racing-red/20">
+                        DNF Lap {maxLap}
+                      </span>
+                    )}
+                    {slot.driver && (
+                      <span className="text-xs font-bold font-mono px-2 py-0.5 rounded" style={{ color: slot.color, backgroundColor: `${slot.color}15` }}>
+                        {slot.driver.name_acronym}
+                      </span>
+                    )}
+                    {sameTeam && slot.label === "Driver 2" && (
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-racing-amber/10 text-racing-amber border border-racing-amber/20">
+                        Adjusted color
+                      </span>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-          ))}
+
+                <div className="flex flex-wrap gap-1.5">
+                  {drivers.map((d) => {
+                    const c = `#${d.team_colour || "888"}`;
+                    const isSelected = slot.driver?.driver_number === d.driver_number;
+                    const isSameAsOther = otherDriver?.driver_number === d.driver_number;
+                    return (
+                      <button
+                        key={d.driver_number}
+                        onClick={() => { if (!isSameAsOther) slot.setDriver(d); }}
+                        disabled={isSameAsOther}
+                        className={cn(
+                          "px-2 py-1 rounded-md text-[11px] font-mono font-bold transition-all duration-200 border",
+                          isSameAsOther
+                            ? "opacity-30 cursor-not-allowed border-[var(--f1-border)] text-f1-muted"
+                            : isSelected
+                              ? "border-opacity-50 cursor-pointer"
+                              : "border-[var(--f1-border)] text-f1-muted hover:text-f1-sub hover:border-f1 cursor-pointer"
+                        )}
+                        style={isSelected ? { backgroundColor: `${c}20`, borderColor: `${c}50`, color: c } : {}}
+                        title={isSameAsOther ? "Already selected as the other driver" : d.full_name}
+                      >
+                        {d.name_acronym}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {slot.laps.length > 0 ? (
+                  <div>
+                    <label className="text-[9px] uppercase tracking-widest text-f1-muted font-semibold block mb-1">
+                      Lap (fastest auto-selected) · {slot.laps.length} laps available
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={slot.selectedLap || ""}
+                        onChange={(e) => slot.setLap(Number(e.target.value))}
+                        className="w-full bg-[var(--f1-hover)] border border-[var(--f1-border)] text-f1 rounded-lg px-3 py-1.5 text-xs font-mono appearance-none cursor-pointer pr-8"
+                      >
+                        {slot.laps.map((l) => (
+                          <option key={l.lap_number} value={l.lap_number}>
+                            Lap {l.lap_number} — {formatLapTime(l.lap_duration)}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
+                    </div>
+                  </div>
+                ) : slot.driver ? (
+                  <div className="flex items-center gap-2 py-2 px-3 rounded-lg bg-racing-red/5 border border-racing-red/20">
+                    <AlertTriangle className="w-3.5 h-3.5 text-racing-red flex-shrink-0" />
+                    <span className="text-[11px] text-racing-red">No lap data available for {slot.driver.name_acronym} — may not have participated in this session</span>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       ) : null}
 
