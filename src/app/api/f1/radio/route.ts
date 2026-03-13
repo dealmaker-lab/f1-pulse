@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { DRIVER_FALLBACK, getTeamInfo, DRIVER_HEADSHOTS } from "@/lib/team-logos";
 
 const BASE = "https://api.openf1.org/v1";
 
@@ -188,7 +189,7 @@ export async function GET(req: NextRequest) {
       intervalsRes.json().catch(() => []),
     ]);
 
-    // Build driver lookup
+    // Build driver lookup with fallback data for incomplete API responses
     const driverMap: Record<
       number,
       {
@@ -202,14 +203,43 @@ export async function GET(req: NextRequest) {
     > = {};
     if (Array.isArray(drivers)) {
       for (const d of drivers) {
-        driverMap[d.driver_number] = {
-          name: d.full_name || `Driver ${d.driver_number}`,
-          code: d.name_acronym || String(d.driver_number),
-          team: d.team_name || "Unknown",
-          teamColor: d.team_colour ? `#${d.team_colour}` : "#666666",
-          number: d.driver_number,
-          headshotUrl: d.headshot_url,
+        const num = d.driver_number;
+        const fallback = DRIVER_FALLBACK[num];
+        const code = d.name_acronym || fallback?.code || String(num);
+        const team = d.team_name || fallback?.team || "Unknown";
+        const teamInfo = getTeamInfo(team);
+        const teamColor = d.team_colour
+          ? `#${d.team_colour}`
+          : teamInfo?.color || "#666666";
+
+        driverMap[num] = {
+          name: d.full_name || fallback?.name || `Driver ${num}`,
+          code,
+          team,
+          teamColor,
+          number: num,
+          headshotUrl: d.headshot_url || DRIVER_HEADSHOTS[code] || undefined,
         };
+      }
+    }
+
+    // Also add any drivers from radio that aren't in the drivers list
+    if (Array.isArray(radio)) {
+      for (const r of radio) {
+        if (!driverMap[r.driver_number]) {
+          const fb = DRIVER_FALLBACK[r.driver_number];
+          if (fb) {
+            const teamInfo = getTeamInfo(fb.team);
+            driverMap[r.driver_number] = {
+              name: fb.name,
+              code: fb.code,
+              team: fb.team,
+              teamColor: teamInfo?.color || "#666666",
+              number: r.driver_number,
+              headshotUrl: DRIVER_HEADSHOTS[fb.code] || undefined,
+            };
+          }
+        }
       }
     }
 

@@ -51,7 +51,10 @@ export function filterPastSessions<
   const now = new Date();
   return sessions
     .filter(
-      (s) => s.session_name === sessionName && new Date(s.date_start) <= now
+      (s) =>
+        s.session_name === sessionName &&
+        new Date(s.date_start) <= now &&
+        VALID_SESSION_NAMES.has(s.session_name)
     )
     .sort(
       (a, b) =>
@@ -59,16 +62,31 @@ export function filterPastSessions<
     );
 }
 
+/** Session names that are real F1 sessions (excludes pre-season testing Day 1/2/3) */
+export const VALID_SESSION_NAMES = new Set([
+  "Race",
+  "Qualifying",
+  "Sprint",
+  "Sprint Qualifying",
+  "Practice 1",
+  "Practice 2",
+  "Practice 3",
+]);
+
 /**
- * Filter sessions that have already occurred (any type),
- * sorted chronologically (earliest first).
+ * Filter sessions that have already occurred (any official type),
+ * excluding pre-season testing (Day 1/2/3), sorted chronologically.
  */
 export function filterAllPastSessions<
-  T extends { date_start: string }
+  T extends { date_start: string; session_name: string }
 >(sessions: T[]): T[] {
   const now = new Date();
   return sessions
-    .filter((s) => new Date(s.date_start) <= now)
+    .filter(
+      (s) =>
+        new Date(s.date_start) <= now &&
+        VALID_SESSION_NAMES.has(s.session_name)
+    )
     .sort(
       (a, b) =>
         new Date(a.date_start).getTime() - new Date(b.date_start).getTime()

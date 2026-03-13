@@ -5,11 +5,11 @@ import {
   Radio, Play, Pause, Volume2, VolumeX, Loader2, ChevronDown,
   AlertTriangle, Clock, Flag, SkipForward, SkipBack, Search, X,
   Shield, Zap, CircleAlert, Timer, TriangleAlert, CircleDot, Gauge,
-  Filter, Users, Mic,
+  Filter, Users, Mic, MapPin, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamShortName, getDriverHeadshot, DRIVER_HEADSHOTS } from "@/lib/team-logos";
-import { filterAllPastSessions } from "@/lib/session-filters";
+import { filterAllPastSessions, VALID_SESSION_NAMES } from "@/lib/session-filters";
 
 // ===== Types =====
 interface SessionInfo {
@@ -20,6 +20,7 @@ interface SessionInfo {
   circuit_short_name: string;
   country_name: string;
   year: number;
+  meeting_key: number;
 }
 
 interface DriverOption {
@@ -59,6 +60,14 @@ interface RadioMessage {
   context?: MessageContext;
 }
 
+/** A GP weekend grouped with all its sessions */
+interface MeetingGroup {
+  meetingKey: number;
+  circuitName: string;
+  countryName: string;
+  sessions: SessionInfo[];
+}
+
 // ===== Helpers =====
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -78,9 +87,6 @@ function formatLapTime(secs: number | null): string {
 
 function getPositionBadge(pos: number | null): string {
   if (!pos) return "";
-  if (pos === 1) return "P1";
-  if (pos === 2) return "P2";
-  if (pos === 3) return "P3";
   return `P${pos}`;
 }
 
@@ -92,30 +98,29 @@ function getPositionColor(pos: number | null): string {
   return "";
 }
 
-const EVENT_BADGES: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  yellow_flag: { label: "Yellow Flag", color: "#000", bg: "#FFD700", icon: "triangle" },
-  red_flag: { label: "Red Flag", color: "#fff", bg: "#DC2626", icon: "circle" },
-  green_flag: { label: "Green Flag", color: "#fff", bg: "#16A34A", icon: "flag" },
-  safety_car: { label: "Safety Car", color: "#000", bg: "#FFA500", icon: "shield" },
-  vsc: { label: "VSC", color: "#000", bg: "#FBBF24", icon: "timer" },
-  drs: { label: "DRS", color: "#fff", bg: "#7C3AED", icon: "zap" },
-  pit: { label: "Pit Stop", color: "#fff", bg: "#2563EB", icon: "dot" },
-  track_limits: { label: "Track Limits", color: "#fff", bg: "#6B7280", icon: "alert" },
-  incident: { label: "Incident", color: "#fff", bg: "#EF4444", icon: "zap" },
-  chequered: { label: "Chequered Flag", color: "#000", bg: "#E5E7EB", icon: "flag" },
-  event: { label: "Event", color: "#fff", bg: "#4B5563", icon: "flag" },
+const EVENT_BADGES: Record<string, { label: string; color: string; bg: string }> = {
+  yellow_flag: { label: "Yellow Flag", color: "#000", bg: "#FFD700" },
+  red_flag: { label: "Red Flag", color: "#fff", bg: "#DC2626" },
+  green_flag: { label: "Green Flag", color: "#fff", bg: "#16A34A" },
+  safety_car: { label: "Safety Car", color: "#000", bg: "#FFA500" },
+  vsc: { label: "VSC", color: "#000", bg: "#FBBF24" },
+  drs: { label: "DRS", color: "#fff", bg: "#7C3AED" },
+  pit: { label: "Pit Stop", color: "#fff", bg: "#2563EB" },
+  track_limits: { label: "Track Limits", color: "#fff", bg: "#6B7280" },
+  incident: { label: "Incident", color: "#fff", bg: "#EF4444" },
+  chequered: { label: "Chequered Flag", color: "#000", bg: "#E5E7EB" },
+  event: { label: "Event", color: "#fff", bg: "#4B5563" },
 };
 
-const SESSION_FILTER_TABS = [
-  { value: "all", label: "All" },
-  { value: "Race", label: "Race" },
-  { value: "Qualifying", label: "Quali" },
-  { value: "Sprint", label: "Sprint" },
-  { value: "Sprint Qualifying", label: "Sprint Q" },
-  { value: "Practice 1", label: "FP1" },
-  { value: "Practice 2", label: "FP2" },
-  { value: "Practice 3", label: "FP3" },
-];
+const SESSION_SHORT_LABELS: Record<string, string> = {
+  Race: "Race",
+  Qualifying: "Quali",
+  Sprint: "Sprint",
+  "Sprint Qualifying": "SQ",
+  "Practice 1": "FP1",
+  "Practice 2": "FP2",
+  "Practice 3": "FP3",
+};
 
 // ===== Sub-components =====
 
@@ -154,9 +159,7 @@ function TeamLogo({ teamName, size = "sm" }: { teamName: string; size?: "xs" | "
   const logoUrl = getTeamLogoUrl(teamName);
   const sizes = { xs: "w-4 h-4", sm: "w-5 h-5" };
 
-  if (!logoUrl || imgError) {
-    return null;
-  }
+  if (!logoUrl || imgError) return null;
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -173,13 +176,12 @@ function TeamLogo({ teamName, size = "sm" }: { teamName: string; size?: "xs" | "
 // ===== Main Component =====
 export default function RadioPage() {
   const [year, setYear] = useState(2026);
-  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [selectedSession, setSelectedSession] = useState<SessionInfo | null>(null);
   const [messages, setMessages] = useState<RadioMessage[]>([]);
   const [drivers, setDrivers] = useState<DriverOption[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<number | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
-  const [sessionTypeFilter, setSessionTypeFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -194,20 +196,26 @@ export default function RadioPage() {
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
   const messageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
-  const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+  const YEARS = [2026, 2025, 2024, 2023];
 
   // ===== Data Fetching =====
 
-  // Fetch sessions
+  // Fetch sessions for the year
   useEffect(() => {
     setLoadingSessions(true);
+    setAllSessions([]);
+    setSelectedSession(null);
     fetch(`/api/f1/sessions?year=${year}`)
       .then((r) => r.json())
       .then((data: SessionInfo[]) => {
         if (Array.isArray(data)) {
           const pastOnly = filterAllPastSessions(data);
-          setSessions(pastOnly);
-          if (pastOnly.length) {
+          setAllSessions(pastOnly);
+          // Auto-select most recent race session
+          const races = pastOnly.filter((s) => s.session_name === "Race");
+          if (races.length) {
+            setSelectedSession(races[races.length - 1]);
+          } else if (pastOnly.length) {
             setSelectedSession(pastOnly[pastOnly.length - 1]);
           }
         }
@@ -216,7 +224,7 @@ export default function RadioPage() {
       .finally(() => setLoadingSessions(false));
   }, [year]);
 
-  // Fetch radio data
+  // Fetch radio data for selected session
   useEffect(() => {
     if (!selectedSession) return;
     setLoading(true);
@@ -233,6 +241,7 @@ export default function RadioPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSession]);
 
   // ===== Audio Controls =====
@@ -246,10 +255,24 @@ export default function RadioPage() {
     setAudioProgress(0);
   }, []);
 
+  const filteredMessages = useMemo(() => {
+    let msgs = messages;
+    if (selectedTeam) {
+      const teamDriverNumbers = drivers
+        .filter((d) => d.team === selectedTeam)
+        .map((d) => d.number);
+      msgs = msgs.filter((m) => teamDriverNumbers.includes(m.driverNumber));
+    }
+    if (selectedDriver) {
+      msgs = msgs.filter((m) => m.driverNumber === selectedDriver);
+    }
+    return msgs;
+  }, [messages, selectedDriver, selectedTeam, drivers]);
+
   const playMessage = useCallback(
     (idx: number) => {
-      const filteredMsgs = filteredMessages;
-      const msg = filteredMsgs[idx];
+      const filtered = filteredMessages;
+      const msg = filtered[idx];
       if (!msg) return;
 
       stopAudio();
@@ -267,7 +290,7 @@ export default function RadioPage() {
         setPlayingIdx(null);
         setAudioProgress(0);
         if (progressInterval.current) clearInterval(progressInterval.current);
-        if (idx + 1 < filteredMsgs.length) {
+        if (idx + 1 < filtered.length) {
           setTimeout(() => playMessage(idx + 1), 500);
         }
       });
@@ -282,7 +305,8 @@ export default function RadioPage() {
 
       audio.load();
     },
-    [messages, muted, stopAudio, selectedDriver, selectedTeam]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredMessages, muted, stopAudio]
   );
 
   const togglePlayPause = useCallback(() => {
@@ -309,46 +333,48 @@ export default function RadioPage() {
   // Cleanup
   useEffect(() => { return () => { stopAudio(); }; }, [stopAudio]);
 
-  // ===== Filtering =====
+  // ===== Derived Data =====
 
-  // Filter sessions by type and search
-  const filteredSessions = useMemo(() => {
-    let filtered = sessions;
-    if (sessionTypeFilter !== "all") {
-      filtered = filtered.filter((s) => s.session_name === sessionTypeFilter);
+  // Group sessions by meeting (GP weekend) for the race card grid
+  const meetingGroups = useMemo((): MeetingGroup[] => {
+    const map = new Map<number, MeetingGroup>();
+    for (const s of allSessions) {
+      if (!map.has(s.meeting_key)) {
+        map.set(s.meeting_key, {
+          meetingKey: s.meeting_key,
+          circuitName: s.circuit_short_name,
+          countryName: s.country_name,
+          sessions: [],
+        });
+      }
+      map.get(s.meeting_key)!.sessions.push(s);
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (s) =>
-          s.circuit_short_name.toLowerCase().includes(q) ||
-          s.country_name.toLowerCase().includes(q) ||
-          s.session_name.toLowerCase().includes(q)
-      );
-    }
-    return filtered;
-  }, [sessions, sessionTypeFilter, searchQuery]);
+    // Sort by first session date (chronological)
+    const groups = Array.from(map.values());
+    groups.sort((a, b) => {
+      const aDate = new Date(a.sessions[0].date_start).getTime();
+      const bDate = new Date(b.sessions[0].date_start).getTime();
+      return aDate - bDate;
+    });
+    return groups;
+  }, [allSessions]);
 
-  // Filter messages by driver and team
-  const filteredMessages = useMemo(() => {
-    let msgs = messages;
-    if (selectedTeam) {
-      const teamDriverNumbers = drivers
-        .filter((d) => d.team === selectedTeam)
-        .map((d) => d.number);
-      msgs = msgs.filter((m) => teamDriverNumbers.includes(m.driverNumber));
-    }
-    if (selectedDriver) {
-      msgs = msgs.filter((m) => m.driverNumber === selectedDriver);
-    }
-    return msgs;
-  }, [messages, selectedDriver, selectedTeam, drivers]);
+  // Filter meeting groups by search
+  const filteredMeetings = useMemo(() => {
+    if (!searchQuery.trim()) return meetingGroups;
+    const q = searchQuery.toLowerCase();
+    return meetingGroups.filter(
+      (g) =>
+        g.circuitName.toLowerCase().includes(q) ||
+        g.countryName.toLowerCase().includes(q)
+    );
+  }, [meetingGroups, searchQuery]);
 
   // Group messages by lap
   const messagesByLap = useMemo(() => {
     const groups: Map<number | string, RadioMessage[]> = new Map();
     filteredMessages.forEach((m) => {
-      const key = m.lapNumber ?? "unknown";
+      const key = m.lapNumber ?? "pre-race";
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(m);
     });
@@ -388,8 +414,11 @@ export default function RadioPage() {
     return drvrs.sort((a, b) => (driverCounts[b.number] || 0) - (driverCounts[a.number] || 0));
   }, [drivers, driverCounts, selectedTeam]);
 
-  // Playing message ref
+  // Currently playing message
   const currentMessage = playingIdx !== null ? filteredMessages[playingIdx] : null;
+
+  // Which meeting is the selected session in?
+  const selectedMeetingKey = selectedSession?.meeting_key;
 
   return (
     <div className="min-h-screen">
@@ -406,206 +435,262 @@ export default function RadioPage() {
         </p>
       </div>
 
-      {/* ===== FILTER BAR ===== */}
-      <div className="space-y-3 mb-6">
-        {/* Row 1: Year + Search + Session Type Tabs */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* Year */}
-          <div className="relative">
-            <select
-              value={year}
-              onChange={(e) => {
-                setYear(Number(e.target.value));
-                setSelectedSession(null);
+      {/* ===== TOP BAR: Year tabs + Search ===== */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
+        {/* Year tabs */}
+        <div className="flex items-center gap-1 bg-[var(--f1-card)] rounded-lg border border-[var(--f1-border)] p-0.5">
+          {YEARS.map((y) => (
+            <button
+              key={y}
+              onClick={() => {
+                setYear(y);
                 setSelectedDriver(null);
                 setSelectedTeam(null);
-                setSessionTypeFilter("all");
                 setSearchQuery("");
               }}
-              className="f1-select text-sm pr-8 min-w-[80px]"
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer",
+                year === y
+                  ? "bg-racing-red text-white"
+                  : "text-f1-sub hover:text-f1 hover:bg-[var(--f1-hover)]"
+              )}
             >
-              {YEARS.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-f1-muted pointer-events-none" />
-          </div>
-
-          {/* Track search */}
-          <div className="relative flex-1 min-w-[140px] max-w-[280px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted" />
-            <input
-              type="text"
-              placeholder="Search circuit..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-8 py-1.5 text-sm rounded-lg border border-[var(--f1-border)] bg-[var(--f1-card)] text-f1 placeholder:text-f1-muted focus:outline-none focus:border-racing-red/50 transition"
-            />
-            {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer">
-                <X className="w-3.5 h-3.5 text-f1-muted hover:text-f1" />
-              </button>
-            )}
-          </div>
-
-          {/* Session type tabs */}
-          <div className="flex items-center gap-1 bg-[var(--f1-card)] rounded-lg border border-[var(--f1-border)] p-0.5">
-            {SESSION_FILTER_TABS.map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setSessionTypeFilter(tab.value)}
-                className={cn(
-                  "px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer whitespace-nowrap",
-                  sessionTypeFilter === tab.value
-                    ? "bg-racing-red text-white"
-                    : "text-f1-sub hover:text-f1 hover:bg-[var(--f1-hover)]"
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Filter toggle (mobile) */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={cn(
-              "sm:hidden p-2 rounded-lg border transition cursor-pointer",
-              showFilters
-                ? "bg-racing-red text-white border-racing-red"
-                : "border-[var(--f1-border)] text-f1-sub"
-            )}
-          >
-            <Filter className="w-4 h-4" />
-          </button>
+              {y}
+            </button>
+          ))}
         </div>
 
-        {/* Row 2: Session selector (as cards on desktop, dropdown on mobile) */}
-        <div className="relative">
-          <select
-            value={selectedSession?.session_key || ""}
-            onChange={(e) => {
-              const session = filteredSessions.find((s) => s.session_key === Number(e.target.value));
-              setSelectedSession(session || null);
-              setSelectedDriver(null);
-              setSelectedTeam(null);
-            }}
-            className="f1-select text-sm w-full pr-8"
-            disabled={loadingSessions}
-          >
-            {filteredSessions.length === 0 && (
-              <option value="">{loadingSessions ? "Loading sessions..." : "No matching sessions"}</option>
-            )}
-            {filteredSessions.map((s) => (
-              <option key={s.session_key} value={s.session_key}>
-                {s.circuit_short_name} — {s.country_name} ({s.session_name})
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-f1-muted pointer-events-none" />
+        {/* Track search */}
+        <div className="relative flex-1 min-w-[140px] max-w-[280px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted" />
+          <input
+            type="text"
+            placeholder="Search circuit..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-8 pr-8 py-1.5 text-sm rounded-lg border border-[var(--f1-border)] bg-[var(--f1-card)] text-f1 placeholder:text-f1-muted focus:outline-none focus:border-racing-red/50 transition"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer">
+              <X className="w-3.5 h-3.5 text-f1-muted hover:text-f1" />
+            </button>
+          )}
         </div>
 
-        {/* Row 3: Team Filter Pills */}
-        {uniqueTeams.length > 0 && (
-          <div className={cn("transition-all", showFilters || "hidden sm:block")}>
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="w-3.5 h-3.5 text-f1-muted" />
-              <span className="text-[10px] font-bold text-f1-muted uppercase tracking-wider">Teams</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => { setSelectedTeam(null); setSelectedDriver(null); }}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border",
-                  !selectedTeam
-                    ? "bg-racing-red text-white border-racing-red"
-                    : "text-f1-sub border-[var(--f1-border)] hover:border-racing-red/50"
-                )}
-              >
-                All Teams
-              </button>
-              {uniqueTeams.map((team) => (
-                <button
-                  key={team.name}
-                  onClick={() => {
-                    setSelectedTeam(selectedTeam === team.name ? null : team.name);
-                    setSelectedDriver(null);
-                  }}
-                  className={cn(
-                    "px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer",
-                    "border flex items-center gap-1.5",
-                    selectedTeam === team.name
-                      ? "text-white border-transparent"
-                      : "text-f1-sub border-[var(--f1-border)] hover:border-opacity-60"
-                  )}
-                  style={
-                    selectedTeam === team.name
-                      ? { backgroundColor: team.color, borderColor: team.color }
-                      : { borderColor: `${team.color}40` }
-                  }
-                >
-                  <TeamLogo teamName={team.name} size="xs" />
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: team.color }}
-                  />
-                  {getTeamShortName(team.name)}
-                  <span className="opacity-60">({team.count})</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Row 4: Driver Filter Pills (with headshots) */}
-        {displayDrivers.length > 0 && (
-          <div className={cn("transition-all", showFilters || "hidden sm:block")}>
-            <div className="flex items-center gap-2 mb-2">
-              <Mic className="w-3.5 h-3.5 text-f1-muted" />
-              <span className="text-[10px] font-bold text-f1-muted uppercase tracking-wider">Drivers</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {!selectedDriver && !selectedTeam && (
-                <button
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold bg-racing-red text-white border border-racing-red cursor-pointer"
-                >
-                  All Drivers ({messages.length})
-                </button>
-              )}
-              {selectedTeam && !selectedDriver && (
-                <button
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold text-white border border-transparent cursor-pointer"
-                  style={{ backgroundColor: uniqueTeams.find(t => t.name === selectedTeam)?.color }}
-                >
-                  All {getTeamShortName(selectedTeam)} ({filteredMessages.length})
-                </button>
-              )}
-              {displayDrivers.map((d) => (
-                <button
-                  key={d.number}
-                  onClick={() => setSelectedDriver(selectedDriver === d.number ? null : d.number)}
-                  className={cn(
-                    "pl-1 pr-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer",
-                    "border flex items-center gap-1.5",
-                    selectedDriver === d.number
-                      ? "text-white border-transparent"
-                      : "text-f1-sub border-[var(--f1-border)] hover:border-opacity-60"
-                  )}
-                  style={
-                    selectedDriver === d.number
-                      ? { backgroundColor: d.teamColor, borderColor: d.teamColor }
-                      : { borderColor: `${d.teamColor}40` }
-                  }
-                >
-                  <DriverHeadshot code={d.code} teamColor={d.teamColor} headshotUrl={d.headshotUrl} size="xs" />
-                  <span style={selectedDriver !== d.number ? { color: d.teamColor } : {}}>{d.code}</span>
-                  <span className="opacity-60">({driverCounts[d.number] || 0})</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Mobile filter toggle */}
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={cn(
+            "sm:hidden p-2 rounded-lg border transition cursor-pointer",
+            showFilters
+              ? "bg-racing-red text-white border-racing-red"
+              : "border-[var(--f1-border)] text-f1-sub"
+          )}
+        >
+          <Filter className="w-4 h-4" />
+        </button>
       </div>
+
+      {/* ===== RACE CARDS GRID ===== */}
+      {loadingSessions ? (
+        <div className="flex items-center justify-center py-10 gap-3">
+          <Loader2 className="w-5 h-5 text-racing-red animate-spin" />
+          <span className="text-f1-sub text-sm">Loading {year} sessions...</span>
+        </div>
+      ) : filteredMeetings.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 gap-2">
+          <AlertTriangle className="w-6 h-6 text-f1-muted" />
+          <span className="text-f1-sub text-sm">No races found for {year}</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3 mb-6">
+          {filteredMeetings.map((meeting, idx) => {
+            const isSelected = selectedMeetingKey === meeting.meetingKey;
+            const sessionOrder = ["Race", "Qualifying", "Sprint", "Sprint Qualifying", "Practice 3", "Practice 2", "Practice 1"];
+            const sortedSessions = [...meeting.sessions].sort(
+              (a, b) => sessionOrder.indexOf(a.session_name) - sessionOrder.indexOf(b.session_name)
+            );
+
+            return (
+              <div
+                key={meeting.meetingKey}
+                className={cn(
+                  "rounded-xl border p-3 transition-all cursor-pointer group relative",
+                  isSelected
+                    ? "border-racing-red bg-racing-red/5 ring-1 ring-racing-red/30"
+                    : "border-[var(--f1-border)] bg-[var(--f1-card)] hover:border-racing-red/40"
+                )}
+                onClick={() => {
+                  // Select the Race session by default, or first available
+                  const race = meeting.sessions.find((s) => s.session_name === "Race");
+                  setSelectedSession(race || meeting.sessions[0]);
+                  setSelectedDriver(null);
+                  setSelectedTeam(null);
+                }}
+              >
+                {/* Round number */}
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={cn(
+                    "text-[10px] font-bold uppercase tracking-wider",
+                    isSelected ? "text-racing-red" : "text-f1-muted"
+                  )}>
+                    R{String(idx + 1).padStart(2, "0")}
+                  </span>
+                  {isSelected && (
+                    <div className="w-2 h-2 rounded-full bg-racing-red animate-pulse" />
+                  )}
+                </div>
+
+                {/* Circuit + Country */}
+                <div className="flex items-center gap-1.5 mb-2">
+                  <MapPin className="w-3 h-3 text-f1-muted flex-shrink-0" />
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-f1 truncate">{meeting.circuitName}</div>
+                    <div className="text-[10px] text-f1-muted truncate">{meeting.countryName}</div>
+                  </div>
+                </div>
+
+                {/* Session type pills */}
+                <div className="flex flex-wrap gap-1">
+                  {sortedSessions.map((s) => {
+                    const isActiveSession = selectedSession?.session_key === s.session_key;
+                    return (
+                      <button
+                        key={s.session_key}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSession(s);
+                          setSelectedDriver(null);
+                          setSelectedTeam(null);
+                        }}
+                        className={cn(
+                          "px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer",
+                          isActiveSession
+                            ? "bg-racing-red text-white"
+                            : isSelected
+                              ? "bg-racing-red/15 text-racing-red hover:bg-racing-red/25"
+                              : "bg-[var(--f1-hover)] text-f1-muted hover:text-f1"
+                        )}
+                      >
+                        {SESSION_SHORT_LABELS[s.session_name] || s.session_name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ===== SELECTED SESSION HEADER ===== */}
+      {selectedSession && (
+        <div className="flex items-center gap-2 mb-4 px-1">
+          <Flag className="w-4 h-4 text-racing-red" />
+          <span className="text-sm font-bold text-f1">
+            {selectedSession.circuit_short_name} — {selectedSession.country_name}
+          </span>
+          <span className="px-2 py-0.5 rounded bg-racing-red/15 text-racing-red text-xs font-bold">
+            {selectedSession.session_name}
+          </span>
+          {messages.length > 0 && (
+            <span className="text-xs text-f1-muted ml-auto">
+              {messages.length} messages
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ===== DRIVER & TEAM FILTERS ===== */}
+      {selectedSession && !loading && drivers.length > 0 && (
+        <div className={cn("space-y-3 mb-6", showFilters || "hidden sm:block")}>
+          {/* Team pills */}
+          {uniqueTeams.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-3.5 h-3.5 text-f1-muted" />
+                <span className="text-[10px] font-bold text-f1-muted uppercase tracking-wider">Teams</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => { setSelectedTeam(null); setSelectedDriver(null); }}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer border",
+                    !selectedTeam
+                      ? "bg-racing-red text-white border-racing-red"
+                      : "text-f1-sub border-[var(--f1-border)] hover:border-racing-red/50"
+                  )}
+                >
+                  All Teams
+                </button>
+                {uniqueTeams.map((team) => (
+                  <button
+                    key={team.name}
+                    onClick={() => {
+                      setSelectedTeam(selectedTeam === team.name ? null : team.name);
+                      setSelectedDriver(null);
+                    }}
+                    className={cn(
+                      "px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer",
+                      "border flex items-center gap-1.5",
+                      selectedTeam === team.name
+                        ? "text-white border-transparent"
+                        : "text-f1-sub border-[var(--f1-border)] hover:border-opacity-60"
+                    )}
+                    style={
+                      selectedTeam === team.name
+                        ? { backgroundColor: team.color, borderColor: team.color }
+                        : { borderColor: `${team.color}40` }
+                    }
+                  >
+                    <TeamLogo teamName={team.name} size="xs" />
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: team.color }}
+                    />
+                    {getTeamShortName(team.name)}
+                    <span className="opacity-60">({team.count})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Driver pills with headshots */}
+          {displayDrivers.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Mic className="w-3.5 h-3.5 text-f1-muted" />
+                <span className="text-[10px] font-bold text-f1-muted uppercase tracking-wider">Drivers</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {displayDrivers.map((d) => (
+                  <button
+                    key={d.number}
+                    onClick={() => setSelectedDriver(selectedDriver === d.number ? null : d.number)}
+                    className={cn(
+                      "pl-1 pr-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer",
+                      "border flex items-center gap-1.5",
+                      selectedDriver === d.number
+                        ? "text-white border-transparent"
+                        : "text-f1-sub border-[var(--f1-border)] hover:border-opacity-60"
+                    )}
+                    style={
+                      selectedDriver === d.number
+                        ? { backgroundColor: d.teamColor, borderColor: d.teamColor }
+                        : { borderColor: `${d.teamColor}40` }
+                    }
+                  >
+                    <DriverHeadshot code={d.code} teamColor={d.teamColor} headshotUrl={d.headshotUrl} size="xs" />
+                    <span style={selectedDriver !== d.number ? { color: d.teamColor } : {}}>{d.code}</span>
+                    <span className="opacity-60">({driverCounts[d.number] || 0})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Loading state */}
       {loading && (
@@ -655,7 +740,6 @@ export default function RadioPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Driver headshot */}
               <DriverHeadshot
                 code={currentMessage.driverCode}
                 teamColor={currentMessage.teamColor}
@@ -663,7 +747,6 @@ export default function RadioPage() {
                 size="md"
               />
 
-              {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span
@@ -753,7 +836,7 @@ export default function RadioPage() {
         </div>
       )}
 
-      {/* ===== TIMELINE ===== */}
+      {/* ===== MESSAGE TIMELINE ===== */}
       {!loading && filteredMessages.length > 0 && (
         <div className="relative">
           {/* Vertical timeline line */}
@@ -767,7 +850,7 @@ export default function RadioPage() {
                 <div className="flex items-center gap-2">
                   <Flag className="w-3.5 h-3.5 text-racing-red" />
                   <span className="text-xs font-bold text-racing-red uppercase tracking-wider">
-                    {lapKey === "unknown" ? "Pre-Race" : `Lap ${lapKey}`}
+                    {lapKey === "pre-race" ? "Pre-Race" : `Lap ${lapKey}`}
                   </span>
                   <span className="text-[10px] text-f1-muted">
                     ({lapMessages.length} message{lapMessages.length !== 1 ? "s" : ""})
@@ -777,7 +860,7 @@ export default function RadioPage() {
 
               {/* Messages in this lap */}
               <div className="space-y-2">
-                {lapMessages.map((msg, msgIdx) => {
+                {lapMessages.map((msg) => {
                   const flatIdx = filteredMessages.indexOf(msg);
                   const isCurrentlyPlaying = playingIdx === flatIdx;
 
@@ -853,7 +936,7 @@ export default function RadioPage() {
                             )}
                           </div>
 
-                          {/* On-track context */}
+                          {/* On-track context badges */}
                           {msg.context && (msg.context.events.length > 0 || msg.context.gapToLeader || msg.context.interval) && (
                             <div className="flex flex-wrap items-center gap-1.5 mt-2">
                               {msg.context.events.map((evt, i) => {
