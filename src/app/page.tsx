@@ -13,6 +13,7 @@ import ConstructorBarChart from "@/components/charts/constructor-bar-chart";
 import { DriverStanding, ConstructorStanding } from "@/types/f1";
 import PredictionPanel from "@/components/predictions/prediction-panel";
 import CircuitMap from "@/components/circuit-map/circuit-map";
+import { HISTORICAL_YEARS } from "@/lib/constants";
 import Link from "next/link";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -80,7 +81,7 @@ interface RaceResultEntry {
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+const YEARS = HISTORICAL_YEARS;
 
 // ─── Subcomponents ─────────────────────────────────────────────────────────
 

@@ -6,6 +6,7 @@ import {
   Cloud, Thermometer, Droplets, Wind, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { OPENF1_YEARS } from "@/lib/constants";
 
 // ===== Speed Presets =====
 const SPEED_PRESETS = [
@@ -445,7 +446,7 @@ export default function RaceReplayPage() {
             onChange={(e) => setYear(Number(e.target.value))}
             className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm font-mono text-f1-sub cursor-pointer"
           >
-            {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
+            {OPENF1_YEARS.map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
           </select>

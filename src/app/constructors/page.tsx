@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { Trophy, TrendingUp, Users, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTeamInfo, getTeamLogoUrl } from "@/lib/team-logos";
+import { HISTORICAL_YEARS } from "@/lib/constants";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, BarChart, Bar, Cell,
 } from "recharts";
 
-const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+const YEARS = HISTORICAL_YEARS;
 
 function TeamLogo({ teamName, size = "md" }: { teamName: string; size?: "sm" | "md" | "lg" }) {
   const [imgError, setImgError] = useState(false);

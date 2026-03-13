@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Users, Trophy, Flag, Timer, TrendingUp, Loader2 } from "lucide-react";
 import { cn, getTeamColor } from "@/lib/utils";
 import { getTeamInfo, getTeamLogoUrl, getDriverHeadshot as getSharedHeadshot } from "@/lib/team-logos";
+import { HISTORICAL_YEARS, getEraForYear } from "@/lib/constants";
 import { DriverStanding } from "@/types/f1";
 import ChampionshipChart from "@/components/charts/championship-chart";
 import {
@@ -252,9 +253,15 @@ export default function DriversPage() {
           onChange={(e) => setYear(Number(e.target.value))}
           className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm font-mono text-f1-sub cursor-pointer"
         >
-          {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
+          {(() => {
+            let lastEra = "";
+            return HISTORICAL_YEARS.map((y) => {
+              const era = getEraForYear(y);
+              const showEra = era !== lastEra;
+              lastEra = era;
+              return <option key={y} value={y}>{showEra ? `── ${era} ── ` : ""}{y}</option>;
+            });
+          })()}
         </select>
       </div>
 
