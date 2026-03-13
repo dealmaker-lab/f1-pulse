@@ -241,7 +241,7 @@ export default function RaceReplayPage() {
   const normX = useCallback((x: number) => ((x - trackBounds.minX) / rangeX) * (svgW - 100) + 50, [trackBounds.minX, rangeX, svgW]);
   const normY = useCallback((y: number) => ((y - trackBounds.minY) / rangeY) * (svgH - 100) + 50, [trackBounds.minY, rangeY, svgH]);
 
-  // ===== Track outline: detect first complete lap =====
+  // ===== Track outline: extract one clean lap from mid-race data =====
   const trackPath = useMemo(() => {
     // Use driver with most data points
     let bestDriver = 0;
@@ -253,35 +253,53 @@ export default function RaceReplayPage() {
     const allPts = locationData[bestDriver];
     if (!allPts || allPts.length < 30) return "";
 
-    // Detect one lap: find when the car returns near its starting position
-    const startX = allPts[0].x;
-    const startY = allPts[0].y;
-    const threshold = rangeX * 0.03; // 3% of track width as "close enough"
-    let lapEnd = allPts.length;
+    // Filter out any zero/invalid coords
+    const validPts = allPts.filter((p) => p.x !== 0 || p.y !== 0);
+    if (validPts.length < 30) return "";
 
-    // Skip first 20% of points (car needs to move away from start first)
-    const minIdx = Math.floor(allPts.length / 58) * 0.4; // ~40% into first lap before we start looking for loop
-    for (let i = Math.max(20, Math.floor(minIdx)); i < allPts.length; i++) {
-      const dx = allPts[i].x - startX;
-      const dy = allPts[i].y - startY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < threshold) {
-        lapEnd = i + 1;
-        break;
+    // Estimate points per lap (data sampled every 8th -> ~40-50 pts/lap for a typical race)
+    const estimatedLaps = 58;
+    const ptsPerLap = Math.max(15, Math.round(validPts.length / estimatedLaps));
+
+    // Skip first 20% of data to get past formation lap, pit exit, safety cars
+    const skipStart = Math.floor(validPts.length * 0.2);
+    const refIdx = Math.min(skipStart, validPts.length - ptsPerLap - 1);
+    const refX = validPts[refIdx].x;
+    const refY = validPts[refIdx].y;
+
+    // From ref point, advance at least 50% of a lap before looking for loop-close
+    const minAdvance = Math.floor(ptsPerLap * 0.5);
+    const searchStart = refIdx + Math.max(minAdvance, 10);
+    const searchEnd = Math.min(validPts.length, refIdx + ptsPerLap * 3);
+
+    // Progressively widen threshold until we find a loop
+    let lapEnd = -1;
+    for (let threshPct = 0.03; threshPct <= 0.12; threshPct += 0.02) {
+      const threshold = rangeX * threshPct;
+      for (let i = searchStart; i < searchEnd; i++) {
+        const dx = validPts[i].x - refX;
+        const dy = validPts[i].y - refY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < threshold) {
+          lapEnd = i;
+          break;
+        }
       }
+      if (lapEnd !== -1) break;
     }
 
-    // If we couldn't detect a loop, estimate one lap from total data / estimated laps
-    if (lapEnd === allPts.length) {
-      lapEnd = Math.floor(allPts.length / 50); // ~50 laps worth
-      if (lapEnd < 30) lapEnd = Math.min(allPts.length, 200); // fallback
+    // Fallback: just take one estimated lap's worth of points
+    if (lapEnd === -1) {
+      lapEnd = Math.min(refIdx + ptsPerLap, validPts.length - 1);
     }
 
-    // Sample the single-lap points to ~300 for smooth path
-    const lapPts = allPts.slice(0, lapEnd);
+    // Extract the single-lap slice
+    const lapPts = validPts.slice(refIdx, lapEnd + 1);
+    if (lapPts.length < 8) return "";
+
+    // Sample to ~300 points for a smooth SVG path
     const step = Math.max(1, Math.floor(lapPts.length / 300));
     const sampled = lapPts.filter((_, i) => i % step === 0);
-
     if (sampled.length < 5) return "";
 
     return sampled
@@ -414,7 +432,7 @@ export default function RaceReplayPage() {
             <Flag className="w-7 h-7 text-racing-red" />
             Race Replay
           </h1>
-          <p className="text-sm text-white/40 mt-1">
+          <p className="text-sm text-f1-muted mt-1">
             {meetingName
               ? `${meetingName} · ${selectedSession?.circuit_short_name}, ${selectedSession?.country_name}`
               : "Select a year and race to replay"}
@@ -425,7 +443,7 @@ export default function RaceReplayPage() {
           <select
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="bg-carbon-800 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-white/80 cursor-pointer"
+            className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm font-mono text-f1-sub cursor-pointer"
           >
             {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -437,7 +455,7 @@ export default function RaceReplayPage() {
               const s = sessions.find((s) => s.session_key === Number(e.target.value));
               if (s) setSelectedSession(s);
             }}
-            className="bg-carbon-800 border border-white/10 rounded-xl px-3 py-2 text-sm text-white/80 cursor-pointer max-w-[300px]"
+            className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm text-f1-sub cursor-pointer max-w-[300px]"
           >
             {sessions.map((s) => (
               <option key={s.session_key} value={s.session_key}>
@@ -452,8 +470,8 @@ export default function RaceReplayPage() {
       {loading && (
         <div className="glass-card p-16 text-center space-y-3">
           <Loader2 className="w-8 h-8 text-racing-blue mx-auto animate-spin" />
-          <p className="text-sm text-white/50 font-mono">{loadingMsg}</p>
-          <p className="text-[10px] text-white/25">Loading real telemetry from OpenF1 API...</p>
+          <p className="text-sm text-f1-sub font-mono">{loadingMsg}</p>
+          <p className="text-[10px] text-[var(--f1-text-dim)]">Loading real telemetry from OpenF1 API...</p>
         </div>
       )}
 
@@ -471,6 +489,7 @@ export default function RaceReplayPage() {
                   <span className="text-white/15 text-sm font-mono">/58</span>
                 </div>
                 <div className="text-[9px] font-mono text-white/20 mt-0.5">{progressPct}% complete</div>
+
               </div>
 
               {/* Weather overlay */}
@@ -616,7 +635,7 @@ export default function RaceReplayPage() {
 
             {/* Leaderboard */}
             <div className="glass-card p-3">
-              <h2 className="text-xs font-semibold mb-2 flex items-center gap-2 text-white/60">
+              <h2 className="text-xs font-semibold mb-2 flex items-center gap-2 text-f1-sub">
                 <Timer className="w-3.5 h-3.5 text-racing-amber" />
                 Leaderboard
               </h2>
@@ -632,15 +651,15 @@ export default function RaceReplayPage() {
                       onClick={() => setSelectedDriver(entry.driver.driver_number)}
                       className={cn(
                         "flex items-center gap-1.5 w-full px-2 py-1.5 rounded-lg transition-all cursor-pointer text-left",
-                        isSel ? "bg-white/8 ring-1 ring-white/10" : "hover:bg-white/3"
+                        isSel ? "bg-black/[0.04] dark:bg-white/[0.08] ring-1 ring-[var(--f1-border)]" : "hover:bg-[var(--f1-hover)]"
                       )}
                     >
                       <span className={cn(
                         "w-5 h-5 flex items-center justify-center rounded text-[9px] font-mono font-bold flex-shrink-0",
                         i === 0 && "bg-racing-amber/20 text-racing-amber",
-                        i === 1 && "bg-white/10 text-white/70",
+                        i === 1 && "bg-[var(--f1-hover)] text-f1-sub",
                         i === 2 && "bg-orange-900/30 text-orange-400",
-                        i > 2 && "text-white/25"
+                        i > 2 && "text-[var(--f1-text-dim)]"
                       )}>
                         {entry.position <= 20 ? entry.position : "-"}
                       </span>
@@ -670,12 +689,12 @@ export default function RaceReplayPage() {
                   </div>
                   <div>
                     <div className="text-sm font-bold">{d.full_name}</div>
-                    <div className="text-[10px] text-white/35">{d.team_name}</div>
+                    <div className="text-[10px] text-[var(--f1-text-dim)]">{d.team_name}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: TIRE_COLORS[comp] || "#666" }} />
-                  <span className="text-[10px] font-mono text-white/40">{comp}</span>
+                  <span className="text-[10px] font-mono text-f1-muted">{comp}</span>
                 </div>
               </div>
             );
@@ -687,7 +706,7 @@ export default function RaceReplayPage() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentFrame(Math.max(0, currentFrame - Math.round(totalFrames * 0.05)))}
-                  className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors cursor-pointer touch-manipulation"
+                  className="p-2 rounded-xl hover:bg-[var(--f1-hover)] text-f1-muted hover:text-f1-sub transition-colors cursor-pointer touch-manipulation"
                   aria-label="Rewind"
                 >
                   <SkipBack className="w-4 h-4" />
@@ -709,7 +728,7 @@ export default function RaceReplayPage() {
                 </button>
                 <button
                   onClick={() => setCurrentFrame(Math.min(totalFrames - 1, currentFrame + Math.round(totalFrames * 0.05)))}
-                  className="p-2 rounded-xl hover:bg-white/5 text-white/30 hover:text-white/60 transition-colors cursor-pointer touch-manipulation"
+                  className="p-2 rounded-xl hover:bg-[var(--f1-hover)] text-f1-muted hover:text-f1-sub transition-colors cursor-pointer touch-manipulation"
                   aria-label="Forward"
                 >
                   <SkipForward className="w-4 h-4" />
@@ -724,7 +743,7 @@ export default function RaceReplayPage() {
                   max={Math.max(1, totalFrames - 1)}
                   value={currentFrame}
                   onChange={(e) => { setCurrentFrame(Number(e.target.value)); setIsPlaying(false); }}
-                  className="w-full h-2 rounded-full appearance-none bg-white/5 cursor-pointer touch-manipulation
+                  className="w-full h-2 rounded-full appearance-none bg-[var(--f1-hover)] cursor-pointer touch-manipulation
                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-racing-blue [&::-webkit-slider-thumb]:cursor-pointer
                     [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(59,130,246,0.5)]"
@@ -739,7 +758,7 @@ export default function RaceReplayPage() {
                     onClick={() => setPlaybackSpeed(idx)}
                     className={cn(
                       "px-1.5 py-1 rounded-lg text-[9px] font-mono font-bold cursor-pointer transition-all touch-manipulation",
-                      playbackSpeed === idx ? "bg-racing-blue/20 text-racing-blue" : "text-white/20 hover:text-white/50"
+                      playbackSpeed === idx ? "bg-racing-blue/20 text-racing-blue" : "text-[var(--f1-text-dim)] hover:text-f1-sub"
                     )}
                   >
                     {preset.label}
@@ -754,9 +773,9 @@ export default function RaceReplayPage() {
       {/* Empty state */}
       {!dataReady && !loading && (
         <div className="glass-card p-20 text-center space-y-3">
-          <Flag className="w-12 h-12 text-white/8 mx-auto" />
-          <p className="text-white/30 text-sm">Select a year and race above to load the replay</p>
-          <p className="text-white/15 text-[10px] font-mono">Real car positions from OpenF1 API</p>
+          <Flag className="w-12 h-12 text-[var(--f1-text-dim)] mx-auto" />
+          <p className="text-f1-muted text-sm">Select a year and race above to load the replay</p>
+          <p className="text-[var(--f1-text-dim)] text-[10px] font-mono">Real car positions from OpenF1 API</p>
         </div>
       )}
     </div>

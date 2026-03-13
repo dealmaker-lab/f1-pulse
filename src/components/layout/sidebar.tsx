@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/layout/theme-provider";
 import {
-  LayoutDashboard, PlayCircle, Activity,
+  LayoutDashboard, PlayCircle, Activity, Swords,
   PieChart, Users, Trophy,
   ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
 } from "lucide-react";
@@ -14,6 +14,7 @@ import {
 const navItems = [
   { href: "/",            label: "Dashboard",    icon: LayoutDashboard },
   { href: "/race",        label: "Race Replay",  icon: PlayCircle },
+  { href: "/h2h",         label: "Head to Head", icon: Swords },
   { href: "/telemetry",  label: "Telemetry",    icon: Activity },
   { href: "/strategy",   label: "Strategy",     icon: PieChart },
   { href: "/drivers",    label: "Drivers",      icon: Users },
