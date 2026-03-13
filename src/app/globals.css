@@ -308,21 +308,23 @@
     @apply flex items-center gap-3 px-3 py-1.5 rounded-xl transition-all duration-200;
     transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
-  .lap-row:hover { @apply bg-white/[0.04]; }
+  .lap-row:hover { background: var(--f1-hover); }
 
   .pos-badge {
     @apply inline-flex items-center justify-center w-7 h-7 rounded-lg font-mono text-sm font-bold flex-shrink-0;
-    @apply bg-white/[0.04] text-white/50;
+    background: var(--f1-hover);
+    color: var(--f1-text-sub);
   }
   .pos-badge.p1 { background: rgba(255,201,6,0.15); color: #ffc906; box-shadow: 0 0 10px rgba(255,201,6,0.15); }
-  .pos-badge.p2 { @apply bg-white/10 text-white/80; }
+  .pos-badge.p2 { background: var(--f1-hover); color: var(--f1-text-sub); }
   .pos-badge.p3 { background: rgba(205,127,50,0.15); color: #cd7f32; }
 
-  .confidence-bar { @apply h-1.5 rounded-full overflow-hidden bg-white/[0.06]; }
+  .confidence-bar { @apply h-1.5 rounded-full overflow-hidden; background: var(--f1-hover); }
   .confidence-bar-fill { @apply h-full rounded-full; transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1); }
 
   .skeleton {
-    @apply bg-white/[0.04] rounded-lg;
+    @apply rounded-lg;
+    background: var(--f1-hover);
     background-image: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.03) 50%, transparent 100%);
     background-size: 200% 100%;
     animation: shimmer 2s linear infinite;

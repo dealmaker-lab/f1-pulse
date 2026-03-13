@@ -101,12 +101,12 @@ function PodiumCard({
         "relative overflow-hidden rounded-xl transition-all duration-300",
         isWinner
           ? "col-span-2 sm:col-span-1"
-          : ""
+          : "bg-[var(--f1-hover)]"
       )}
       style={{
         background: isWinner
           ? `linear-gradient(135deg, ${color}15, ${color}05)`
-          : "rgba(255,255,255,0.02)",
+          : undefined,
         borderLeft: `3px solid ${color}`,
       }}
     >
@@ -118,7 +118,7 @@ function PodiumCard({
               "font-display font-black",
               isWinner ? "text-4xl sm:text-5xl" : "text-3xl"
             )}
-            style={{ color: position === 1 ? "#ffc906" : position === 2 ? "rgba(255,255,255,0.6)" : "#cd7f32" }}
+            style={{ color: position === 1 ? "#ffc906" : position === 2 ? "var(--f1-text-sub)" : "#cd7f32" }}
           >
             P{position}
           </span>
@@ -151,7 +151,7 @@ function PodiumCard({
 
         {/* Time */}
         {time && (
-          <div className="mt-3 text-xs font-mono text-white/30">
+          <div className="mt-3 text-xs font-mono text-f1-muted">
             {time}
           </div>
         )}
@@ -194,8 +194,8 @@ function StandingRow({
       className={cn(
         "flex items-center gap-3 w-full text-left px-3 py-2 rounded-lg transition-all duration-200 group",
         isSelected
-          ? "bg-white/[0.06]"
-          : "hover:bg-white/[0.03]"
+          ? "bg-black/[0.04] dark:bg-white/[0.06]"
+          : "hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
       )}
     >
       {/* Position */}
@@ -203,9 +203,9 @@ function StandingRow({
         className={cn(
           "w-6 text-right font-display font-black text-sm flex-shrink-0",
           position === 1 && "text-[#ffc906]",
-          position === 2 && "text-white/60",
+          position === 2 && "text-[var(--f1-text-sub)]",
           position === 3 && "text-[#cd7f32]",
-          position > 3 && "text-white/20"
+          position > 3 && "text-[var(--f1-text-dim)]"
         )}
       >
         {position}
@@ -219,10 +219,10 @@ function StandingRow({
 
       {/* Name + team */}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold truncate group-hover:text-white transition-colors">
+        <div className="text-sm font-semibold truncate group-hover:text-f1 transition-colors">
           {name}
         </div>
-        <div className="text-[10px] text-white/25 truncate">{team}</div>
+        <div className="text-[10px] text-[var(--f1-text-dim)] truncate">{team}</div>
       </div>
 
       {/* Points */}
@@ -396,17 +396,17 @@ export default function DashboardPage() {
                 <select
                   value={year}
                   onChange={(e) => setYear(Number(e.target.value))}
-                  className="appearance-none bg-white/[0.04] border border-white/[0.08] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-white/70 cursor-pointer hover:border-white/15 transition-colors outline-none"
+                  className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none"
                 >
                   {[2026, 2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018].map((y) => (
-                    <option key={y} value={y} className="bg-[#15151e]">
+                    <option key={y} value={y} className="bg-[var(--f1-card)]">
                       {y}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
               </div>
-              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/20">
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)]">
                 Season
               </span>
             </div>
@@ -416,7 +416,7 @@ export default function DashboardPage() {
                 "flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-full border",
                 isLiveSession
                   ? "text-racing-green border-racing-green/20 bg-racing-green/5"
-                  : "text-white/30 border-white/[0.06] bg-white/[0.02]"
+                  : "text-f1-muted border-[var(--f1-border)] bg-[var(--f1-hover)]"
               )}
             >
               <div
@@ -424,7 +424,7 @@ export default function DashboardPage() {
                   "w-1.5 h-1.5 rounded-full",
                   isLiveSession
                     ? "bg-racing-green animate-pulse shadow-[0_0_8px_rgba(0,210,190,0.6)]"
-                    : "bg-white/20"
+                    : "bg-[var(--f1-text-dim)]"
                 )}
               />
               {isLiveSession ? "LIVE SESSION" : "NO LIVE SESSION"}
@@ -444,7 +444,7 @@ export default function DashboardPage() {
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-display font-black uppercase tracking-tight leading-[0.95]">
                 {latestResult ? (
                   <>
-                    <span className="text-white">
+                    <span className="text-f1">
                       {latestResult.raceName.replace(" Grand Prix", "")}
                     </span>
                     <br />
@@ -452,7 +452,7 @@ export default function DashboardPage() {
                   </>
                 ) : nextRace ? (
                   <>
-                    <span className="text-white">
+                    <span className="text-f1">
                       {(getMeetingName(nextRace.meeting_key) || nextRace.circuit_short_name)
                         .replace(" Grand Prix", "")}
                     </span>
@@ -461,7 +461,7 @@ export default function DashboardPage() {
                   </>
                 ) : (
                   <>
-                    <span className="text-white">F1 Pulse</span>
+                    <span className="text-f1">F1 Pulse</span>
                     <br />
                     <span className="text-f1-red glow-text">{year}</span>
                   </>
@@ -469,14 +469,14 @@ export default function DashboardPage() {
               </h1>
 
               {/* Subtext */}
-              <div className="mt-4 flex items-center gap-4 text-sm text-white/30">
+              <div className="mt-4 flex items-center gap-4 text-sm text-f1-muted">
                 {latestRace && (
                   <>
                     <span className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5" />
                       {latestRace.circuit_short_name}, {latestRace.country_name}
                     </span>
-                    <span className="text-white/10">|</span>
+                    <span className="text-[var(--f1-text-dim)]">|</span>
                   </>
                 )}
                 <span className="font-mono text-xs">
@@ -487,7 +487,7 @@ export default function DashboardPage() {
               {/* Winner callout */}
               {latestResult && latestResult.results[0] && (
                 <div className="mt-8">
-                  <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/20 mb-2">
+                  <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)] mb-2">
                     Race Winner
                   </div>
                   <div className="flex items-end gap-4">
@@ -521,12 +521,12 @@ export default function DashboardPage() {
               {/* Quick stat pills */}
               <div className="mt-8 flex flex-wrap gap-2">
                 {leader && (
-                  <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-3 py-2">
                     <Trophy className="w-3.5 h-3.5 text-racing-amber" />
                     <span className="text-xs font-semibold">
                       {leader.driver.code}
                     </span>
-                    <span className="text-xs font-mono text-white/40">
+                    <span className="text-xs font-mono text-f1-muted">
                       {leader.points} pts
                     </span>
                     {pointsGap > 0 && (
@@ -539,7 +539,7 @@ export default function DashboardPage() {
                 {nextRace && (
                   <Link
                     href="/race"
-                    className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-lg px-3 py-2 hover:border-f1-red/20 transition-colors group"
+                    className="flex items-center gap-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-3 py-2 hover:border-f1-red/20 transition-colors group"
                   >
                     <Calendar className="w-3.5 h-3.5 text-f1-red/60" />
                     <span className="text-xs font-semibold">
@@ -550,13 +550,13 @@ export default function DashboardPage() {
                       )
                         .replace(" Grand Prix", " GP")}
                     </span>
-                    <span className="text-[10px] font-mono text-white/30">
+                    <span className="text-[10px] font-mono text-f1-muted">
                       {new Date(nextRace.date_start).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
                       })}
                     </span>
-                    <ArrowRight className="w-3 h-3 text-white/20 group-hover:text-f1-red transition-colors" />
+                    <ArrowRight className="w-3 h-3 text-[var(--f1-text-dim)] group-hover:text-f1-red transition-colors" />
                   </Link>
                 )}
               </div>
@@ -587,13 +587,13 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <Flag className="w-4 h-4 text-f1-red/60" />
-                <h2 className="text-f1-sm uppercase tracking-wider text-white/40">
+                <h2 className="text-f1-sm uppercase tracking-wider text-f1-muted">
                   Race Result
                 </h2>
               </div>
               <Link
                 href="/race"
-                className="text-[10px] font-mono uppercase tracking-widest text-white/20 hover:text-f1-red transition-colors flex items-center gap-1"
+                className="text-[10px] font-mono uppercase tracking-widest text-[var(--f1-text-dim)] hover:text-f1-red transition-colors flex items-center gap-1"
               >
                 Full Results <ChevronRight className="w-3 h-3" />
               </Link>
@@ -620,9 +620,9 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={r.driver.code}
-                    className="flex items-center gap-2 py-2 px-3 rounded-lg bg-white/[0.02] border border-white/[0.04]"
+                    className="flex items-center gap-2 py-2 px-3 rounded-lg bg-[var(--f1-hover)] border border-[var(--f1-border)]"
                   >
-                    <span className="text-xs font-display font-black text-white/25 w-5">
+                    <span className="text-xs font-display font-black text-[var(--f1-text-dim)] w-5">
                       {r.position}
                     </span>
                     <div
@@ -657,13 +657,13 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
               <TrendingUp className="w-4 h-4 text-f1-red/60" />
-              <h2 className="text-f1-sm uppercase tracking-wider text-white/40">
+              <h2 className="text-f1-sm uppercase tracking-wider text-f1-muted">
                 Championship
               </h2>
             </div>
 
             {/* Tab toggle */}
-            <div className="flex items-center gap-0.5 bg-white/[0.03] border border-white/[0.06] p-0.5 rounded-lg">
+            <div className="flex items-center gap-0.5 bg-[var(--f1-hover)] border border-[var(--f1-border)] p-0.5 rounded-lg">
               {(["drivers", "constructors"] as const).map((tab) => (
                 <button
                   key={tab}
@@ -672,7 +672,7 @@ export default function DashboardPage() {
                     "px-3 py-1.5 rounded-md text-[11px] font-semibold uppercase tracking-wider transition-all",
                     activeTab === tab
                       ? "bg-f1-red/15 text-f1-red"
-                      : "text-white/30 hover:text-white/50"
+                      : "text-f1-muted hover:text-f1-sub"
                   )}
                 >
                   {tab}
@@ -685,7 +685,7 @@ export default function DashboardPage() {
           {leader && activeTab === "drivers" && (
             <div className="mb-6 flex items-end gap-6">
               <div>
-                <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/15 mb-1">
+                <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)] mb-1">
                   Championship Leader
                 </div>
                 <div className="flex items-center gap-3">
@@ -712,7 +712,7 @@ export default function DashboardPage() {
                         {leader.points} PTS
                       </span>
                       {pointsGap > 0 && (
-                        <span className="text-[10px] font-mono text-white/20">
+                        <span className="text-[10px] font-mono text-[var(--f1-text-dim)]">
                           +{pointsGap} to P2
                         </span>
                       )}
@@ -735,14 +735,14 @@ export default function DashboardPage() {
                 champStandings.length > 0 ? (
                   <ChampionshipChart drivers={champStandings} races={champRaceNames} />
                 ) : (
-                  <div className="flex items-center justify-center h-[400px] text-white/20 text-sm font-mono">
+                  <div className="flex items-center justify-center h-[400px] text-f1-muted text-sm font-mono">
                     No championship data for {year}
                   </div>
                 )
               ) : constructorChartData.length > 0 ? (
                 <ConstructorBarChart constructors={constructorChartData} />
               ) : (
-                <div className="flex items-center justify-center h-[300px] text-white/20 text-sm font-mono">
+                <div className="flex items-center justify-center h-[300px] text-f1-muted text-sm font-mono">
                   No constructor data for {year}
                 </div>
               )}
@@ -750,7 +750,7 @@ export default function DashboardPage() {
 
             {/* Standings list */}
             <div className="glass-card p-4">
-              <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-white/20 mb-3 px-3">
+              <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-[var(--f1-text-dim)] mb-3 px-3">
                 {activeTab === "drivers" ? "Driver Standings" : "Constructor Standings"}
               </div>
               {standingsLoading ? (
@@ -816,11 +816,11 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
               <Calendar className="w-4 h-4 text-f1-red/60" />
-              <h2 className="text-f1-sm uppercase tracking-wider text-white/40">
+              <h2 className="text-f1-sm uppercase tracking-wider text-f1-muted">
                 {year} Calendar
               </h2>
             </div>
-            <span className="text-[10px] font-mono text-white/15">
+            <span className="text-[10px] font-mono text-[var(--f1-text-dim)]">
               {pastRaces.length} of {sessions.length} completed
             </span>
           </div>
@@ -834,7 +834,7 @@ export default function DashboardPage() {
               {/* Calendar timeline */}
               <div className="relative">
                 {/* Progress bar background */}
-                <div className="absolute top-4 left-0 right-0 h-[2px] bg-white/[0.04] rounded-full" />
+                <div className="absolute top-4 left-0 right-0 h-[2px] bg-black/[0.04] dark:bg-white/[0.04] rounded-full" />
                 {/* Progress bar fill */}
                 {sessions.length > 0 && (
                   <div
@@ -869,8 +869,8 @@ export default function DashboardPage() {
                             isNext
                               ? "w-3 h-3 bg-f1-red shadow-[0_0_12px_rgba(225,6,0,0.5)]"
                               : isPast
-                              ? "w-2 h-2 bg-white/30 group-hover:bg-f1-red/60"
-                              : "w-1.5 h-1.5 bg-white/10 group-hover:bg-white/20"
+                              ? "w-2 h-2 bg-f1-muted group-hover:bg-f1-red/60"
+                              : "w-1.5 h-1.5 bg-[var(--f1-text-dim)] group-hover:bg-f1-muted"
                           )}
                         />
 
@@ -881,18 +881,18 @@ export default function DashboardPage() {
                             isNext ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                           )}
                         >
-                          <div className="text-[9px] font-mono text-white/20">
+                          <div className="text-[9px] font-mono text-[var(--f1-text-dim)]">
                             R{String(idx + 1).padStart(2, "0")}
                           </div>
                           <div
                             className={cn(
                               "text-[10px] font-semibold truncate max-w-[100px]",
-                              isNext ? "text-white" : "text-white/50"
+                              isNext ? "text-f1" : "text-f1-sub"
                             )}
                           >
                             {name.replace(" Grand Prix", " GP")}
                           </div>
-                          <div className="text-[9px] font-mono text-white/15 mt-0.5">
+                          <div className="text-[9px] font-mono text-[var(--f1-text-dim)] mt-0.5">
                             {new Date(race.date_start).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -940,12 +940,12 @@ export default function DashboardPage() {
                           isNext
                             ? "border-f1-red/20 bg-f1-red/[0.04]"
                             : isPast
-                            ? "border-white/[0.04] bg-white/[0.02] hover:border-white/[0.08]"
-                            : "border-white/[0.03] bg-white/[0.01] opacity-60 hover:opacity-80"
+                            ? "border-[var(--f1-border)] bg-[var(--f1-hover)] hover:border-f1-muted/30"
+                            : "border-[var(--f1-border)] bg-[var(--f1-hover)] opacity-60 hover:opacity-80"
                         )}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-mono text-white/20">
+                          <span className="text-[10px] font-mono text-[var(--f1-text-dim)]">
                             R{String(globalIdx + 1).padStart(2, "0")}
                           </span>
                           <div className="flex items-center gap-1.5">
@@ -959,16 +959,16 @@ export default function DashboardPage() {
                             )}
                           </div>
                         </div>
-                        <div className="text-sm font-semibold truncate group-hover:text-white transition-colors">
+                        <div className="text-sm font-semibold truncate group-hover:text-f1 transition-colors">
                           {name.replace(" Grand Prix", " GP")}
                         </div>
                         <div className="flex items-center gap-1 mt-1.5">
-                          <MapPin className="w-3 h-3 text-white/15" />
-                          <span className="text-[10px] text-white/25 truncate">
+                          <MapPin className="w-3 h-3 text-[var(--f1-text-dim)]" />
+                          <span className="text-[10px] text-[var(--f1-text-dim)] truncate">
                             {race.circuit_short_name}
                           </span>
                         </div>
-                        <div className="text-[10px] font-mono text-white/15 mt-1">
+                        <div className="text-[10px] font-mono text-[var(--f1-text-dim)] mt-1">
                           {new Date(race.date_start).toLocaleDateString("en-US", {
                             month: "short",
                             day: "numeric",

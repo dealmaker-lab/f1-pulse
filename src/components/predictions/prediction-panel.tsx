@@ -73,7 +73,7 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
         </div>
         <div className="flex flex-col items-center justify-center py-12 gap-3">
           <Loader2 className="w-6 h-6 text-racing-purple animate-spin" />
-          <span className="text-xs text-white/30 font-mono">Analyzing {year - 3}–{year} data...</span>
+          <span className="text-xs text-f1-muted font-mono">Analyzing {year - 3}–{year} data...</span>
         </div>
       </div>
     );
@@ -86,7 +86,7 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
           <Brain className="w-4 h-4 text-racing-purple" />
           <h2 className="text-sm font-semibold">AI Predictions</h2>
         </div>
-        <div className="text-center py-8 text-white/30 text-sm">
+        <div className="text-center py-8 text-f1-muted text-sm">
           Not enough data to generate predictions for {year}
         </div>
       </div>
@@ -116,17 +116,17 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
           <div>
             <h2 className="text-sm font-semibold">Next Race Predictions</h2>
             {nextRaceName && (
-              <span className="text-[10px] text-white/30 font-mono">{nextRaceName}</span>
+              <span className="text-[10px] text-f1-muted font-mono">{nextRaceName}</span>
             )}
           </div>
         </div>
 
-        <div className="flex rounded-lg overflow-hidden border border-white/10">
+        <div className="flex rounded-lg overflow-hidden border border-[var(--f1-border)]">
           <button
             onClick={() => setActiveView("qualifying")}
             className={cn(
               "px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5",
-              activeView === "qualifying" ? "bg-racing-purple/20 text-racing-purple" : "text-white/40 hover:text-white/60"
+              activeView === "qualifying" ? "bg-racing-purple/20 text-racing-purple" : "text-f1-muted hover:text-f1-sub"
             )}
           >
             <Timer className="w-3 h-3" />
@@ -136,7 +136,7 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
             onClick={() => setActiveView("race")}
             className={cn(
               "px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5",
-              activeView === "race" ? "bg-racing-purple/20 text-racing-purple" : "text-white/40 hover:text-white/60"
+              activeView === "race" ? "bg-racing-purple/20 text-racing-purple" : "text-f1-muted hover:text-f1-sub"
             )}
           >
             <Trophy className="w-3 h-3" />
@@ -153,13 +153,13 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
             className={cn(
               "relative p-3 rounded-xl text-center transition-all duration-300",
               i === 0 ? "bg-racing-amber/10 ring-1 ring-racing-amber/20" :
-              i === 1 ? "bg-white/[0.04] ring-1 ring-white/[0.08]" :
+              i === 1 ? "bg-[var(--f1-hover)] ring-1 ring-[var(--f1-border)]" :
               "bg-orange-900/10 ring-1 ring-orange-800/15"
             )}
           >
             <div className={cn(
               "text-[10px] font-mono font-bold uppercase tracking-wider mb-2",
-              i === 0 ? "text-racing-amber" : i === 1 ? "text-white/50" : "text-orange-400"
+              i === 0 ? "text-racing-amber" : i === 1 ? "text-f1-sub" : "text-orange-400"
             )}>
               P{i + 1}
             </div>
@@ -170,7 +170,7 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
               {p.code}
             </div>
             <div className="text-xs font-semibold truncate">{p.name.split(" ").pop()}</div>
-            <div className="text-[10px] text-white/25 truncate">{p.team}</div>
+            <div className="text-[10px] text-[var(--f1-text-dim)] truncate">{p.team}</div>
             <div className="mt-2">
               <div className="confidence-bar">
                 <div
@@ -202,7 +202,7 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
                 <div className="w-1 h-5 rounded-full flex-shrink-0" style={{ backgroundColor: p.teamColor }} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{p.name}</div>
-                  <div className="text-[10px] text-white/25">{p.team}</div>
+                  <div className="text-[10px] text-[var(--f1-text-dim)]">{p.team}</div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <div className="w-16">
@@ -213,15 +213,15 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
                       />
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono text-white/30 w-8 text-right">{Math.round(p.confidence)}%</span>
-                  {isExpanded ? <ChevronUp className="w-3 h-3 text-white/20" /> : <ChevronDown className="w-3 h-3 text-white/20" />}
+                  <span className="text-[10px] font-mono text-f1-muted w-8 text-right">{Math.round(p.confidence)}%</span>
+                  {isExpanded ? <ChevronUp className="w-3 h-3 text-[var(--f1-text-dim)]" /> : <ChevronDown className="w-3 h-3 text-[var(--f1-text-dim)]" />}
                 </div>
               </button>
 
               {/* Expanded factor breakdown */}
               {isExpanded && factors && (
-                <div className="ml-10 mr-2 mb-2 p-3 bg-white/[0.02] rounded-xl space-y-2 animate-fade-in">
-                  <div className="text-[10px] uppercase tracking-wider text-white/30 font-semibold mb-2">
+                <div className="ml-10 mr-2 mb-2 p-3 bg-[var(--f1-hover)] rounded-xl space-y-2 animate-fade-in">
+                  <div className="text-[10px] uppercase tracking-wider text-f1-muted font-semibold mb-2">
                     Performance Factors
                   </div>
                   {[
@@ -231,13 +231,13 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
                     { label: "Consistency", value: 10 - factors.consistency, max: 10, icon: Trophy, desc: `Variance: ${factors.consistency.toFixed(1)}` },
                   ].map((f) => (
                     <div key={f.label} className="flex items-center gap-2">
-                      <f.icon className="w-3 h-3 text-white/20 flex-shrink-0" />
+                      <f.icon className="w-3 h-3 text-[var(--f1-text-dim)] flex-shrink-0" />
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-[10px] text-white/50">{f.label}</span>
-                          <span className="text-[9px] font-mono text-white/30">{f.desc}</span>
+                          <span className="text-[10px] text-f1-sub">{f.label}</span>
+                          <span className="text-[9px] font-mono text-f1-muted">{f.desc}</span>
                         </div>
-                        <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                        <div className="h-1 rounded-full bg-[var(--f1-hover)] overflow-hidden">
                           <div
                             className="h-full rounded-full bg-racing-purple/60 transition-all duration-500"
                             style={{ width: `${Math.max(5, (f.value / f.max) * 100)}%` }}
@@ -254,14 +254,14 @@ export default function PredictionPanel({ year, nextRaceCircuit, nextRaceName }:
       </div>
 
       {/* Footer metadata */}
-      <div className="mt-4 pt-3 border-t border-white/[0.04] flex items-center justify-between">
+      <div className="mt-4 pt-3 border-t border-[var(--f1-border)] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-racing-purple animate-pulse" />
-          <span className="text-[9px] text-white/20 font-mono">
+          <span className="text-[9px] text-[var(--f1-text-dim)] font-mono">
             Based on {data.totalDataPoints} races · {data.dataYears.join("–")} data
           </span>
         </div>
-        <span className="text-[9px] text-white/15 font-mono">
+        <span className="text-[9px] text-[var(--f1-text-dim)] font-mono">
           {new Date(data.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </span>
       </div>
