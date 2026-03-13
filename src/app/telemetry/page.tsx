@@ -360,7 +360,7 @@ export default function TelemetryPage() {
             </div>
           </div>
 
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 min-w-0 sm:min-w-[200px]">
             <label className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold block mb-1.5">Grand Prix</label>
             <div className="relative">
               <select
@@ -508,7 +508,7 @@ export default function TelemetryPage() {
               </div>
             </div>
 
-            <div className="w-full h-[350px]">
+            <div className="w-full h-[250px] sm:h-[300px] lg:h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={processedData.merged} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--f1-border)" />

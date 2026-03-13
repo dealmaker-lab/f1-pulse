@@ -418,7 +418,7 @@ export default function DashboardPage() {
       {/* ════════════════════════════════════════════════════════════════════
           HERO SECTION — Full-width race weekend command center
           ════════════════════════════════════════════════════════════════════ */}
-      <section className="relative overflow-hidden px-4 sm:px-6 lg:px-8 pt-6 pb-8">
+      <section className="relative overflow-hidden px-2 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-6 sm:pb-8">
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 right-0 w-[600px] h-[400px] bg-f1-red/[0.03] rounded-full blur-[120px]" />
@@ -455,7 +455,7 @@ export default function DashboardPage() {
                     const val = e.target.value;
                     setSelectedRound(val === "latest" ? "latest" : Number(val));
                   }}
-                  className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none max-w-[280px]"
+                  className="appearance-none bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg pl-3 pr-8 py-1.5 text-sm font-mono text-f1-sub cursor-pointer hover:border-f1-red/30 transition-colors outline-none max-w-[200px] sm:max-w-[280px]"
                 >
                   <option value="latest" className="bg-[var(--f1-card)]">
                     Latest Race
@@ -508,7 +508,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Huge race name */}
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-display font-black uppercase tracking-tight leading-[0.95]">
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-display font-black uppercase tracking-tight leading-[0.95]">
                 {displayedResult ? (
                   <>
                     <span className="text-f1">

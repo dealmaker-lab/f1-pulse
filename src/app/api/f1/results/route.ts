@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
+import { JOLPICA_BASE, fetchAllRaces } from "@/lib/jolpica";
 
 export async function GET(req: NextRequest) {
   const year = req.nextUrl.searchParams.get("year") || "2026";
   const round = req.nextUrl.searchParams.get("round"); // optional specific round
 
   try {
-    const url = round
-      ? `${JOLPICA_BASE}/${year}/${round}/results/?format=json`
-      : `${JOLPICA_BASE}/${year}/results/?format=json&limit=1000`;
-
-    const res = await fetch(url, {
-      cache: "no-store",
-    });
-    const json = await res.json();
-
-    const races = json?.MRData?.RaceTable?.Races || [];
+    let races;
+    if (round) {
+      const res = await fetch(
+        `${JOLPICA_BASE}/${year}/${round}/results/?format=json`,
+        { cache: "no-store" }
+      );
+      const json = await res.json();
+      races = json?.MRData?.RaceTable?.Races || [];
+    } else {
+      races = await fetchAllRaces(
+        `${JOLPICA_BASE}/${year}/results/?format=json`,
+        "Results"
+      );
+    }
 
     const results = races.map((race: any) => ({
       round: parseInt(race.round),

@@ -228,7 +228,7 @@ export default function WeatherPage() {
             </select>
           </div>
 
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 min-w-0 sm:min-w-[200px]">
             <label className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold block mb-1.5">Grand Prix</label>
             <div className="relative">
               <select

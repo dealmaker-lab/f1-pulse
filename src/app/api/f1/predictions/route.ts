@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
+import { JOLPICA_BASE, fetchAllRaces } from "@/lib/jolpica";
 
 interface DriverPerformance {
   code: string;
@@ -24,14 +23,15 @@ export async function GET(req: NextRequest) {
   const circuit = req.nextUrl.searchParams.get("circuit") || "";
 
   try {
-    // Fetch data in parallel for speed
-    const [currentStandings, constructorStandings, currentResults, prevYear1, prevYear2, prevYear3] = await Promise.all([
+    // Fetch data in parallel for speed (with pagination for results)
+    const y = parseInt(year);
+    const [currentStandings, constructorStandings, currentRaces, prevRaces1, prevRaces2, prevRaces3] = await Promise.all([
       fetchJSON(`${JOLPICA_BASE}/${year}/driverstandings/?format=json`),
       fetchJSON(`${JOLPICA_BASE}/${year}/constructorstandings/?format=json`),
-      fetchJSON(`${JOLPICA_BASE}/${year}/results/?format=json&limit=1000`),
-      fetchJSON(`${JOLPICA_BASE}/${parseInt(year) - 1}/results/?format=json&limit=1000`),
-      fetchJSON(`${JOLPICA_BASE}/${parseInt(year) - 2}/results/?format=json&limit=1000`),
-      fetchJSON(`${JOLPICA_BASE}/${parseInt(year) - 3}/results/?format=json&limit=1000`),
+      fetchAllRaces(`${JOLPICA_BASE}/${year}/results/?format=json`, "Results"),
+      fetchAllRaces(`${JOLPICA_BASE}/${y - 1}/results/?format=json`, "Results"),
+      fetchAllRaces(`${JOLPICA_BASE}/${y - 2}/results/?format=json`, "Results"),
+      fetchAllRaces(`${JOLPICA_BASE}/${y - 3}/results/?format=json`, "Results"),
     ]);
 
     const driverStandings = currentStandings?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
@@ -45,10 +45,10 @@ export async function GET(req: NextRequest) {
 
     // Gather all race results from current + previous 3 years
     const allResults = [
-      ...(currentResults?.MRData?.RaceTable?.Races || []),
-      ...(prevYear1?.MRData?.RaceTable?.Races || []),
-      ...(prevYear2?.MRData?.RaceTable?.Races || []),
-      ...(prevYear3?.MRData?.RaceTable?.Races || []),
+      ...currentRaces,
+      ...prevRaces1,
+      ...prevRaces2,
+      ...prevRaces3,
     ];
 
     // Get current grid drivers from standings or latest race
@@ -64,14 +64,15 @@ export async function GET(req: NextRequest) {
         });
       });
     } else {
-      // Fallback: get drivers from previous year's last standings
-      const prevStandings = prevYear1?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
-      prevStandings.forEach((s: any) => {
-        const code = s.Driver?.code || s.Driver?.familyName?.substring(0, 3).toUpperCase();
+      // Fallback: get drivers from previous year's last race results
+      const lastPrevRace = prevRaces1[prevRaces1.length - 1];
+      const prevResults = lastPrevRace?.Results || [];
+      prevResults.forEach((r: any) => {
+        const code = r.Driver?.code || r.Driver?.familyName?.substring(0, 3).toUpperCase();
         currentDrivers.set(code, {
-          name: `${s.Driver?.givenName} ${s.Driver?.familyName}`,
-          team: s.Constructors?.[0]?.name || "",
-          constructorId: s.Constructors?.[0]?.constructorId || "",
+          name: `${r.Driver?.givenName} ${r.Driver?.familyName}`,
+          team: r.Constructor?.name || "",
+          constructorId: r.Constructor?.constructorId || "",
         });
       });
     }

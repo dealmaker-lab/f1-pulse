@@ -213,7 +213,7 @@ export default function ConstructorsPage() {
             No progression data available for {selectedYear}
           </div>
         ) : (
-          <div className="w-full h-[400px]">
+          <div className="w-full h-[280px] sm:h-[350px] lg:h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={progressionChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
+import { JOLPICA_BASE, fetchAllRaces } from "@/lib/jolpica";
 
 interface DriverResult {
   code: string;
@@ -67,19 +66,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch all race results + qualifying for the year
-    const [raceRes, qualiRes, standingsRes] = await Promise.all([
-      fetch(`${JOLPICA_BASE}/${year}/results/?format=json&limit=1000`, { cache: "no-store" }),
-      fetch(`${JOLPICA_BASE}/${year}/qualifying/?format=json&limit=1000`, { cache: "no-store" }),
+    // Fetch all race results + qualifying for the year (with pagination)
+    const [races, qualifyingRaces, standingsRes] = await Promise.all([
+      fetchAllRaces(`${JOLPICA_BASE}/${year}/results/?format=json`, "Results"),
+      fetchAllRaces(`${JOLPICA_BASE}/${year}/qualifying/?format=json`, "QualifyingResults"),
       fetch(`${JOLPICA_BASE}/${year}/driverstandings/?format=json`, { cache: "no-store" }),
     ]);
 
-    const raceJson = await raceRes.json();
-    const qualiJson = await qualiRes.json();
     const standingsJson = await standingsRes.json();
-
-    const races = raceJson?.MRData?.RaceTable?.Races || [];
-    const qualifyingRaces = qualiJson?.MRData?.RaceTable?.Races || [];
     const allStandings = standingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
 
     // Build race-by-race H2H

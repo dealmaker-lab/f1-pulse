@@ -1,19 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const JOLPICA_BASE = "https://api.jolpi.ca/ergast/f1";
+import { JOLPICA_BASE, fetchAllRaces } from "@/lib/jolpica";
 
 // Returns round-by-round championship progression for all drivers
-// Uses the Jolpica API to fetch standings after each round
 export async function GET(req: NextRequest) {
   const year = req.nextUrl.searchParams.get("year") || "2026";
 
   try {
-    // First get results for every round to compute cumulative points
-    const resultsRes = await fetch(`${JOLPICA_BASE}/${year}/results/?format=json&limit=1000`, {
-      cache: "no-store",
-    });
-    const resultsJson = await resultsRes.json();
-    const races = resultsJson?.MRData?.RaceTable?.Races || [];
+    // Fetch all results with pagination
+    const races = await fetchAllRaces(
+      `${JOLPICA_BASE}/${year}/results/?format=json`,
+      "Results"
+    );
 
     if (races.length === 0) {
       return NextResponse.json({ raceNames: [], drivers: [] });

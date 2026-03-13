@@ -639,7 +639,7 @@ export default function RaceReplayPage() {
                 <Timer className="w-3.5 h-3.5 text-racing-amber" />
                 Leaderboard
               </h2>
-              <div className="space-y-px max-h-[560px] overflow-y-auto fade-bottom">
+              <div className="space-y-px max-h-[300px] sm:max-h-[400px] lg:max-h-[560px] overflow-y-auto fade-bottom">
                 {leaderboard.map((entry, i) => {
                   const color = `#${entry.driver.team_colour || "888888"}`;
                   const tireColor = TIRE_COLORS[entry.compound] || TIRE_COLORS.UNKNOWN;

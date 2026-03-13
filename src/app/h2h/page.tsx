@@ -234,7 +234,7 @@ export default function H2HPage() {
       </div>
 
       {/* ═══ Driver Picker ═══ */}
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-3 items-center">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 items-center">
         {/* Driver 1 */}
         <div className="glass-card p-4 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: d1Color }} />
@@ -260,7 +260,7 @@ export default function H2HPage() {
         </div>
 
         {/* VS badge */}
-        <div className="w-12 h-12 rounded-full bg-f1-red/10 border-2 border-f1-red/30 flex items-center justify-center">
+        <div className="w-12 h-12 rounded-full bg-f1-red/10 border-2 border-f1-red/30 flex items-center justify-center mx-auto sm:mx-0">
           <span className="text-xs font-display font-black text-f1-red">VS</span>
         </div>
 

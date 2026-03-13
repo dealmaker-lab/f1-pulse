@@ -45,7 +45,7 @@ export default function RootLayout({
         <ThemeProvider>
           <Sidebar />
           <main className="lg:ml-[220px] min-h-screen">
-            <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 pt-16 lg:pt-6">
+            <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 pt-14 lg:pt-6">
               {children}
             </div>
           </main>
