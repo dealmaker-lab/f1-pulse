@@ -54,16 +54,34 @@ async function resolveDriverId(codeOrId: string): Promise<string> {
   return codeOrId.toLowerCase();
 }
 
-/** Safe JSON fetch that handles non-JSON responses (rate limit pages, errors) */
-async function safeFetchJson(url: string): Promise<any> {
-  const res = await fetch(url);
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    console.warn(`Non-JSON response from ${url}: ${text.substring(0, 100)}`);
-    return null;
+/** Small delay helper */
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Safe JSON fetch with retry for rate-limited responses */
+async function safeFetchJson(url: string, retries = 2): Promise<any> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        // Got HTML (rate limit) — wait and retry
+        if (attempt < retries) {
+          await delay(500 * (attempt + 1));
+          continue;
+        }
+        return null;
+      }
+    } catch {
+      if (attempt < retries) {
+        await delay(500 * (attempt + 1));
+        continue;
+      }
+      return null;
+    }
   }
+  return null;
 }
 
 /**
@@ -153,6 +171,7 @@ export async function GET(req: NextRequest) {
     // Process each season sequentially with only 2 parallel requests at a time
     // to avoid Jolpica rate limits (>4 concurrent requests get HTML error pages)
     for (let i = 0; i < commonSeasons.length; i++) {
+      if (i > 0) await delay(200); // Breathing room between seasons
       const year = commonSeasons[i];
       // Fetch race results (2 parallel)
       const [d1Races, d2Races] = await Promise.all([
