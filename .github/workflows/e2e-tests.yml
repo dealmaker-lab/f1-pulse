@@ -10,7 +10,7 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -26,15 +26,33 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps
 
-      - name: Wait for Vercel deploy
+      - name: Wait for Vercel deployment
         if: github.event_name == 'push'
-        run: sleep 60
+        run: |
+          echo "Waiting for Vercel deployment to be ready..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://patootu-f1.vercel.app/)
+            if [ "$STATUS" = "200" ]; then
+              echo "Site is live (attempt $i)"
+              sleep 10
+              break
+            fi
+            echo "Attempt $i: status $STATUS, retrying in 10s..."
+            sleep 10
+          done
 
       - name: Run post-deploy tests (production)
         if: github.event_name == 'push'
         run: npx playwright test e2e/post-deploy.spec.ts --project=chromium-dark --project=chromium-light
         env:
           BASE_URL: https://patootu-f1.vercel.app
+
+      - name: Run data loading tests
+        if: github.event_name == 'push'
+        run: npx playwright test e2e/data-loading.spec.ts --project=chromium-dark
+        env:
+          BASE_URL: https://patootu-f1.vercel.app
+        continue-on-error: true
 
       - name: Run smoke tests (PR preview)
         if: github.event_name == 'pull_request'
