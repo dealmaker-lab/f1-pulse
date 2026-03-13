@@ -136,7 +136,10 @@ export default function CircuitMap({
     return pts;
   }, [trackOutline, bounds]);
 
-  const trackPath = useMemo(() => pointsToSmoothPath(normalizedTrack), [normalizedTrack]);
+  const trackPath = useMemo(() => {
+    if (normalizedTrack.length < 30) return ""; // Not enough points for a valid circuit outline
+    return pointsToSmoothPath(normalizedTrack);
+  }, [normalizedTrack]);
 
   const normalizedCars = useMemo(() => {
     if (!carPositions.length || !bounds) return [];
