@@ -144,14 +144,14 @@ export default function ConstructorsPage() {
             <Trophy className="w-7 h-7 text-racing-amber" />
             Constructor Championship
           </h1>
-          <p className="text-sm text-white/40 mt-1">Team standings, points progression, and analysis</p>
+          <p className="text-sm text-f1-muted mt-1">Team standings, points progression, and analysis</p>
         </div>
 
         {/* Year selector */}
         <select
           value={selectedYear}
           onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-          className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-racing-amber/50 transition-colors font-mono"
+          className="px-4 py-2 bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg text-sm text-f1 outline-none focus:border-racing-amber/50 transition-colors font-mono"
         >
           {YEARS.map((y) => (
             <option key={y} value={y} className="bg-slate-900">{y} Season</option>
@@ -165,7 +165,7 @@ export default function ConstructorsPage() {
           <Loader2 className="w-6 h-6 animate-spin text-racing-amber" />
         </div>
       ) : standings.length === 0 ? (
-        <div className="glass-card p-8 text-center text-white/40">
+        <div className="glass-card p-8 text-center text-f1-sub">
           No constructor standings data available for {selectedYear}
         </div>
       ) : (
@@ -176,7 +176,7 @@ export default function ConstructorsPage() {
               onClick={() => setSelectedTeam(c.team)}
               className={cn(
                 "glass-card-hover p-4 text-left cursor-pointer transition-all",
-                selectedTeam === c.team && "ring-1 ring-white/20 bg-white/5"
+                selectedTeam === c.team && "ring-1 ring-[var(--f1-border)] bg-[var(--f1-hover)]"
               )}
             >
               <div className="flex items-center justify-between mb-3">
@@ -193,7 +193,7 @@ export default function ConstructorsPage() {
               <div className="text-sm font-bold leading-tight">{c.team}</div>
               <div className="flex items-center justify-between mt-2">
                 <div className="font-mono text-xl font-bold" style={{ color: c.teamColor }}>{c.points}</div>
-                <div className="text-[10px] text-white/30 font-mono">{c.wins}W</div>
+                <div className="text-[10px] text-f1-muted font-mono">{c.wins}W</div>
               </div>
             </button>
           ))}
@@ -205,11 +205,11 @@ export default function ConstructorsPage() {
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-4 h-4 text-racing-blue" />
           <h2 className="text-sm font-semibold">Points Progression</h2>
-          {loadingProgression && <Loader2 className="w-4 h-4 animate-spin text-white/40 ml-auto" />}
+          {loadingProgression && <Loader2 className="w-4 h-4 animate-spin text-f1-muted ml-auto" />}
         </div>
 
         {!loadingProgression && progressionChartData.length === 0 ? (
-          <div className="flex items-center justify-center h-64 text-white/40 text-sm">
+          <div className="flex items-center justify-center h-64 text-f1-sub text-sm">
             No progression data available for {selectedYear}
           </div>
         ) : (
@@ -321,7 +321,7 @@ export default function ConstructorsPage() {
             <div className="w-2 h-12 rounded-full" style={{ backgroundColor: team.teamColor }} />
             <div>
               <div className="text-xl font-bold">{team.team}</div>
-              <div className="text-sm text-white/40">
+              <div className="text-sm text-f1-sub">
                 Constructor Championship Position: P{team.position} · {selectedYear} Season
               </div>
             </div>
@@ -333,8 +333,8 @@ export default function ConstructorsPage() {
               { label: "Race Wins", value: team.wins, color: "#E10600" },
               { label: "Nationality", value: team.nationality || "—", color: "#3B82F6" },
             ].map((s) => (
-              <div key={s.label} className="bg-white/3 rounded-xl p-4 space-y-1">
-                <span className="text-[10px] uppercase tracking-widest text-white/30">{s.label}</span>
+              <div key={s.label} className="bg-[var(--f1-hover)] rounded-xl p-4 space-y-1">
+                <span className="text-[10px] uppercase tracking-widest text-f1-muted">{s.label}</span>
                 <div className="font-mono text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
               </div>
             ))}

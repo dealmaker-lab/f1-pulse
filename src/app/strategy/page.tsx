@@ -113,7 +113,7 @@ function StrategyPanel({
     );
   if (!strategies.length)
     return (
-      <div className="flex flex-col items-center justify-center h-48 gap-2 text-white/20">
+      <div className="flex flex-col items-center justify-center h-48 gap-2 text-f1-muted">
         <Fuel className="w-6 h-6" />
         <span className="text-xs font-mono">No strategy data</span>
       </div>
@@ -153,7 +153,7 @@ function PositionsPanel({
     );
   if (!data.length)
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-2 text-white/20">
+      <div className="flex flex-col items-center justify-center h-64 gap-2 text-f1-muted">
         <TrendingUp className="w-6 h-6" />
         <span className="text-xs font-mono">No position data</span>
       </div>
@@ -234,7 +234,7 @@ function PitStopsPanel({
     );
   if (!pitData.length)
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-2 text-white/20">
+      <div className="flex flex-col items-center justify-center h-64 gap-2 text-f1-muted">
         <Timer className="w-6 h-6" />
         <span className="text-xs font-mono">No pit stop data</span>
       </div>
@@ -292,7 +292,7 @@ function RaceSelector({
 }) {
   return (
     <div
-      className="relative rounded-xl p-4 space-y-3 border bg-white/[0.03]"
+      className="relative rounded-xl p-4 space-y-3 border bg-[var(--f1-hover)]"
       style={{ borderColor: `${accent}30` }}
     >
       {/* accent top bar */}
@@ -309,19 +309,19 @@ function RaceSelector({
           <select
             value={year}
             onChange={(e) => setYear(+e.target.value)}
-            className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm font-mono text-white bg-white/5 border border-white/[0.07] outline-none focus:border-white/20 transition-colors cursor-pointer"
+            className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm font-mono text-f1 bg-[var(--f1-hover)] border border-[var(--f1-border)] outline-none focus:border-f1-sub transition-colors cursor-pointer"
           >
             {YEARS.map((y) => (
               <option key={y} value={y} className="bg-[#0d0f14]">{y}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
         </div>
 
         {/* Race */}
         <div className="relative">
           {loading ? (
-            <div className="flex items-center px-3 h-[38px] text-white/30">
+            <div className="flex items-center px-3 h-[38px] text-f1-muted">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             </div>
           ) : (
@@ -332,7 +332,7 @@ function RaceSelector({
                   const r = races.find((x) => x.session_key === +e.target.value);
                   if (r) setSelected(r);
                 }}
-                className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm font-mono text-white bg-white/5 border border-white/[0.07] outline-none focus:border-white/20 transition-colors cursor-pointer"
+                className="w-full appearance-none px-3 py-2 pr-8 rounded-lg text-sm font-mono text-f1 bg-[var(--f1-hover)] border border-[var(--f1-border)] outline-none focus:border-f1-sub transition-colors cursor-pointer"
               >
                 <option value="" className="bg-[#0d0f14]">Select race…</option>
                 {races.map((r) => (
@@ -341,18 +341,18 @@ function RaceSelector({
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 pointer-events-none" />
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-f1-muted pointer-events-none" />
             </>
           )}
         </div>
       </div>
 
       {selected && (
-        <div className="flex items-center gap-1.5 text-[10px] text-white/30 font-mono">
-          <Flag className="w-3 h-3" />
+        <div className="flex items-center gap-1.5 text-[10px] text-f1-muted font-mono">
+       <Flag className="w-3 h-3" />
           {selected.circuit_short_name} · {year}
           {selected.date && (
-            <span className="ml-1 text-white/20">
+            <span className="ml-1 text-[var(--f1-text-dim)]">
               {new Date(selected.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
             </span>
           )}
@@ -367,8 +367,8 @@ function RaceSelector({
 function StatChip({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
     <div className="space-y-1">
-      <div className="text-[9px] uppercase tracking-widest text-white/25 font-mono">{label}</div>
-      <div className="text-sm font-black font-mono" style={{ color: accent ?? "rgba(255,255,255,0.9)" }}>
+      <div className="text-[9px] uppercase tracking-widest text-f1-muted font-mono">{label}</div>
+      <div className="text-sm font-black font-mono" style={{ color: accent ?? "var(--f1-text-sub)" }}>
         {value}
       </div>
     </div>
@@ -557,7 +557,7 @@ export default function StrategyPage() {
             <Zap className="w-7 h-7 text-racing-green" />
             Strategy Analyzer
           </h1>
-          <p className="text-sm text-white/35 mt-1">Tire strategy · pit stops · race positions</p>
+          <p className="text-sm text-f1-muted mt-1">Tire strategy · pit stops · race positions</p>
         </div>
 
         <button
@@ -566,7 +566,7 @@ export default function StrategyPage() {
             "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all",
             compareMode
               ? "border-racing-green/50 bg-racing-green/10 text-racing-green shadow-[0_0_20px_rgba(57,181,74,0.15)]"
-              : "border-white/10 bg-white/5 text-white/50 hover:text-white hover:border-white/20"
+              : "border-[var(--f1-border)] bg-[var(--f1-hover)] text-f1-sub hover:text-f1 hover:border-f1"
           )}
         >
           <GitCompare className="w-4 h-4" />
@@ -626,7 +626,7 @@ export default function StrategyPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.06] p-1 rounded-xl w-fit">
+          <div className="flex items-center gap-1 bg-[var(--f1-hover)] border border-[var(--f1-border)] p-1 rounded-xl w-fit">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -634,8 +634,8 @@ export default function StrategyPage() {
                 className={cn(
                   "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all",
                   tab === t.id
-                    ? "bg-white/10 text-white shadow-sm"
-                    : "text-white/35 hover:text-white/60"
+                    ? "bg-[var(--f1-hover)] text-f1 shadow-sm"
+                    : "text-f1-muted hover:text-f1-sub"
                 )}
               >
                 {t.icon}
@@ -652,7 +652,7 @@ export default function StrategyPage() {
                 <span className="text-[9px] font-mono font-black uppercase tracking-[0.2em] text-[#3B82F6]">
                   Race A · {race1?.circuit_short_name} {year1}
                 </span>
-                <span className="text-[9px] text-white/25 font-mono">{visible1.length} drivers</span>
+                <span className="text-[9px] text-f1-muted font-mono">{visible1.length} drivers</span>
               </div>
               {tab === "strategy" && (
                 <StrategyPanel stints={stints1} drivers={drivers1} visible={visible1}
@@ -684,7 +684,7 @@ export default function StrategyPage() {
                 <span className="text-[9px] font-mono font-black uppercase tracking-[0.2em] text-[#39B54A]">
                   Race B · {race2?.circuit_short_name} {year2}
                 </span>
-                <span className="text-[9px] text-white/25 font-mono">{visible2.length} drivers</span>
+                <span className="text-[9px] text-f1-muted font-mono">{visible2.length} drivers</span>
               </div>
               {tab === "strategy" && (
                 <StrategyPanel stints={stints2} drivers={drivers2} visible={visible2}
@@ -719,13 +719,13 @@ export default function StrategyPage() {
           {/* Stats bar */}
           <div className="glass-card px-5 py-4 flex flex-wrap items-center gap-6 rounded-xl border-t-2 border-racing-blue/40">
             <StatChip label="Race" value={`${race1.circuit_short_name} ${year1}`} />
-            <div className="h-5 w-px bg-white/10" />
+            <div className="h-5 w-px bg-[var(--f1-border)]" />
             <StatChip label="Laps" value={stints1.length ? safeLaps(stints1) : "—"} />
-            <div className="h-5 w-px bg-white/10" />
+            <div className="h-5 w-px bg-[var(--f1-border)]" />
             <StatChip label="Max Stops" value={stints1.length ? maxStops(stints1) : "—"} />
-            <div className="h-5 w-px bg-white/10" />
+            <div className="h-5 w-px bg-[var(--f1-border)]" />
             <StatChip label="Top Tyre" value={topTyre(stints1)} accent="#39B54A" />
-            <div className="h-5 w-px bg-white/10" />
+            <div className="h-5 w-px bg-[var(--f1-border)]" />
             <StatChip label="Drivers" value={`${visible1.length} shown`} />
           </div>
 
@@ -734,7 +734,7 @@ export default function StrategyPage() {
             <div className="flex items-center gap-2 mb-5">
               <Fuel className="w-4 h-4 text-racing-amber" />
               <h2 className="text-sm font-bold">Tire Strategy</h2>
-              {loading1 && <Loader2 className="w-3.5 h-3.5 animate-spin text-white/30 ml-auto" />}
+              {loading1 && <Loader2 className="w-3.5 h-3.5 animate-spin text-f1-muted ml-auto" />}
             </div>
             <StrategyPanel
               stints={stints1} drivers={drivers1} visible={visible1}
@@ -748,7 +748,7 @@ export default function StrategyPage() {
               <div className="flex items-center gap-2 mb-4">
                 <ArrowUpDown className="w-4 h-4 text-racing-blue" />
                 <h2 className="text-sm font-bold">Position Changes</h2>
-                {loading1 && <Loader2 className="w-3.5 h-3.5 animate-spin text-white/30 ml-auto" />}
+                {loading1 && <Loader2 className="w-3.5 h-3.5 animate-spin text-f1-muted ml-auto" />}
               </div>
               <PositionsPanel
                 positions={positions1} drivers={drivers1} visible={visible1} loading={loading1}
@@ -758,7 +758,7 @@ export default function StrategyPage() {
               <div className="flex items-center gap-2 mb-4">
                 <Timer className="w-4 h-4 text-racing-amber" />
                 <h2 className="text-sm font-bold">Pit Stops</h2>
-                {loading1 && <Loader2 className="w-3.5 h-3.5 animate-spin text-white/30 ml-auto" />}
+                {loading1 && <Loader2 className="w-3.5 h-3.5 animate-spin text-f1-muted ml-auto" />}
               </div>
               <PitStopsPanel
                 stints={stints1} drivers={drivers1} visible={visible1} loading={loading1}
@@ -768,7 +768,7 @@ export default function StrategyPage() {
 
           {/* Driver filter */}
           <div className="glass-card p-4 rounded-xl">
-            <div className="text-[9px] uppercase tracking-widest text-white/30 font-mono mb-3">
+            <div className="text-[9px] uppercase tracking-widest text-f1-muted font-mono mb-3">
               Filter Drivers
             </div>
             <DriverStrip
@@ -783,8 +783,8 @@ export default function StrategyPage() {
       {/* ── Empty state ── */}
       {!compareMode && !race1 && !loadingRaces1 && (
         <div className="glass-card p-12 rounded-xl flex flex-col items-center gap-3 text-center">
-          <Flag className="w-8 h-8 text-white/15" />
-          <div className="text-sm text-white/30 font-mono">Select a year and race to load strategy data</div>
+          <Flag className="w-8 h-8 text-[var(--f1-text-dim)]" />
+          <div className="text-sm text-f1-muted font-mono">Select a year and race to load strategy data</div>
         </div>
       )}
     </div>

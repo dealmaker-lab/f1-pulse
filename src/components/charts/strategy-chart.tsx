@@ -26,7 +26,7 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
             return (
               <span
                 key={lap}
-                className="text-[10px] font-mono text-white/25 absolute"
+                className="text-[10px] font-mono text-f1-muted absolute"
                 style={{ left: `${leftPad + (lap / totalLaps) * 100}%` }}
               >
                 {lap}
@@ -85,7 +85,7 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: getTireColor(c) }}
               />
-              <span className="text-[10px] font-mono text-white/40">{c}</span>
+              <span className="text-[10px] font-mono text-f1-sub">{c}</span>
             </div>
           ))}
         </div>

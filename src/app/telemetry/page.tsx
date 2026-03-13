@@ -128,7 +128,7 @@ export default function TelemetryPage() {
           <Activity className="w-7 h-7 text-racing-blue" />
           Telemetry Lab
         </h1>
-        <p className="text-sm text-white/40 mt-1">Head-to-head driver telemetry comparison</p>
+        <p className="text-sm text-f1-muted mt-1">Head-to-head driver telemetry comparison</p>
       </div>
 
       {/* Driver Selection */}
@@ -138,7 +138,7 @@ export default function TelemetryPage() {
           { driver: driver2, setDriver: setDriver2, label: "Driver 2", color: d2Color },
         ].map((slot) => (
           <div key={slot.label} className="glass-card p-4">
-            <span className="text-[10px] uppercase tracking-widest text-white/30 font-semibold">{slot.label}</span>
+            <span className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold">{slot.label}</span>
             <div className="flex flex-wrap gap-2 mt-2">
               {DRIVERS.map((d) => (
                 <button
@@ -148,7 +148,7 @@ export default function TelemetryPage() {
                     "px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all duration-200 cursor-pointer border",
                     slot.driver === d.code
                       ? "border-opacity-50 bg-opacity-20"
-                      : "border-white/5 text-white/40 hover:text-white/70 hover:border-white/10"
+                      : "border-[var(--f1-border)] text-f1-muted hover:text-f1-sub hover:border-f1"
                   )}
                   style={
                     slot.driver === d.code
@@ -174,7 +174,7 @@ export default function TelemetryPage() {
               "px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer border",
               metric === m
                 ? "bg-racing-blue/15 border-racing-blue/30 text-racing-blue"
-                : "border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                : "border-[var(--f1-border)] text-f1-muted hover:text-f1-sub hover:border-f1"
             )}
           >
             {m}
@@ -297,19 +297,19 @@ export default function TelemetryPage() {
             { label: "DRS Zones", v1: `${stats1.drsLaps}`, v2: `${stats2.drsLaps}`, unit: "pts" },
           ].map((s) => (
             <div key={s.label} className="text-center space-y-2">
-              <div className="text-[10px] uppercase tracking-widest text-white/30">{s.label}</div>
+              <div className="text-[10px] uppercase tracking-widest text-f1-muted">{s.label}</div>
               <div className="flex items-center justify-center gap-3">
                 <div>
                   <div className="font-mono text-lg font-bold" style={{ color: d1Color }}>{s.v1}</div>
-                  <div className="text-[10px] font-mono text-white/20">{driver1}</div>
+                  <div className="text-[10px] font-mono text-[var(--f1-text-dim)]">{driver1}</div>
                 </div>
-                <div className="text-white/10 text-xs">vs</div>
+                <div className="text-[var(--f1-text-dim)] text-xs">vs</div>
                 <div>
                   <div className="font-mono text-lg font-bold" style={{ color: d2Color }}>{s.v2}</div>
-                  <div className="text-[10px] font-mono text-white/20">{driver2}</div>
+                  <div className="text-[10px] font-mono text-[var(--f1-text-dim)]">{driver2}</div>
                 </div>
               </div>
-              <div className="text-[10px] text-white/20 font-mono">{s.unit}</div>
+              <div className="text-[10px] text-[var(--f1-text-dim)] font-mono">{s.unit}</div>
             </div>
           ))}
         </div>

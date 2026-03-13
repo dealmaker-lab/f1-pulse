@@ -116,7 +116,7 @@ function DriverHeadshot({ code, teamColor, size = "sm" }: { code: string; teamCo
   }
 
   return (
-    <div className={cn(sizeClass, "rounded-full overflow-hidden bg-white/5 flex-shrink-0")} style={{ border: `2px solid ${teamColor}40` }}>
+    <div className={cn(sizeClass, "rounded-full overflow-hidden bg-[var(--f1-hover)] flex-shrink-0")} style={{ border: `2px solid ${teamColor}40` }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
@@ -236,7 +236,7 @@ export default function DriversPage() {
         </div>
         <div className="glass-card p-16 flex flex-col items-center justify-center gap-3">
           <Loader2 className="w-6 h-6 animate-spin text-racing-amber" />
-          <span className="text-sm text-white/50">Loading driver data...</span>
+          <span className="text-sm text-f1-sub">Loading driver data...</span>
         </div>
       </div>
     );
@@ -251,12 +251,12 @@ export default function DriversPage() {
             <Users className="w-7 h-7 text-racing-amber" />
             Driver Profiles
           </h1>
-          <p className="text-sm text-white/40 mt-1">Career stats, performance, and head-to-head comparison</p>
+          <p className="text-sm text-f1-muted mt-1">Career stats, performance, and head-to-head comparison</p>
         </div>
         <select
           value={year}
           onChange={(e) => setYear(Number(e.target.value))}
-          className="bg-carbon-800 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-white/80 cursor-pointer"
+          className="bg-[var(--f1-card)] border border-[var(--f1-border)] rounded-xl px-3 py-2 text-sm font-mono text-f1-sub cursor-pointer"
         >
           {[2026, 2025, 2024, 2023, 2022, 2021, 2020].map((y) => (
             <option key={y} value={y}>{y}</option>
@@ -272,14 +272,14 @@ export default function DriversPage() {
             onClick={() => setSelectedDriver(d.driver.code)}
             className={cn(
               "glass-card-hover p-3 text-center cursor-pointer transition-all",
-              selectedDriver === d.driver.code && "ring-1 ring-white/20 bg-white/5"
+              selectedDriver === d.driver.code && "ring-1 ring-[var(--f1-border)] bg-[var(--f1-hover)]"
             )}
           >
             <div className="flex justify-center mb-2">
               <DriverHeadshot code={d.driver.code} teamColor={d.driver.teamColor} size="sm" />
             </div>
             <div className="text-xs font-bold">{d.driver.code}</div>
-            <div className="text-[9px] text-white/30 mt-0.5 truncate">{d.driver.team.replace(" Racing", "").replace(" F1 Team", "")}</div>
+            <div className="text-[9px] text-f1-muted mt-0.5 truncate">{d.driver.team.replace(" Racing", "").replace(" F1 Team", "")}</div>
           </button>
         ))}
       </div>
@@ -293,8 +293,8 @@ export default function DriversPage() {
               <DriverHeadshot code={driver.driver.code} teamColor={driver.driver.teamColor} size="lg" />
               <div>
                 <div className="text-xl font-bold">{driver.driver.name}</div>
-                <div className="text-sm text-white/40">{driver.driver.team}</div>
-                <div className="text-xs text-white/30 font-mono mt-0.5">{driver.driver.nationality}</div>
+                <div className="text-sm text-f1-sub">{driver.driver.team}</div>
+                <div className="text-xs text-f1-muted font-mono mt-0.5">{driver.driver.nationality}</div>
               </div>
             </div>
 
@@ -305,10 +305,10 @@ export default function DriversPage() {
                 { label: "Podiums", value: careerStats.podiums, icon: TrendingUp, color: "#00D2BE" },
                 { label: "Pole Positions", value: careerStats.poles, icon: Timer, color: "#3B82F6" },
               ].map((s) => (
-                <div key={s.label} className="bg-white/3 rounded-xl p-3 space-y-1">
+                <div key={s.label} className="bg-[var(--f1-hover)] rounded-xl p-3 space-y-1">
                   <div className="flex items-center gap-1.5">
                     <s.icon className="w-3 h-3" style={{ color: s.color }} />
-                    <span className="text-[10px] uppercase tracking-widest text-white/30">{s.label}</span>
+                    <span className="text-[10px] uppercase tracking-widest text-f1-muted">{s.label}</span>
                   </div>
                   <div className="font-mono text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
                 </div>
@@ -316,21 +316,21 @@ export default function DriversPage() {
             </div>
 
             {/* Season stats */}
-            <div className="mt-6 pt-4 border-t border-white/5 space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-white/30">{year} Season</h3>
+            <div className="mt-6 pt-4 border-t border-[var(--f1-border)] space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-f1-muted">{year} Season</h3>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-white/50">Championship Position</span>
+                <span className="text-sm text-f1-sub">Championship Position</span>
                 <span className="font-mono font-bold text-lg">P{driver.position}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-white/50">Points</span>
+                <span className="text-sm text-f1-sub">Points</span>
                 <span className="font-mono font-bold" style={{ color: driver.driver.teamColor }}>{driver.points}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-white/50">Wins / Podiums</span>
+                <span className="text-sm text-f1-sub">Wins / Podiums</span>
                 <span className="font-mono font-bold">{driver.wins}W / {driver.podiums || 0}P</span>
               </div>
-              <p className="text-[9px] text-white/20 italic">Career stats through end of 2024</p>
+              <p className="text-[9px] text-[var(--f1-text-dim)] italic">Career stats through end of 2024</p>
             </div>
           </div>
 
@@ -343,11 +343,11 @@ export default function DriversPage() {
                   <DriverHeadshot code={selectedDriver} teamColor={driver.driver.teamColor} size="sm" />
                   <span className="text-[10px] font-mono" style={{ color: driver.driver.teamColor }}>{selectedDriver}</span>
                 </div>
-                <span className="text-white/20 text-xs">vs</span>
+                <span className="text-[var(--f1-text-dim)] text-xs">vs</span>
                 <select
                   value={compareDriver}
                   onChange={(e) => setCompareDriver(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs font-mono text-white/70 cursor-pointer appearance-none"
+                  className="bg-[var(--f1-hover)] border border-[var(--f1-border)] rounded-lg px-2 py-1 text-xs font-mono text-f1-sub cursor-pointer appearance-none"
                 >
                   {standings.filter(d => d.driver.code !== selectedDriver).map((d) => (
                     <option key={d.driver.code} value={d.driver.code}>{d.driver.code} — {d.driver.name}</option>
