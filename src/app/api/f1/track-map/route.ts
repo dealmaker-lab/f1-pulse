@@ -58,57 +58,52 @@ export async function GET(req: NextRequest) {
 
       if (sessionInfo?.date_start) {
         const sessionStart = new Date(sessionInfo.date_start);
-        // Skip first 20 minutes to get mid-race data where cars are spread around track
-        const lapStart = new Date(sessionStart.getTime() + 20 * 60 * 1000);
-        const lapEnd = new Date(lapStart.getTime() + 100 * 1000); // ~100 seconds = ~1 lap
+        // Try multiple time windows to find a good complete lap outline
+        // Different offsets help for different session types (race vs qualifying)
+        const offsets = [20, 30, 10, 40, 5]; // minutes into session
+        const lapDuration = 130; // seconds — generous to ensure full lap capture
 
-        // Pick a driver for outline — use provided or find first available
-        let outlineDriver = driverNumber || "1";
+        // Candidate driver numbers to try (common across 2024-2026 grids)
+        const candidateDrivers = driverNumber
+          ? [driverNumber]
+          : ["1", "4", "44", "16", "55", "63", "81", "11", "14", "22", "27", "10", "31", "23", "2", "18", "77", "24", "20", "3"];
 
-        const outlineUrl = `${BASE}/location?session_key=${sessionKey}&driver_number=${outlineDriver}&date>${lapStart.toISOString()}&date<${lapEnd.toISOString()}`;
-        const outlineRes = await fetch(outlineUrl, { next: { revalidate: 3600 } });
-        const outlineData: LocationPoint[] = await outlineRes.json();
+        let bestOutline: { x: number; y: number }[] = [];
+        let bestBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 
-        if (Array.isArray(outlineData) && outlineData.length > 0) {
-          // Filter out zero coordinates and sample every 3rd point for smooth outline
-          const validPoints = outlineData.filter(
-            (p) => p.x !== 0 || p.y !== 0
-          );
-          const sampled = validPoints.filter((_, i) => i % 3 === 0);
+        for (const offset of offsets) {
+          if (bestOutline.length > 50) break; // good enough
+          const lapStart = new Date(sessionStart.getTime() + offset * 60 * 1000);
+          const lapEnd = new Date(lapStart.getTime() + lapDuration * 1000);
 
-          result.trackOutline = sampled.map((p) => ({ x: p.x, y: p.y }));
+          for (const tryDriver of candidateDrivers) {
+            const outlineUrl = `${BASE}/location?session_key=${sessionKey}&driver_number=${tryDriver}&date>${lapStart.toISOString()}&date<${lapEnd.toISOString()}`;
+            const outlineRes = await fetch(outlineUrl, { next: { revalidate: 3600 } });
+            const outlineData: LocationPoint[] = await outlineRes.json();
 
-          // Calculate bounds
-          const xs = sampled.map((p) => p.x);
-          const ys = sampled.map((p) => p.y);
-          result.bounds = {
-            minX: Math.min(...xs),
-            maxX: Math.max(...xs),
-            minY: Math.min(...ys),
-            maxY: Math.max(...ys),
-          };
-        } else if (!driverNumber) {
-          // Try different driver numbers if default didn't work
-          for (const tryDriver of ["4", "44", "16", "55", "63", "81"]) {
-            const retryUrl = `${BASE}/location?session_key=${sessionKey}&driver_number=${tryDriver}&date>${lapStart.toISOString()}&date<${lapEnd.toISOString()}`;
-            const retryRes = await fetch(retryUrl, { next: { revalidate: 3600 } });
-            const retryData: LocationPoint[] = await retryRes.json();
-            if (Array.isArray(retryData) && retryData.length > 5) {
-              const valid = retryData.filter((p) => p.x !== 0 || p.y !== 0);
-              const s = valid.filter((_, i) => i % 3 === 0);
-              result.trackOutline = s.map((p) => ({ x: p.x, y: p.y }));
-              const xArr = s.map((p) => p.x);
-              const yArr = s.map((p) => p.y);
-              result.bounds = {
-                minX: Math.min(...xArr),
-                maxX: Math.max(...xArr),
-                minY: Math.min(...yArr),
-                maxY: Math.max(...yArr),
-              };
-              outlineDriver = tryDriver;
-              break;
+            if (Array.isArray(outlineData) && outlineData.length > 20) {
+              const validPoints = outlineData.filter((p) => p.x !== 0 || p.y !== 0);
+              const sampled = validPoints.filter((_, i) => i % 3 === 0);
+
+              if (sampled.length > bestOutline.length) {
+                bestOutline = sampled.map((p) => ({ x: p.x, y: p.y }));
+                const xs = sampled.map((p) => p.x);
+                const ys = sampled.map((p) => p.y);
+                bestBounds = {
+                  minX: Math.min(...xs),
+                  maxX: Math.max(...xs),
+                  minY: Math.min(...ys),
+                  maxY: Math.max(...ys),
+                };
+              }
+              if (sampled.length > 50) break; // found a good outline
             }
           }
+        }
+
+        if (bestOutline.length > 0) {
+          result.trackOutline = bestOutline;
+          result.bounds = bestBounds;
         }
       }
     }

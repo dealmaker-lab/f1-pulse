@@ -123,7 +123,17 @@ export default function CircuitMap({
 
   const normalizedTrack = useMemo(() => {
     if (!trackOutline.length || !bounds) return [];
-    return normalizePoints(trackOutline, bounds);
+    const pts = normalizePoints(trackOutline, bounds);
+    // Close the loop if first and last points are reasonably close
+    if (pts.length > 10) {
+      const first = pts[0];
+      const last = pts[pts.length - 1];
+      const dist = Math.sqrt((first.x - last.x) ** 2 + (first.y - last.y) ** 2);
+      if (dist > 5 && dist < SVG_WIDTH * 0.3) {
+        pts.push({ ...first });
+      }
+    }
+    return pts;
   }, [trackOutline, bounds]);
 
   const trackPath = useMemo(() => pointsToSmoothPath(normalizedTrack), [normalizedTrack]);

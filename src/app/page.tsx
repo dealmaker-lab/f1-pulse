@@ -664,8 +664,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Right: Circuit Map */}
-            <div className="relative">
+            {/* Right: Circuit Map — desktop only */}
+            <div className="relative hidden lg:block">
               <CircuitMap
                 sessionKey={heroSessionKey}
                 compact
