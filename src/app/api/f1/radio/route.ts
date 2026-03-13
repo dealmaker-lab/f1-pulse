@@ -52,6 +52,69 @@ function findNearbyEvents(
   });
 }
 
+/** Generate a human-readable context description */
+function generateContextDescription(
+  events: { type: string; message: string; flag?: string }[],
+  gap: { gapToLeader: string | null; interval: string | null },
+  position: number | null,
+  driverCode: string
+): string | null {
+  const parts: string[] = [];
+
+  // Position context
+  if (position) {
+    if (position === 1) parts.push(`${driverCode} leading the race`);
+    else if (position <= 3) parts.push(`${driverCode} running P${position}`);
+    else parts.push(`${driverCode} in P${position}`);
+  }
+
+  // Gap context
+  if (gap.gapToLeader && position && position > 1) {
+    const gapNum = parseFloat(gap.gapToLeader);
+    if (!isNaN(gapNum)) {
+      if (gapNum < 1) parts.push("within DRS range of car ahead");
+      else if (gapNum < 3) parts.push(`close to car ahead (+${gap.interval || gap.gapToLeader}s)`);
+    }
+  }
+
+  // Event context
+  for (const evt of events) {
+    switch (evt.type) {
+      case "safety_car":
+        parts.push("Safety Car deployed — field bunched up");
+        break;
+      case "vsc":
+        parts.push("Virtual Safety Car active — speed limited");
+        break;
+      case "yellow_flag":
+        parts.push(`Yellow flag — ${evt.message || "caution on track"}`);
+        break;
+      case "red_flag":
+        parts.push("Red flag — session stopped");
+        break;
+      case "incident":
+        parts.push(`Incident reported — ${evt.message || "on-track event"}`);
+        break;
+      case "pit":
+        parts.push("Pit activity in progress");
+        break;
+      case "drs":
+        if (evt.message?.toLowerCase().includes("enabled")) parts.push("DRS enabled");
+        else if (evt.message?.toLowerCase().includes("disabled")) parts.push("DRS disabled");
+        break;
+      case "track_limits":
+        parts.push(`Track limits: ${evt.message || "lap time deleted"}`);
+        break;
+      case "chequered":
+        parts.push("Chequered flag — race complete");
+        break;
+    }
+  }
+
+  if (parts.length === 0) return null;
+  return parts.join(". ") + ".";
+}
+
 /** Find the closest interval entry for a driver near a timestamp */
 function findInterval(
   intervals: any[],
@@ -185,23 +248,27 @@ export async function GET(req: NextRequest) {
           // On-track context
           const nearbyEvents = findNearbyEvents(rcEvents, radioTime);
           const gap = findInterval(ivData, r.driver_number, radioTime);
+          const driverCode = driver?.code || String(r.driver_number);
+          const pos = lapData?.position ?? null;
+          const description = generateContextDescription(nearbyEvents, gap, pos, driverCode);
 
           return {
             date: r.date,
             driverNumber: r.driver_number,
-            driverCode: driver?.code || String(r.driver_number),
+            driverCode,
             driverName: driver?.name || `Driver ${r.driver_number}`,
             team: driver?.team || "Unknown",
             teamColor: driver?.teamColor || "#666666",
             headshotUrl: driver?.headshotUrl,
             recordingUrl: r.recording_url,
             lapNumber,
-            position: lapData?.position ?? null,
+            position: pos,
             lapTime: lapData?.lap_duration ?? null,
             context: {
               events: nearbyEvents,
               gapToLeader: gap.gapToLeader,
               interval: gap.interval,
+              description,
             },
           };
         })
