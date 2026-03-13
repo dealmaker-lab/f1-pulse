@@ -41,23 +41,14 @@ async function resolveDriverId(codeOrId: string): Promise<string> {
     return codeOrId;
   }
 
-  // It's a 3-letter code — search recent seasons for the mapping
+  // It's a 3-letter code — search recent seasons sequentially to avoid rate limits
   const currentYear = new Date().getFullYear();
-  // Fetch two years in parallel for speed
-  const fetches = [currentYear, currentYear - 1, currentYear - 2].map(async (year) => {
-    try {
-      const res = await fetch(`${JOLPICA_BASE}/${year}/drivers.json?limit=50`, { cache: "no-store" });
-      const data = await res.json();
-      return data?.MRData?.DriverTable?.Drivers || [];
-    } catch {
-      return [];
-    }
-  });
-
-  const results = await Promise.all(fetches);
-  for (const drivers of results) {
+  for (let year = currentYear; year >= currentYear - 3; year--) {
+    const data = await safeFetchJson(`${JOLPICA_BASE}/${year}/drivers.json?limit=50`);
+    const drivers = data?.MRData?.DriverTable?.Drivers || [];
     const match = drivers.find((d: any) => d.code === codeOrId.toUpperCase());
     if (match) return match.driverId;
+    if (drivers.length > 0) break; // Found a valid response, driver just isn't in this year
   }
 
   return codeOrId.toLowerCase();
