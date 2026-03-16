@@ -548,11 +548,16 @@ export default function RaceReplayPage() {
     let bestDriver = 0, bestLen = 0;
     Object.entries(locationData).forEach(([num, pts]) => {
       if (pts.length < 30) return;
-      // Quick diversity check: sample 20 points, need at least 5 unique x values
-      const sampleStep = Math.max(1, Math.floor(pts.length / 20));
-      const uniqueXs = new Set<number>();
-      for (let i = 0; i < pts.length; i += sampleStep) uniqueXs.add(pts[i].x);
-      if (uniqueXs.size > 5 && pts.length > bestLen) {
+      // Quick diversity check: need varying x coordinates (not all same point)
+      const first = pts[0];
+      let diverse = false;
+      for (let i = Math.floor(pts.length / 4); i < pts.length; i += Math.floor(pts.length / 10)) {
+        if (Math.abs(pts[i].x - first.x) > 100 || Math.abs(pts[i].y - first.y) > 100) {
+          diverse = true;
+          break;
+        }
+      }
+      if (diverse && pts.length > bestLen) {
         bestLen = pts.length;
         bestDriver = Number(num);
       }
@@ -561,43 +566,42 @@ export default function RaceReplayPage() {
     const allPts = locationData[bestDriver];
     if (!allPts || allPts.length < 30) return "";
 
-    const ptsPerLap = Math.max(20, Math.round(allPts.length / Math.max(totalLaps, 1)));
+    // Simple approach: take a chunk of consecutive points from the middle of the data.
+    // The car is racing around the circuit, so consecutive points trace the track shape.
+    // We use ~2% of total points centered at 50% to get approximately one lap.
+    const totalPts = allPts.length;
+    const chunkSize = Math.max(50, Math.min(400, Math.round(totalPts / Math.max(totalLaps, 1)) * 1.2));
+    const midIdx = Math.floor(totalPts * 0.5);
+    const startIdx = Math.max(0, midIdx - Math.floor(chunkSize / 2));
+    const endIdx = Math.min(totalPts - 1, startIdx + chunkSize);
 
-    // Strategy: extract one lap from 30% into the dataset (well past formation lap)
-    const startIdx = Math.floor(allPts.length * 0.30);
-    const refX = allPts[startIdx].x;
-    const refY = allPts[startIdx].y;
+    const lapPts = allPts.slice(startIdx, endIdx + 1);
+    if (lapPts.length < 10) return "";
 
-    // Search forward for the car returning near the reference point (one lap completed)
-    const minAdvance = Math.floor(ptsPerLap * 0.6);
-    const searchStart = startIdx + Math.max(minAdvance, 20);
-    const searchEnd = Math.min(allPts.length - 1, startIdx + ptsPerLap * 4);
-
-    let lapEnd = -1;
-    // Try absolute distance thresholds (200 to 2000 units)
-    for (let thresh = 200; thresh <= 2000; thresh += 100) {
-      for (let i = searchStart; i < searchEnd; i++) {
-        const dx = allPts[i].x - refX;
-        const dy = allPts[i].y - refY;
+    // Try to find lap closure: search for a point near the start to close the loop
+    const refX = lapPts[0].x;
+    const refY = lapPts[0].y;
+    let closeIdx = lapPts.length; // default: use all points
+    // Start searching from 60% through the chunk
+    const searchFrom = Math.floor(lapPts.length * 0.6);
+    for (let thresh = 100; thresh <= 3000; thresh += 200) {
+      for (let i = searchFrom; i < lapPts.length; i++) {
+        const dx = lapPts[i].x - refX;
+        const dy = lapPts[i].y - refY;
         if (Math.sqrt(dx * dx + dy * dy) < thresh) {
-          lapEnd = i;
+          closeIdx = i + 1;
           break;
         }
       }
-      if (lapEnd !== -1) break;
+      if (closeIdx < lapPts.length) break;
     }
 
-    // Fallback: use estimated points-per-lap
-    if (lapEnd === -1) {
-      lapEnd = Math.min(startIdx + ptsPerLap, allPts.length - 1);
-    }
+    const finalPts = lapPts.slice(0, closeIdx);
+    if (finalPts.length < 10) return "";
 
-    const lapPts = allPts.slice(startIdx, lapEnd + 1);
-    if (lapPts.length < 10) return "";
-
-    // Sample down to ~300 points max for smooth SVG rendering
-    const step = Math.max(1, Math.floor(lapPts.length / 300));
-    const sampled = lapPts.filter((_, i) => i % step === 0);
+    // Sample down to ~300 points max for smooth SVG
+    const step = Math.max(1, Math.floor(finalPts.length / 300));
+    const sampled = finalPts.filter((_, i) => i % step === 0);
     if (sampled.length < 5) return "";
 
     return sampled
