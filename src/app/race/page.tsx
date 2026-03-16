@@ -507,7 +507,14 @@ export default function RaceReplayPage() {
   // ===== Track bounds =====
   const trackBounds = useMemo(() => {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    // Only use drivers with diverse location data (skip broken single-point data)
     Object.values(locationData).forEach((pts) => {
+      if (pts.length < 10) return;
+      // Quick check: if all points have the same coordinates, skip this driver
+      const firstX = pts[0].x, firstY = pts[0].y;
+      const hasDiversity = pts.some((p) => p.x !== firstX || p.y !== firstY);
+      if (!hasDiversity) return;
+
       pts.forEach((p) => {
         if (p.x < minX) minX = p.x;
         if (p.x > maxX) maxX = p.x;
@@ -537,47 +544,56 @@ export default function RaceReplayPage() {
 
   // ===== Track outline =====
   const trackPath = useMemo(() => {
-    // Find the driver with the most location points (best data coverage)
+    // Find the driver with the most DIVERSE location data (skip broken single-point drivers)
     let bestDriver = 0, bestLen = 0;
     Object.entries(locationData).forEach(([num, pts]) => {
-      if (pts.length > bestLen) { bestLen = pts.length; bestDriver = Number(num); }
+      if (pts.length < 30) return;
+      // Quick diversity check: sample 20 points, need at least 5 unique x values
+      const sampleStep = Math.max(1, Math.floor(pts.length / 20));
+      const uniqueXs = new Set<number>();
+      for (let i = 0; i < pts.length; i += sampleStep) uniqueXs.add(pts[i].x);
+      if (uniqueXs.size > 5 && pts.length > bestLen) {
+        bestLen = pts.length;
+        bestDriver = Number(num);
+      }
     });
 
     const allPts = locationData[bestDriver];
     if (!allPts || allPts.length < 30) return "";
 
-    // Data is already pre-filtered (no (0,0) points, pre-race trimmed)
-    const validPts = allPts;
-    if (validPts.length < 30) return "";
+    const ptsPerLap = Math.max(20, Math.round(allPts.length / Math.max(totalLaps, 1)));
 
-    const ptsPerLap = Math.max(15, Math.round(validPts.length / Math.max(totalLaps, 1)));
+    // Strategy: extract one lap from 30% into the dataset (well past formation lap)
+    const startIdx = Math.floor(allPts.length * 0.30);
+    const refX = allPts[startIdx].x;
+    const refY = allPts[startIdx].y;
 
-    // Skip first 15% to get past formation lap / pit exit onto a clean racing lap
-    const skipStart = Math.floor(validPts.length * 0.15);
-    const refIdx = Math.min(skipStart, validPts.length - ptsPerLap - 1);
-    const refX = validPts[refIdx].x;
-    const refY = validPts[refIdx].y;
-
-    // Search for the point where the driver returns to the reference position (completes a lap)
+    // Search forward for the car returning near the reference point (one lap completed)
     const minAdvance = Math.floor(ptsPerLap * 0.6);
-    const searchStart = refIdx + Math.max(minAdvance, 15);
-    const searchEnd = Math.min(validPts.length, refIdx + ptsPerLap * 3);
+    const searchStart = startIdx + Math.max(minAdvance, 20);
+    const searchEnd = Math.min(allPts.length - 1, startIdx + ptsPerLap * 4);
 
     let lapEnd = -1;
-    const diagRange = Math.sqrt(rangeX * rangeX + rangeY * rangeY);
-    for (let threshPct = 0.02; threshPct <= 0.10; threshPct += 0.01) {
-      const threshold = diagRange * threshPct;
+    // Try absolute distance thresholds (200 to 2000 units)
+    for (let thresh = 200; thresh <= 2000; thresh += 100) {
       for (let i = searchStart; i < searchEnd; i++) {
-        const dx = validPts[i].x - refX;
-        const dy = validPts[i].y - refY;
-        if (Math.sqrt(dx * dx + dy * dy) < threshold) { lapEnd = i; break; }
+        const dx = allPts[i].x - refX;
+        const dy = allPts[i].y - refY;
+        if (Math.sqrt(dx * dx + dy * dy) < thresh) {
+          lapEnd = i;
+          break;
+        }
       }
       if (lapEnd !== -1) break;
     }
-    if (lapEnd === -1) lapEnd = Math.min(refIdx + ptsPerLap, validPts.length - 1);
 
-    const lapPts = validPts.slice(refIdx, lapEnd + 1);
-    if (lapPts.length < 8) return "";
+    // Fallback: use estimated points-per-lap
+    if (lapEnd === -1) {
+      lapEnd = Math.min(startIdx + ptsPerLap, allPts.length - 1);
+    }
+
+    const lapPts = allPts.slice(startIdx, lapEnd + 1);
+    if (lapPts.length < 10) return "";
 
     // Sample down to ~300 points max for smooth SVG rendering
     const step = Math.max(1, Math.floor(lapPts.length / 300));
@@ -587,7 +603,7 @@ export default function RaceReplayPage() {
     return sampled
       .map((p, i) => `${i === 0 ? "M" : "L"} ${normX(p.x).toFixed(1)},${normY(p.y).toFixed(1)}`)
       .join(" ") + " Z";
-  }, [locationData, normX, normY, rangeX, rangeY, totalLaps]);
+  }, [locationData, normX, normY, totalLaps]);
 
   // ===== DRS zones: detect straights where DRS is commonly activated =====
   const drsZones = useMemo(() => {
