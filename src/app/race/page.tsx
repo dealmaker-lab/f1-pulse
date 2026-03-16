@@ -384,12 +384,57 @@ export default function RaceReplayPage() {
             locMap[num] = valid.filter((_: LocationPoint, idx: number) => idx % 4 === 0);
           });
         }
+
+        // ===== Detect race start: find earliest time when multiple cars are moving =====
+        // OpenF1 data often includes hours of pre-race stationary data.
+        // We detect where the "real" session begins by finding when cars start
+        // showing position changes (movement), and trim everything before.
+        const allValidDates: string[] = [];
+        Object.values(locMap).forEach((pts) => pts.forEach((p) => allValidDates.push(p.date)));
+        allValidDates.sort();
+
+        if (allValidDates.length > 100) {
+          // Find the point where data density increases (pre-race has sparse data with big gaps)
+          // Strategy: look at the date 10% into the dataset — if there's a gap of >30 minutes
+          // between early entries and this point, trim the early entries
+          const tenPct = Math.floor(allValidDates.length * 0.1);
+          const earlyDate = new Date(allValidDates[0]).getTime();
+          const tenPctDate = new Date(allValidDates[tenPct]).getTime();
+          const gapHours = (tenPctDate - earlyDate) / (1000 * 60 * 60);
+
+          if (gapHours > 2) {
+            // Large gap detected — find the actual session start by looking for
+            // the first cluster of dense data (points within seconds of each other)
+            let raceStartDate = allValidDates[0];
+            for (let i = 1; i < allValidDates.length; i++) {
+              const prev = new Date(allValidDates[i - 1]).getTime();
+              const curr = new Date(allValidDates[i]).getTime();
+              const gapSec = (curr - prev) / 1000;
+              // If we find a gap > 10 minutes followed by dense data, that's the session start
+              if (gapSec > 600) {
+                raceStartDate = allValidDates[i];
+              }
+              // Once we're past the big gaps and into dense data, stop
+              if (raceStartDate !== allValidDates[0] && gapSec < 5) {
+                break;
+              }
+            }
+
+            // Trim location data to start from detected race start
+            // Keep a 60-second buffer before the detected start for formation lap
+            const trimTime = new Date(new Date(raceStartDate).getTime() - 60000).toISOString();
+            Object.keys(locMap).forEach((numStr) => {
+              const num = Number(numStr);
+              locMap[num] = locMap[num].filter((p) => p.date >= trimTime);
+            });
+          }
+        }
+
         setLocationData(locMap);
 
-        // Phase 3: car telemetry for selected drivers (top 6 initially)
-        // We load the top 3 drivers + first-loaded data to keep it fast
+        // Phase 3: car telemetry — load top 10 drivers for better coverage
         setLoadingMsg("Loading car telemetry...");
-        const telemetryDrivers = driverNums.slice(0, 3);
+        const telemetryDrivers = driverNums.slice(0, 10);
         const cdMap: Record<number, CarDataEntry[]> = {};
 
         for (const num of telemetryDrivers) {
@@ -397,8 +442,10 @@ export default function RaceReplayPage() {
             const res = await fetch(`/api/f1/car-data?session_key=${sk}&driver_number=${num}`);
             const data = await res.json();
             if (Array.isArray(data)) {
-              // Sample every 20th for manageable size (~4Hz down to ~0.2Hz per driver)
-              cdMap[num] = data.filter((_: CarDataEntry, idx: number) => idx % 20 === 0);
+              // Filter to only entries with actual data (speed > 0 or during race)
+              // and sample every 20th for manageable size
+              const sampled = data.filter((_: CarDataEntry, idx: number) => idx % 20 === 0);
+              cdMap[num] = sampled;
             }
           } catch {
             // Skip individual driver failures
@@ -485,10 +532,12 @@ export default function RaceReplayPage() {
   const svgW = 1000;
   const svgH = Math.round(svgW / (trackBounds.aspect || 1.6));
   const normX = useCallback((x: number) => ((x - trackBounds.minX) / rangeX) * (svgW - 100) + 50, [trackBounds.minX, rangeX]);
-  const normY = useCallback((y: number) => ((y - trackBounds.minY) / rangeY) * (svgH - 100) + 50, [trackBounds.minY, rangeY, svgH]);
+  // Invert Y axis: OpenF1 Y increases upward, SVG Y increases downward
+  const normY = useCallback((y: number) => svgH - (((y - trackBounds.minY) / rangeY) * (svgH - 100) + 50), [trackBounds.minY, rangeY, svgH]);
 
   // ===== Track outline =====
   const trackPath = useMemo(() => {
+    // Find the driver with the most location points (best data coverage)
     let bestDriver = 0, bestLen = 0;
     Object.entries(locationData).forEach(([num, pts]) => {
       if (pts.length > bestLen) { bestLen = pts.length; bestDriver = Number(num); }
@@ -496,22 +545,28 @@ export default function RaceReplayPage() {
 
     const allPts = locationData[bestDriver];
     if (!allPts || allPts.length < 30) return "";
-    const validPts = allPts.filter((p) => p.x !== 0 || p.y !== 0);
+
+    // Data is already pre-filtered (no (0,0) points, pre-race trimmed)
+    const validPts = allPts;
     if (validPts.length < 30) return "";
 
-    const ptsPerLap = Math.max(15, Math.round(validPts.length / totalLaps));
-    const skipStart = Math.floor(validPts.length * 0.2);
+    const ptsPerLap = Math.max(15, Math.round(validPts.length / Math.max(totalLaps, 1)));
+
+    // Skip first 15% to get past formation lap / pit exit onto a clean racing lap
+    const skipStart = Math.floor(validPts.length * 0.15);
     const refIdx = Math.min(skipStart, validPts.length - ptsPerLap - 1);
     const refX = validPts[refIdx].x;
     const refY = validPts[refIdx].y;
 
-    const minAdvance = Math.floor(ptsPerLap * 0.5);
-    const searchStart = refIdx + Math.max(minAdvance, 10);
+    // Search for the point where the driver returns to the reference position (completes a lap)
+    const minAdvance = Math.floor(ptsPerLap * 0.6);
+    const searchStart = refIdx + Math.max(minAdvance, 15);
     const searchEnd = Math.min(validPts.length, refIdx + ptsPerLap * 3);
 
     let lapEnd = -1;
-    for (let threshPct = 0.03; threshPct <= 0.12; threshPct += 0.02) {
-      const threshold = rangeX * threshPct;
+    const diagRange = Math.sqrt(rangeX * rangeX + rangeY * rangeY);
+    for (let threshPct = 0.02; threshPct <= 0.10; threshPct += 0.01) {
+      const threshold = diagRange * threshPct;
       for (let i = searchStart; i < searchEnd; i++) {
         const dx = validPts[i].x - refX;
         const dy = validPts[i].y - refY;
@@ -524,6 +579,7 @@ export default function RaceReplayPage() {
     const lapPts = validPts.slice(refIdx, lapEnd + 1);
     if (lapPts.length < 8) return "";
 
+    // Sample down to ~300 points max for smooth SVG rendering
     const step = Math.max(1, Math.floor(lapPts.length / 300));
     const sampled = lapPts.filter((_, i) => i % step === 0);
     if (sampled.length < 5) return "";
@@ -531,7 +587,7 @@ export default function RaceReplayPage() {
     return sampled
       .map((p, i) => `${i === 0 ? "M" : "L"} ${normX(p.x).toFixed(1)},${normY(p.y).toFixed(1)}`)
       .join(" ") + " Z";
-  }, [locationData, normX, normY, rangeX, totalLaps]);
+  }, [locationData, normX, normY, rangeX, rangeY, totalLaps]);
 
   // ===== DRS zones: detect straights where DRS is commonly activated =====
   const drsZones = useMemo(() => {
