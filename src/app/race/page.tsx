@@ -44,7 +44,7 @@ interface PositionEntry {
 
 interface StintEntry {
   driver_number: number;
-  compound: string;
+  compound: string | null;
   lap_start: number;
   lap_end: number;
   stint_number: number;
@@ -67,7 +67,7 @@ interface CarDataEntry {
   throttle: number;
   brake: number;
   n_gear: number;
-  drs: number;
+  drs: number | null;
   rpm: number;
 }
 
@@ -130,8 +130,8 @@ function TelemetryCard({
   const throttle = carData?.throttle ?? 0;
   const brake = carData?.brake ?? 0;
   const gear = carData?.n_gear ?? 0;
-  const drs = carData?.drs ?? 0;
-  const isDrsOpen = drs >= 10 && drs <= 14;
+  const drs = carData?.drs;
+  const isDrsOpen = drs != null && drs >= 10 && drs <= 14;
 
   return (
     <button
@@ -248,7 +248,7 @@ function TireProgressBar({
         const end = stint.lap_end || totalLaps;
         const widthPct = ((end - start + 1) / totalLaps) * 100;
         const isCurrent = currentLap >= start && currentLap <= end;
-        const color = TIRE_COLORS[stint.compound] || TIRE_COLORS.UNKNOWN;
+        const color = TIRE_COLORS[stint.compound && stint.compound !== "None" ? stint.compound : "UNKNOWN"] || TIRE_COLORS.UNKNOWN;
 
         return (
           <div
@@ -262,7 +262,7 @@ function TireProgressBar({
               backgroundColor: color,
               minWidth: "4px",
             }}
-            title={`${stint.compound} — Laps ${start}-${end}`}
+            title={`${stint.compound || "Unknown"} — Laps ${start}-${end}`}
           />
         );
       })}
@@ -379,8 +379,9 @@ export default function RaceReplayPage() {
           );
 
           results.forEach(({ num, data }) => {
-            // Sample every 4th point (~1 per second) — denser than before
-            locMap[num] = data.filter((_: LocationPoint, idx: number) => idx % 4 === 0);
+            // Filter out (0,0) points (pit/grid) and sample every 4th (~1/sec)
+            const valid = data.filter((p: LocationPoint) => p.x !== 0 || p.y !== 0);
+            locMap[num] = valid.filter((_: LocationPoint, idx: number) => idx % 4 === 0);
           });
         }
         setLocationData(locMap);
@@ -551,7 +552,7 @@ export default function RaceReplayPage() {
     const drsSegments: { startIdx: number; endIdx: number }[] = [];
     let segStart = -1;
     for (let i = 0; i < cData.length; i++) {
-      const isDrsOpen = cData[i].drs >= 10 && cData[i].drs <= 14;
+      const isDrsOpen = cData[i].drs != null && cData[i].drs! >= 10 && cData[i].drs! <= 14;
       if (isDrsOpen && segStart === -1) segStart = i;
       if (!isDrsOpen && segStart !== -1) {
         if (i - segStart > 3) drsSegments.push({ startIdx: segStart, endIdx: i - 1 });
@@ -681,9 +682,10 @@ export default function RaceReplayPage() {
       .filter((s) => s.driver_number === num)
       .sort((a, b) => a.stint_number - b.stint_number);
     for (const s of driverStints) {
-      if (lap >= s.lap_start && lap <= (s.lap_end || 999)) return s.compound || "UNKNOWN";
+      if (lap >= s.lap_start && lap <= (s.lap_end || 999)) return (s.compound && s.compound !== "None") ? s.compound : "UNKNOWN";
     }
-    return driverStints[driverStints.length - 1]?.compound || "UNKNOWN";
+    const last = driverStints[driverStints.length - 1]?.compound;
+    return (last && last !== "None") ? last : "UNKNOWN";
   }
 
   function getTireAge(num: number): number {
@@ -709,15 +711,19 @@ export default function RaceReplayPage() {
 
   // ===== Detect Safety Car / VSC from weather or position bunching =====
   const safetyCarStatus = useMemo(() => {
-    // Simple heuristic: if the top 10 drivers all have similar gaps (<2s) → likely SC
-    if (leaderboard.length < 5) return null;
+    // Heuristic: if the top 10 drivers all have small intervals → likely SC
+    // Only trigger after lap 5 and require valid interval data
+    if (leaderboard.length < 5 || estimatedLap < 5) return null;
     const top10 = leaderboard.slice(0, 10);
-    const gaps = top10
-      .filter((e) => e.gapToLeader !== null && e.gapToLeader! > 0)
-      .map((e) => e.interval);
-    if (gaps.length < 3) return null;
-    const avgInterval = gaps.reduce((a, b) => a! + b!, 0)! / gaps.length;
-    if (avgInterval !== null && avgInterval < 1.5 && estimatedLap > 2) return "SC";
+    const validIntervals = top10
+      .filter((e) => e.interval !== null && typeof e.interval === "number" && e.interval > 0)
+      .map((e) => e.interval as number);
+    // Need at least 6 drivers with real interval data
+    if (validIntervals.length < 6) return null;
+    const avgInterval = validIntervals.reduce((a, b) => a + b, 0) / validIntervals.length;
+    // Also check that leader gap for P10 is reasonable (not 0)
+    const p10Gap = top10[9]?.gapToLeader;
+    if (p10Gap !== null && typeof p10Gap === "number" && p10Gap > 0 && p10Gap < 15 && avgInterval < 1.5) return "SC";
     return null;
   }, [leaderboard, estimatedLap]);
 
@@ -902,7 +908,7 @@ export default function RaceReplayPage() {
                     const color = `#${driver.team_colour || "888888"}`;
                     const isSel = selectedDriver === driver.driver_number;
                     const entry = leaderboard.find((e) => e.driver.driver_number === driver.driver_number);
-                    const isDrsOpen = entry?.carData?.drs ? entry.carData.drs >= 10 && entry.carData.drs <= 14 : false;
+                    const isDrsOpen = entry?.carData?.drs != null && entry.carData.drs >= 10 && entry.carData.drs <= 14;
 
                     return (
                       <g key={driver.driver_number} onClick={() => setSelectedDriver(driver.driver_number)} className="cursor-pointer">
@@ -1057,7 +1063,7 @@ export default function RaceReplayPage() {
                         </div>
                       </div>
                       {/* DRS indicator */}
-                      {cd.drs >= 10 && cd.drs <= 14 && (
+                      {cd.drs != null && cd.drs >= 10 && cd.drs <= 14 && (
                         <div className="px-2 py-1 rounded-lg bg-racing-green/20 border border-racing-green/30">
                           <span className="text-[10px] font-mono font-bold text-racing-green">DRS</span>
                         </div>
