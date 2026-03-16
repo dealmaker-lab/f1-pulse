@@ -273,7 +273,7 @@ function TireProgressBar({
 
 export default function RaceReplayPage() {
   // Data state
-  const [year, setYear] = useState(2025);
+  const [year, setYear] = useState(OPENF1_YEARS[0]);
   const [sessionType, setSessionType] = useState<string>("Race");
   const [allSessions, setAllSessions] = useState<SessionInfo[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
