@@ -25,10 +25,10 @@ export function collectConsoleErrors(page: Page): string[] {
   return errors;
 }
 
-/** Wait for the page to finish loading — network idle + no loaders visible */
+/** Wait for the page to finish loading — DOM ready + no loaders visible */
 export async function waitForPageReady(page: Page) {
-  // Wait for network to settle
-  await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
+  // Wait for DOM to be ready (Lightpanda CDP: domcontentloaded instead of networkidle)
+  await page.waitForLoadState("domcontentloaded", { timeout: 15_000 }).catch(() => {});
   // Wait for any Loader2 spinner to disappear (max 10s)
   await page
     .locator(".animate-spin")
@@ -69,4 +69,28 @@ export async function checkTextVisibility(page: Page) {
   if (await h1.count()) {
     await expect(h1).toBeVisible();
   }
+}
+
+/** Build URL with Vercel Protection Bypass header (alternative if needed) */
+const BYPASS = process.env.VERCEL_BYPASS || process.env.VERCEL_BYPASS_F1_PULSE || "";
+export function bypassUrl(path: string): string {
+  if (!BYPASS) return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}x-vercel-protection-bypass=${BYPASS}`;
+}
+
+/** Verify page loaded without errors (Lightpanda CDP safe) */
+export async function expectPageLoaded(page: Page) {
+  // Get body text to confirm page loaded
+  const body = await page.locator("body").textContent({ timeout: 10_000 });
+  expect(body).toBeTruthy();
+
+  // Check for error pages (404, 500, application error)
+  const is404 = await page.locator("text=404").count();
+  const is500 = await page.locator("text=Internal Server Error").count();
+  const isAppError = await page.locator("text=Application error").count();
+
+  expect(is404 + is500 + isAppError, "Page should not show error pages").toBe(
+    0
+  );
 }

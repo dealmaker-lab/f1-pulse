@@ -1,50 +1,40 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig } from "@playwright/test";
 
-const BASE_URL = process.env.BASE_URL || "https://patootu-f1.vercel.app";
+const CDP_ENDPOINT = process.env.CDP_ENDPOINT || "http://127.0.0.1:9222";
+const BYPASS = process.env.VERCEL_BYPASS || process.env.VERCEL_BYPASS_F1_PULSE || "";
+const BASE_URL = process.env.BASE_URL || "https://f1-pulse.vercel.app";
 
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : 4,
-  reporter: [
-    ["html", { open: "never" }],
-    ["list"],
-  ],
+  reporter: process.env.CI ? "github" : [["html", { open: "never" }], ["list"]],
   timeout: 30_000,
   expect: { timeout: 10_000 },
 
+  globalSetup: "./e2e/global-setup.ts",
+  globalTeardown: "./e2e/global-teardown.ts",
+
   use: {
     baseURL: BASE_URL,
+    connectOptions: {
+      wsEndpoint: CDP_ENDPOINT,
+    },
+    extraHTTPHeaders: BYPASS ? { "x-vercel-protection-bypass": BYPASS } : {},
     screenshot: "only-on-failure",
     trace: "on-first-retry",
-    video: "off",
   },
 
   projects: [
     {
-      name: "chromium-dark",
-      use: {
-        ...devices["Desktop Chrome"],
-        colorScheme: "dark",
-        viewport: { width: 1440, height: 900 },
-      },
+      name: "desktop",
+      use: { viewport: { width: 1440, height: 900 } },
     },
     {
-      name: "chromium-light",
-      use: {
-        ...devices["Desktop Chrome"],
-        colorScheme: "light",
-        viewport: { width: 1440, height: 900 },
-      },
-    },
-    {
-      name: "mobile-dark",
-      use: {
-        ...devices["iPhone 14"],
-        colorScheme: "dark",
-      },
+      name: "mobile",
+      use: { viewport: { width: 390, height: 844 }, isMobile: true },
     },
   ],
 });

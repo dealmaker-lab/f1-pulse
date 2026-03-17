@@ -5,10 +5,18 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  deployment_status:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   e2e:
-    name: Playwright E2E
+    if: >
+      github.event_name == 'push' ||
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -23,40 +31,73 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright Chromium
-        run: npx playwright install chromium --with-deps
+      - name: Install Lightpanda
+        run: curl -sSfL https://get.lightpanda.io | bash
+
+      - name: Create screenshots dir
+        run: mkdir -p e2e/screenshots
 
       - name: Wait for Vercel deployment
         if: github.event_name == 'push'
         run: |
-          echo "Waiting for Vercel deployment to be ready..."
+          echo "Waiting for deployment to be ready..."
           for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://patootu-f1.vercel.app/)
-            if [ "$STATUS" = "200" ]; then
-              echo "Site is live (attempt $i)"
-              sleep 10
-              break
-            fi
-            echo "Attempt $i: status $STATUS, retrying in 10s..."
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "x-vercel-protection-bypass: $VERCEL_BYPASS" "$BASE_URL")
+            if [ "$STATUS" = "200" ]; then echo "✓ Deployment ready"; exit 0; fi
+            echo "Attempt $i: status=$STATUS, retrying in 10s..."
             sleep 10
           done
-
-      - name: Run post-deploy tests (production)
-        if: github.event_name == 'push'
-        run: npx playwright test e2e/post-deploy.spec.ts --project=chromium-dark --project=chromium-light
+          echo "Deployment not ready after 5 minutes"
+          exit 1
         env:
-          BASE_URL: https://patootu-f1.vercel.app
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
+
+      - name: Run smoke tests
+        run: npx playwright test e2e/smoke.spec.ts --project=desktop
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
+          CDP_ENDPOINT: http://127.0.0.1:9222
+
+      - name: Run post-deploy tests
+        if: github.event_name == 'push' || github.event_name == 'deployment_status'
+        run: npx playwright test e2e/post-deploy.spec.ts --project=desktop
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
+          CDP_ENDPOINT: http://127.0.0.1:9222
 
       - name: Run data loading tests
-        if: github.event_name == 'push'
-        run: npx playwright test e2e/data-loading.spec.ts --project=chromium-dark
+        if: github.event_name == 'push' || github.event_name == 'deployment_status'
+        run: npx playwright test e2e/data-loading.spec.ts --project=desktop
         env:
-          BASE_URL: https://patootu-f1.vercel.app
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
+          CDP_ENDPOINT: http://127.0.0.1:9222
         continue-on-error: true
 
-      - name: Run smoke tests (PR preview)
-        if: github.event_name == 'pull_request'
-        run: npx playwright test e2e/smoke.spec.ts --project=chromium-dark
+      - name: Run theme tests
+        run: npx playwright test e2e/theme.spec.ts --project=desktop
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
+          CDP_ENDPOINT: http://127.0.0.1:9222
+
+      - name: Run navigation tests
+        run: npx playwright test e2e/navigation.spec.ts --project=desktop
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
+          CDP_ENDPOINT: http://127.0.0.1:9222
+
+      - name: Run mobile smoke tests
+        run: npx playwright test e2e/smoke.spec.ts --project=mobile
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
+          CDP_ENDPOINT: http://127.0.0.1:9222
+        continue-on-error: true
 
       - name: Upload screenshots
         uses: actions/upload-artifact@v4

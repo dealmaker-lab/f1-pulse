@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { PAGES, collectConsoleErrors, waitForPageReady } from "./helpers";
+import { PAGES, collectConsoleErrors, waitForPageReady, expectPageLoaded } from "./helpers";
 
 /**
  * Smoke tests — fast pass over every page.
@@ -12,6 +12,9 @@ for (const { path, name } of PAGES) {
 
     await page.goto(path);
     await waitForPageReady(page);
+
+    // Verify page loaded (Lightpanda CDP safe)
+    await expectPageLoaded(page);
 
     // Page title / heading should exist
     const h1 = page.locator("h1").first();

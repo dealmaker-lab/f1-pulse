@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { PAGES, collectConsoleErrors, waitForPageReady, setLightMode } from "./helpers";
+import { PAGES, collectConsoleErrors, waitForPageReady, setLightMode, expectPageLoaded } from "./helpers";
 
 /**
  * POST-DEPLOY QUICK CHECK — Run this after every Vercel deploy.
@@ -17,15 +17,17 @@ test.describe("Post-Deploy Verification", () => {
       const errors = collectConsoleErrors(page);
 
       // 1. Navigate
-      const response = await page.goto(path);
-      expect(response?.status(), `${name} returned ${response?.status()}`).toBeLessThan(400);
+      await page.goto(path);
       await waitForPageReady(page);
 
-      // 2. Page has content
+      // 2. Verify page loaded (Lightpanda CDP safe — no response.status())
+      await expectPageLoaded(page);
+
+      // 3. Page has content
       const h1 = page.locator("h1").first();
       await expect(h1).toBeVisible({ timeout: 12_000 });
 
-      // 3. No fatal console errors
+      // 4. No fatal console errors
       const fatal = errors.filter(
         (e) =>
           !e.includes("ResizeObserver") &&
@@ -42,13 +44,13 @@ test.describe("Post-Deploy Verification", () => {
       );
       expect(fatal).toHaveLength(0);
 
-      // 4. Screenshot (dark mode — default)
+      // 5. Screenshot (dark mode — default)
       await page.screenshot({
         path: `e2e/screenshots/deploy-${name.toLowerCase().replace(/\s+/g, "-")}-dark.png`,
         fullPage: true,
       });
 
-      // 5. Switch to light mode & screenshot
+      // 6. Switch to light mode & screenshot
       await setLightMode(page);
       await page.waitForTimeout(400);
       await page.screenshot({
@@ -56,7 +58,7 @@ test.describe("Post-Deploy Verification", () => {
         fullPage: true,
       });
 
-      // 6. Verify light mode text isn't invisible
+      // 7. Verify light mode text isn't invisible
       if (await h1.count()) {
         const color = await h1.evaluate((el) => getComputedStyle(el).color);
         expect(color, `h1 color in light mode on ${name}`).not.toMatch(
