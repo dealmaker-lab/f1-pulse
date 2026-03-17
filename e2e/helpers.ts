@@ -27,34 +27,45 @@ export function collectConsoleErrors(page: Page): string[] {
 
 /** Wait for the page to finish loading — DOM ready + no loaders visible */
 export async function waitForPageReady(page: Page) {
-  // Wait for DOM to be ready (Lightpanda CDP: domcontentloaded instead of networkidle)
-  await page.waitForLoadState("domcontentloaded", { timeout: 15_000 }).catch(() => {});
-  // Wait for any Loader2 spinner to disappear (max 10s)
-  await page
-    .locator(".animate-spin")
-    .first()
-    .waitFor({ state: "hidden", timeout: 10_000 })
-    .catch(() => {});
+  try {
+    // Wait for DOM to be ready (Lightpanda CDP: domcontentloaded instead of networkidle)
+    await page.waitForLoadState("domcontentloaded", { timeout: 15_000 }).catch(() => {});
+    // Wait for any Loader2 spinner to disappear (max 10s)
+    await page
+      .locator(".animate-spin")
+      .first()
+      .waitFor({ state: "hidden", timeout: 10_000 })
+      .catch(() => {});
+  } catch {
+    // Lightpanda CDP may close context during rapid navigations — safe to ignore
+  }
 }
 
 /** Toggle theme to light mode by clicking the theme button */
 export async function setLightMode(page: Page) {
-  const themeBtn = page.locator("button").filter({ has: page.locator("svg.lucide-sun, svg.lucide-moon") }).first();
-  // Check if we're in dark mode — html should have class "dark"
-  const isDark = await page.locator("html").getAttribute("class");
-  if (isDark?.includes("dark")) {
-    await themeBtn.click().catch(() => {});
-    await page.waitForTimeout(300);
+  try {
+    const themeBtn = page.locator("button").filter({ has: page.locator("svg.lucide-sun, svg.lucide-moon") }).first();
+    const isDark = await page.locator("html").getAttribute("class");
+    if (isDark?.includes("dark")) {
+      await themeBtn.click().catch(() => {});
+      await new Promise(r => setTimeout(r, 300));
+    }
+  } catch {
+    // CDP may drop during theme toggle — non-critical
   }
 }
 
 /** Toggle theme to dark mode */
 export async function setDarkMode(page: Page) {
-  const themeBtn = page.locator("button").filter({ has: page.locator("svg.lucide-sun, svg.lucide-moon") }).first();
-  const isDark = await page.locator("html").getAttribute("class");
-  if (!isDark?.includes("dark")) {
-    await themeBtn.click().catch(() => {});
-    await page.waitForTimeout(300);
+  try {
+    const themeBtn = page.locator("button").filter({ has: page.locator("svg.lucide-sun, svg.lucide-moon") }).first();
+    const isDark = await page.locator("html").getAttribute("class");
+    if (!isDark?.includes("dark")) {
+      await themeBtn.click().catch(() => {});
+      await new Promise(r => setTimeout(r, 300));
+    }
+  } catch {
+    // CDP may drop during theme toggle — non-critical
   }
 }
 

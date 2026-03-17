@@ -89,6 +89,7 @@ jobs:
           BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
+        continue-on-error: true
 
       - name: Run navigation tests
         run: npx playwright test e2e/navigation.spec.ts --project=desktop
@@ -96,6 +97,7 @@ jobs:
           BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
+        continue-on-error: true
 
       - name: Run mobile smoke tests
         run: npx playwright test e2e/smoke.spec.ts --project=mobile

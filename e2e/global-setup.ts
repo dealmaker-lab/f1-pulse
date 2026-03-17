@@ -51,7 +51,7 @@ export default async function globalSetup() {
     "--port",
     String(port),
     "--timeout",
-    "120",
+    "600",
   ]);
 
   // Store PID in global state for teardown
