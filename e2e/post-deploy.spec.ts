@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { PAGES, collectConsoleErrors, waitForPageReady, setLightMode, expectPageLoaded } from "./helpers";
 
 /**

@@ -19,9 +19,6 @@ export default defineConfig({
 
   use: {
     baseURL: BASE_URL,
-    connectOptions: {
-      wsEndpoint: CDP_ENDPOINT,
-    },
     extraHTTPHeaders: BYPASS ? { "x-vercel-protection-bypass": BYPASS } : {},
     screenshot: "only-on-failure",
     trace: "on-first-retry",
