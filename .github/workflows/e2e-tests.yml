@@ -32,7 +32,14 @@ jobs:
         run: npm ci
 
       - name: Install Lightpanda
-        run: curl -sSfL https://get.lightpanda.io | bash
+        run: |
+          curl -sSfL https://get.lightpanda.io | bash || {
+            echo "Installer failed, downloading from GitHub releases..."
+            sudo curl -sL -o /usr/local/bin/lightpanda \
+              "https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-x86_64-linux"
+            sudo chmod +x /usr/local/bin/lightpanda
+          }
+          which lightpanda || { echo "::error::Lightpanda installation failed"; exit 1; }
 
       - name: Create screenshots dir
         run: mkdir -p e2e/screenshots
