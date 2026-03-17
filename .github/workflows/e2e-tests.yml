@@ -33,12 +33,15 @@ jobs:
 
       - name: Install Lightpanda
         run: |
-          curl -sSfL https://get.lightpanda.io | bash || {
-            echo "Installer failed, downloading from GitHub releases..."
+          set +e
+          curl -sSfL https://get.lightpanda.io | bash
+          if ! which lightpanda > /dev/null 2>&1; then
+            echo "Official installer failed, downloading from GitHub releases..."
             sudo curl -sL -o /usr/local/bin/lightpanda \
               "https://github.com/lightpanda-io/browser/releases/download/nightly/lightpanda-x86_64-linux"
             sudo chmod +x /usr/local/bin/lightpanda
-          }
+          fi
+          set -e
           which lightpanda || { echo "::error::Lightpanda installation failed"; exit 1; }
 
       - name: Create screenshots dir
