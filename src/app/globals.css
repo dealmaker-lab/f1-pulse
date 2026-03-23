@@ -8,7 +8,7 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* F1 Official Fonts */
+/* F1 Official Fonts — swap for no FOIT */
 @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&family=Fira+Code:wght@400;500;600;700&display=swap');
 
 @layer base {
@@ -161,6 +161,7 @@ html, body {
     padding: 12px 12px;
     font-size: 13px;
     color: var(--f1-text);
+    font-variant-numeric: tabular-nums;
   }
 
   /* ── F1 Position Badge ── */
@@ -243,6 +244,7 @@ html, body {
   /* ── Typography helpers ── */
   .data-value {
     @apply font-mono text-lg font-semibold tracking-tight;
+    font-variant-numeric: tabular-nums;
   }
   .section-title {
     font-size: 10px;
@@ -258,6 +260,7 @@ html, body {
     font-weight: 900;
     letter-spacing: -0.02em;
     line-height: 1.1;
+    font-variant-numeric: tabular-nums;
   }
   .f1-heading {
     font-family: 'Titillium Web', sans-serif;
@@ -350,6 +353,14 @@ html, body {
   .border-f1     { border-color: var(--f1-border); }
   .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
   .animate-shimmer { animation: shimmer 2s linear infinite; }
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+}
+
+/* ── Focus-visible — accessible focus indicators ── */
+:focus-visible {
+  outline: 2px solid rgba(225, 6, 0, 0.6);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ── Keyframes ── */
