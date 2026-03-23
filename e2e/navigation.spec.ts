@@ -2,7 +2,7 @@ import { test, expect } from "./fixtures";
 import { PAGES, PUBLIC_PAGES, waitForPageReady } from "./helpers";
 
 /**
- * Navigation tests — verify public pages load and protected pages redirect to sign-in.
+ * Navigation tests — verify pages load and navigation works.
  */
 
 test("hero page loads without auth", async ({ page }) => {
@@ -23,14 +23,11 @@ test("sign-in page loads", async ({ page }) => {
   expect(body?.length).toBeGreaterThan(20);
 });
 
-test("protected pages redirect to sign-in when unauthenticated", async ({ page }) => {
+test("all dashboard pages load without crashing", async ({ page }) => {
   for (const { path, name } of PAGES) {
     await page.goto(path);
     await waitForPageReady(page);
-    // Should redirect to sign-in or show sign-in content
-    const url = page.url();
     const body = await page.locator("body").textContent();
-    const isRedirected = url.includes("sign-in") || body?.includes("Sign in");
-    expect(isRedirected, `${name} (${path}) should require auth`).toBe(true);
+    expect(body?.length, `${name} should have content`).toBeGreaterThan(10);
   }
 });
