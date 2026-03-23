@@ -1,8 +1,15 @@
 import { Page, expect } from "@playwright/test";
 
-/** All routable pages in F1 Pulse */
+/** Public pages (no auth required) */
+export const PUBLIC_PAGES = [
+  { path: "/", name: "Hero" },
+  { path: "/sign-in", name: "Sign In" },
+  { path: "/sign-up", name: "Sign Up" },
+] as const;
+
+/** All routable pages in F1 Pulse (dashboard requires auth) */
 export const PAGES = [
-  { path: "/", name: "Dashboard" },
+  { path: "/dashboard", name: "Dashboard" },
   { path: "/race", name: "Race Replay" },
   { path: "/h2h", name: "Head to Head" },
   { path: "/telemetry", name: "Telemetry" },

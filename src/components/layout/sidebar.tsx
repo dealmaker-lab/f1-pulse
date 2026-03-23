@@ -10,6 +10,7 @@ import {
   PieChart, Users, Trophy, Lock, CloudRain, Radio,
   ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
 } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 
 interface NavItem {
   href: string;
@@ -19,7 +20,7 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/",            label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/dashboard",   label: "Dashboard",    icon: LayoutDashboard },
   { href: "/race",        label: "Race Replay",  icon: PlayCircle, liveLocked: true },
   { href: "/h2h",         label: "Head to Head", icon: Swords },
   { href: "/telemetry",  label: "Telemetry",    icon: Activity },
@@ -117,7 +118,7 @@ export default function Sidebar() {
         {/* Nav */}
         <nav className="flex-1 py-3 px-2 space-y-0.5">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+            const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
@@ -172,8 +173,24 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* Bottom: theme toggle + live badge + collapse */}
+        {/* Bottom: user + theme toggle + live badge + collapse */}
         <div className="border-t border-white/[0.06]">
+
+          {/* User button */}
+          <div className={cn("px-2 pt-3", collapsed && "flex justify-center")}>
+            <div className={cn(
+              "flex items-center gap-2.5 px-3 py-2",
+              collapsed && "justify-center px-0"
+            )}>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: "w-7 h-7",
+                  },
+                }}
+              />
+            </div>
+          </div>
 
           {/* Theme toggle button */}
           <div className={cn("px-2 pt-2", collapsed && "flex justify-center")}>

@@ -1,39 +1,36 @@
 import { test, expect } from "./fixtures";
-import { PAGES, waitForPageReady } from "./helpers";
+import { PAGES, PUBLIC_PAGES, waitForPageReady } from "./helpers";
 
 /**
- * Navigation tests — verify sidebar links work and page transitions are smooth.
+ * Navigation tests — verify public pages load and protected pages redirect to sign-in.
  */
 
-test("sidebar navigation visits all pages", async ({ page }) => {
+test("hero page loads without auth", async ({ page }) => {
   await page.goto("/");
   await waitForPageReady(page);
 
-  for (const { path, name } of PAGES) {
-    // Find sidebar link by href
-    const link = page.locator(`a[href="${path}"]`).first();
-    if (await link.count()) {
-      await link.click();
-      await page.waitForURL(`**${path}`, { timeout: 10_000 });
-      await waitForPageReady(page);
-
-      // Verify we're on the right page
-      expect(page.url()).toContain(path === "/" ? "" : path);
-
-      // Page should have content (not blank)
-      const body = page.locator("body");
-      const text = await body.textContent();
-      expect(text?.length).toBeGreaterThan(50);
-    }
-  }
+  const body = await page.locator("body").textContent();
+  expect(body?.length).toBeGreaterThan(50);
+  // Hero page should show the product name
+  expect(body).toContain("Pulse");
 });
 
-test("direct URL navigation works for all pages", async ({ page }) => {
+test("sign-in page loads", async ({ page }) => {
+  await page.goto("/sign-in");
+  await waitForPageReady(page);
+
+  const body = await page.locator("body").textContent();
+  expect(body?.length).toBeGreaterThan(20);
+});
+
+test("protected pages redirect to sign-in when unauthenticated", async ({ page }) => {
   for (const { path, name } of PAGES) {
     await page.goto(path);
     await waitForPageReady(page);
-    // Verify page loaded (Lightpanda CDP safe — check content instead of status code)
+    // Should redirect to sign-in or show sign-in content
+    const url = page.url();
     const body = await page.locator("body").textContent();
-    expect(body?.length).toBeGreaterThan(50);
+    const isRedirected = url.includes("sign-in") || body?.includes("Sign in");
+    expect(isRedirected, `${name} (${path}) should require auth`).toBe(true);
   }
 });

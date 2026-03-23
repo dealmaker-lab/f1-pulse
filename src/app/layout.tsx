@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import Sidebar from "@/components/layout/sidebar";
+import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 
 export const metadata: Metadata = {
   title: "F1 Pulse — Race Analytics & Visualization",
-  description: "Interactive Formula 1 race visualization, telemetry analysis, and strategic insights platform.",
+  description:
+    "Interactive Formula 1 race visualization, telemetry analysis, and strategic insights platform.",
 };
 
 export const viewport: Viewport = {
@@ -14,8 +15,7 @@ export const viewport: Viewport = {
   themeColor: "#15151e",
 };
 
-// Inline script injected before React hydration to prevent FOUC (flash of unstyled content).
-// Sets the `dark` class on <html> immediately from localStorage or system preference.
+// Inline script injected before React hydration to prevent FOUC.
 const noFlashScript = `
 (function(){
   try {
@@ -36,21 +36,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        {/* No-flash theme script — runs before React paint */}
-        <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
-      </head>
-      <body className="min-h-screen grid-bg">
-        <ThemeProvider>
-          <Sidebar />
-          <main className="lg:ml-[220px] min-h-screen">
-            <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 pt-14 lg:pt-6">
-              {children}
-            </div>
-          </main>
-        </ThemeProvider>
-      </body>
-    </html>
+    <ClerkProvider
+      appearance={{
+        variables: {
+          colorPrimary: "#e10600",
+          colorBackground: "#15151e",
+          colorInputBackground: "#1e1e2a",
+          colorInputText: "#ffffff",
+          fontFamily: "'Titillium Web', system-ui, sans-serif",
+        },
+      }}
+    >
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
+        </head>
+        <body className="min-h-screen grid-bg">
+          <ThemeProvider>{children}</ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

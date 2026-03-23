@@ -1,15 +1,18 @@
 import { test, expect } from "./fixtures";
-import { PAGES, waitForPageReady, setLightMode, setDarkMode } from "./helpers";
+import { PUBLIC_PAGES, waitForPageReady, setLightMode, setDarkMode } from "./helpers";
 
 /**
- * Theme tests — verify light/dark mode renders correctly on every page.
- * Takes screenshots for visual comparison.
+ * Theme tests — verify light/dark mode renders correctly on public pages.
+ * Protected pages require auth and are tested separately.
  *
  * Note: These tests use page.evaluate() to toggle themes, which can trigger
  * Lightpanda CDP connection drops. Tests are wrapped in try-catch for resilience.
  */
 
-for (const { path, name } of PAGES) {
+// Only test theme on public pages (hero) — protected pages redirect to sign-in
+const THEME_PAGES = PUBLIC_PAGES.filter((p) => p.path === "/");
+
+for (const { path, name } of THEME_PAGES) {
   test.describe(`${name} — theme`, () => {
     test("dark mode renders correctly", async ({ page }) => {
       await page.goto(path);

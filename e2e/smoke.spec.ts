@@ -1,12 +1,18 @@
 import { test, expect } from "./fixtures";
-import { PAGES, collectConsoleErrors, waitForPageReady, expectPageLoaded } from "./helpers";
+import {
+  PAGES,
+  PUBLIC_PAGES,
+  collectConsoleErrors,
+  waitForPageReady,
+  expectPageLoaded,
+} from "./helpers";
 
 /**
- * Smoke tests — fast pass over every page.
- * Checks: page loads, no JS crashes, h1 present, sidebar renders.
+ * Smoke tests — fast pass over public pages.
+ * Protected pages redirect to sign-in (tested in navigation.spec.ts).
  */
 
-for (const { path, name } of PAGES) {
+for (const { path, name } of PUBLIC_PAGES) {
   test(`${name} (${path}) — loads without errors`, async ({ page }) => {
     const errors = collectConsoleErrors(page);
 
@@ -16,19 +22,11 @@ for (const { path, name } of PAGES) {
     // Verify page loaded (Lightpanda CDP safe)
     await expectPageLoaded(page);
 
-    // Page should have some heading (h1, h2, or h3) — not all pages use h1
-    const heading = page.locator("h1, h2, h3").first();
-    if (await heading.count() > 0) {
-      await expect(heading).toBeVisible({ timeout: 10_000 });
-    }
+    // Page should have some heading or content
+    const body = await page.locator("body").textContent();
+    expect(body?.length).toBeGreaterThan(20);
 
-    // Sidebar nav should be present (desktop)
-    const sidebar = page.locator("nav, aside").first();
-    if (await sidebar.count()) {
-      await expect(sidebar).toBeVisible();
-    }
-
-    // No fatal JS errors (filter out known benign ones like ResizeObserver)
+    // No fatal JS errors
     const fatal = errors.filter(
       (e) =>
         !e.includes("ResizeObserver") &&
@@ -37,8 +35,31 @@ for (const { path, name } of PAGES) {
         !e.includes("hydration") &&
         !e.includes("Minified React error #418") &&
         !e.includes("Minified React error #423") &&
-        !e.includes("Minified React error #425")
+        !e.includes("Minified React error #425") &&
+        !e.includes("Clerk")
     );
-    expect(fatal, `Console errors on ${name}: ${fatal.join("\n")}`).toHaveLength(0);
+    expect(
+      fatal,
+      `Console errors on ${name}: ${fatal.join("\n")}`
+    ).toHaveLength(0);
+  });
+}
+
+// Protected pages should redirect (not crash)
+for (const { path, name } of PAGES) {
+  test(`${name} (${path}) — redirects to sign-in when unauthenticated`, async ({
+    page,
+  }) => {
+    await page.goto(path);
+    await waitForPageReady(page);
+
+    // Should not show application errors
+    const body = await page.locator("body").textContent();
+    expect(body).toBeTruthy();
+
+    // Should redirect to sign-in or show Clerk UI
+    const url = page.url();
+    const hasAuth = url.includes("sign-in") || body?.includes("Sign in");
+    expect(hasAuth, `${name} should require auth`).toBe(true);
   });
 }
