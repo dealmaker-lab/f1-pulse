@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 const CDP_ENDPOINT = process.env.CDP_ENDPOINT || "http://127.0.0.1:9222";
 const BYPASS = process.env.VERCEL_BYPASS || process.env.VERCEL_BYPASS_F1_PULSE || "";
-const BASE_URL = process.env.BASE_URL || "https://f1-pulse.vercel.app";
+const BASE_URL = process.env.BASE_URL || "https://f1-pulse-dealmaker-labs-projects.vercel.app";
 
 export default defineConfig({
   testDir: "./e2e",

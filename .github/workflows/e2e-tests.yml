@@ -56,13 +56,13 @@ jobs:
           echo "Deployment not ready after 5 minutes"
           exit 1
         env:
-          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
 
       - name: Run smoke tests
         run: npx playwright test e2e/smoke.spec.ts --project=desktop
         env:
-          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
 
@@ -70,7 +70,7 @@ jobs:
         if: github.event_name == 'push' || github.event_name == 'deployment_status'
         run: npx playwright test e2e/post-deploy.spec.ts --project=desktop
         env:
-          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
 
@@ -78,7 +78,7 @@ jobs:
         if: github.event_name == 'push' || github.event_name == 'deployment_status'
         run: npx playwright test e2e/data-loading.spec.ts --project=desktop
         env:
-          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
         continue-on-error: true
@@ -86,7 +86,7 @@ jobs:
       - name: Run theme tests
         run: npx playwright test e2e/theme.spec.ts --project=desktop
         env:
-          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
         continue-on-error: true
@@ -94,7 +94,7 @@ jobs:
       - name: Run navigation tests
         run: npx playwright test e2e/navigation.spec.ts --project=desktop
         env:
-          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
         continue-on-error: true
@@ -102,7 +102,7 @@ jobs:
       - name: Run mobile smoke tests
         run: npx playwright test e2e/smoke.spec.ts --project=mobile
         env:
-          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse.vercel.app' }}
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
         continue-on-error: true
