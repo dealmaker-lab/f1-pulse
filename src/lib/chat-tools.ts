@@ -183,4 +183,27 @@ export const chatTools = {
       return data;
     },
   }),
+
+  queryDatabase: tool({
+    description:
+      "Execute a natural language query against the F1 database. Use for complex analytical questions that require SQL: comparing multiple drivers, aggregating across races, filtering by multiple conditions, or any question that the other specific tools can't answer directly.",
+    inputSchema: z.object({
+      question: z
+        .string()
+        .describe("The natural language question to answer using the F1 database"),
+    }),
+    execute: async ({ question }) => {
+      const { executeNL2SQL } = await import("./nl2sql");
+      const result = await executeNL2SQL(question);
+      if (result.error) {
+        return { error: result.error, sql: result.sql };
+      }
+      return {
+        explanation: result.explanation,
+        data: result.data.slice(0, 20), // Limit for chat context
+        rowCount: result.rowCount,
+        sql: result.sql,
+      };
+    },
+  }),
 };

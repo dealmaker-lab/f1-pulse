@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -12,6 +12,24 @@ import {
   Radio,
   Flag,
 } from "lucide-react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+// ─── Types ──────────────────────────────────────────────────────────
+interface DriverStanding {
+  position: number;
+  points: number;
+  wins: number;
+  driver: {
+    code: string;
+    name: string;
+    number: number;
+    nationality: string;
+    team: string;
+    teamColor: string;
+    driverId: string;
+  };
+}
 
 // ─── Animated counter ────────────────────────────────────────────────
 function AnimatedNumber({ target, duration = 2000 }: { target: number; duration?: number }) {
@@ -159,50 +177,208 @@ function CircuitAnimation() {
   );
 }
 
+// ─── Standings Ticker ────────────────────────────────────────────────
+const FALLBACK_STANDINGS: DriverStanding[] = [
+  { position: 1, points: 245, wins: 8, driver: { code: "VER", name: "Max Verstappen", number: 1, nationality: "Dutch", team: "Red Bull", teamColor: "#3671C6", driverId: "max_verstappen" } },
+  { position: 2, points: 200, wins: 4, driver: { code: "NOR", name: "Lando Norris", number: 4, nationality: "British", team: "McLaren", teamColor: "#FF8000", driverId: "norris" } },
+  { position: 3, points: 188, wins: 3, driver: { code: "LEC", name: "Charles Leclerc", number: 16, nationality: "Monegasque", team: "Ferrari", teamColor: "#E8002D", driverId: "leclerc" } },
+  { position: 4, points: 160, wins: 2, driver: { code: "HAM", name: "Lewis Hamilton", number: 44, nationality: "British", team: "Ferrari", teamColor: "#E8002D", driverId: "hamilton" } },
+  { position: 5, points: 148, wins: 1, driver: { code: "PIA", name: "Oscar Piastri", number: 81, nationality: "Australian", team: "McLaren", teamColor: "#FF8000", driverId: "piastri" } },
+  { position: 6, points: 130, wins: 1, driver: { code: "SAI", name: "Carlos Sainz", number: 55, nationality: "Spanish", team: "Williams", teamColor: "#64C4FF", driverId: "sainz" } },
+  { position: 7, points: 115, wins: 0, driver: { code: "RUS", name: "George Russell", number: 63, nationality: "British", team: "Mercedes", teamColor: "#27F4D2", driverId: "russell" } },
+  { position: 8, points: 98, wins: 0, driver: { code: "ALO", name: "Fernando Alonso", number: 14, nationality: "Spanish", team: "Aston Martin", teamColor: "#229971", driverId: "alonso" } },
+];
+
+function StandingsTicker() {
+  const tickerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const tweenRef = useRef<gsap.core.Tween | null>(null);
+  const [standings, setStandings] = useState<DriverStanding[]>(FALLBACK_STANDINGS);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/f1/standings/drivers?year=2025", { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error("API error");
+        return res.json();
+      })
+      .then((data: DriverStanding[]) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setStandings(data);
+        }
+      })
+      .catch(() => {
+        /* use fallback */
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (!innerRef.current) return;
+
+    // Wait a frame so the DOM has rendered the duplicated content
+    const raf = requestAnimationFrame(() => {
+      if (!innerRef.current) return;
+      const contentWidth = innerRef.current.scrollWidth / 2;
+      if (contentWidth <= 0) return;
+
+      tweenRef.current = gsap.to(innerRef.current, {
+        x: -contentWidth,
+        duration: standings.length * 3,
+        ease: "none",
+        repeat: -1,
+        modifiers: {
+          x: gsap.utils.unitize((x: number) => x % contentWidth),
+        },
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      tweenRef.current?.kill();
+    };
+  }, [standings]);
+
+  const handleMouseEnter = useCallback(() => tweenRef.current?.pause(), []);
+  const handleMouseLeave = useCallback(() => tweenRef.current?.resume(), []);
+
+  // Duplicate standings for seamless loop
+  const doubled = [...standings, ...standings];
+
+  return (
+    <div
+      ref={tickerRef}
+      className="standings-ticker relative overflow-hidden border-y border-white/[0.06] bg-[#15151e]/80"
+      style={{ backdropFilter: "blur(8px)" }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div className="py-3">
+        <div ref={innerRef} className="flex whitespace-nowrap gap-0">
+          {doubled.map((s, i) => (
+            <div
+              key={`${s.driver.code}-${i}`}
+              className="inline-flex items-center gap-2 px-6 shrink-0"
+            >
+              <span
+                className="text-[11px] font-black tabular-nums"
+                style={{ fontFamily: "Titillium Web, sans-serif", color: "rgba(255,255,255,0.3)" }}
+              >
+                P{s.position}
+              </span>
+              <span
+                className="w-1.5 h-1.5 rounded-full shrink-0"
+                style={{ backgroundColor: s.driver.teamColor }}
+              />
+              <span
+                className="text-xs font-bold uppercase tracking-wider"
+                style={{ fontFamily: "Titillium Web, sans-serif", color: s.driver.teamColor }}
+              >
+                {s.driver.code}
+              </span>
+              <span
+                className="text-[11px] font-semibold tabular-nums text-white/50"
+                style={{ fontFamily: "Titillium Web, sans-serif" }}
+              >
+                {s.points}pts
+              </span>
+              {i < doubled.length - 1 && (
+                <span className="text-white/[0.08] ml-4">|</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Feature cards ───────────────────────────────────────────────────
 const features = [
   {
     icon: Activity,
     title: "Live Telemetry",
-    description: "Speed, throttle, brake and DRS data for every driver, every lap.",
+    description: "Speed, throttle, brake and DRS data at 3.7Hz sampling for every driver, every lap.",
   },
   {
     icon: Timer,
     title: "Lap Analysis",
-    description: "Compare lap times across sessions, compounds and weather conditions.",
+    description: "Compare lap times across sessions, compounds and weather conditions with micro-sector detail.",
   },
   {
     icon: Trophy,
     title: "Championship Tracker",
-    description: "Real-time standings with progression charts and historical comparisons.",
+    description: "Real-time standings with progression charts and 75+ years of historical comparisons.",
   },
   {
     icon: BarChart3,
     title: "Strategy Analyzer",
-    description: "Pit stop timing, tire stint analysis and undercut/overcut scenarios.",
+    description: "Pit stop timing, tire stint analysis and undercut/overcut scenario modeling.",
   },
   {
     icon: Radio,
     title: "Team Radio",
-    description: "Session-by-session radio transcripts with timestamps and context.",
+    description: "Session-by-session radio transcripts with timestamps and strategic context.",
   },
   {
     icon: Zap,
     title: "Head-to-Head",
-    description: "Career and race-by-race driver comparisons with detailed metrics.",
+    description: "Career and race-by-race driver comparisons with 50,000+ data points per race.",
   },
 ];
 
 // ─── Hero Page ───────────────────────────────────────────────────────
 export default function HeroPage() {
-  const [mounted, setMounted] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMounted(true);
+    gsap.registerPlugin(ScrollTrigger);
+
+    const ctx = gsap.context(() => {
+      // Hero entrance -- staggered cascade
+      const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
+
+      tl.from(".hero-badge", { opacity: 0, y: 20, duration: 0.5 })
+        .from(".hero-headline", { opacity: 0, y: 40, duration: 0.7 }, "-=0.2")
+        .from(".hero-sub", { opacity: 0, y: 30, duration: 0.5 }, "-=0.3")
+        .from(".hero-cta", { opacity: 0, y: 20, duration: 0.5 }, "-=0.2")
+        .from(".hero-chart", { opacity: 0, y: 50, scale: 0.95, duration: 0.8 }, "-=0.3");
+
+      // Stats counter -- animate on scroll into view
+      gsap.from(".stat-item", {
+        scrollTrigger: { trigger: ".stats-bar", start: "top 80%" },
+        opacity: 0,
+        y: 30,
+        stagger: 0.1,
+        duration: 0.6,
+        ease: "quart.out",
+      });
+
+      // Feature cards -- stagger reveal on scroll
+      gsap.from(".feature-card", {
+        scrollTrigger: { trigger: "#features", start: "top 75%" },
+        opacity: 0,
+        y: 40,
+        stagger: 0.12,
+        duration: 0.6,
+        ease: "quart.out",
+      });
+
+      // Bottom CTA -- fade up
+      gsap.from(".bottom-cta", {
+        scrollTrigger: { trigger: ".bottom-cta", start: "top 85%" },
+        opacity: 0,
+        y: 30,
+        duration: 0.7,
+        ease: "expo.out",
+      });
+    }, heroRef);
+
+    return () => ctx.revert();
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#15151e] text-white overflow-hidden">
+    <div ref={heroRef} className="min-h-screen bg-[#15151e] text-white overflow-hidden">
       {/* Navigation bar */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.06]" style={{ background: "rgba(21,21,30,0.92)", backdropFilter: "blur(12px)" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
@@ -242,7 +418,7 @@ export default function HeroPage() {
         <div className="h-[2px] bg-gradient-to-r from-transparent via-[#e10600] to-transparent" />
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero Section (ATTENTION) */}
       <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-28 px-4 sm:px-6 lg:px-8">
         {/* Background circuit animation */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -262,25 +438,19 @@ export default function HeroPage() {
 
         <div className="relative max-w-5xl mx-auto text-center">
           {/* Badge */}
-          <div
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#e10600]/20 bg-[#e10600]/[0.06] mb-8 transition-all duration-700 ${
-              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
+          <div className="hero-badge inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#e10600]/20 bg-[#e10600]/[0.06] mb-8">
             <span className="w-1.5 h-1.5 rounded-full bg-[#e10600] animate-pulse" />
             <span
               className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#e10600]"
               style={{ fontFamily: "Titillium Web, sans-serif" }}
             >
-              Live Race Data
+              Every Lap. Every Data Point. In Real Time.
             </span>
           </div>
 
           {/* Headline */}
           <h1
-            className={`text-4xl sm:text-6xl lg:text-7xl font-black uppercase leading-[0.95] tracking-tight mb-6 transition-all duration-700 delay-100 ${
-              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
+            className="hero-headline text-4xl sm:text-6xl lg:text-7xl font-black uppercase leading-[0.95] tracking-tight mb-6"
             style={{ fontFamily: "Titillium Web, sans-serif", letterSpacing: "-0.02em" }}
           >
             <span className="text-white">Race Analytics</span>
@@ -297,21 +467,15 @@ export default function HeroPage() {
 
           {/* Subheadline */}
           <p
-            className={`max-w-2xl mx-auto text-base sm:text-lg text-white/45 leading-relaxed mb-10 transition-all duration-700 delay-200 ${
-              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
+            className="hero-sub max-w-2xl mx-auto text-base sm:text-lg text-white/45 leading-relaxed mb-10"
             style={{ fontFamily: "Titillium Web, sans-serif" }}
           >
-            Real-time telemetry, lap-by-lap strategy analysis, and championship tracking.
-            Every session. Every compound. Every overtake.
+            3.7Hz telemetry. Lap-by-lap strategy. 75 years of championship data.
+            Every session, every compound, every overtake — analyzed in real time.
           </p>
 
-          {/* CTA buttons */}
-          <div
-            className={`flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 transition-all duration-700 delay-300 ${
-              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-            }`}
-          >
+          {/* CTA buttons (ACTION) */}
+          <div className="hero-cta flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
             <Link
               href="/sign-up"
               className="group flex items-center gap-3 px-8 py-3.5 rounded-lg text-sm font-bold uppercase tracking-wider text-white transition-all duration-300 hover:shadow-[0_0_30px_rgba(225,6,0,0.4)] hover:scale-[1.02] active:scale-[0.98]"
@@ -333,12 +497,8 @@ export default function HeroPage() {
             </Link>
           </div>
 
-          {/* Race position chart preview */}
-          <div
-            className={`relative glass-card overflow-hidden transition-all duration-700 delay-[400ms] ${
-              mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-            }`}
-          >
+          {/* Race position chart preview (DESIRE) */}
+          <div className="hero-chart relative glass-card overflow-hidden">
             {/* Top bar */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
               <div className="flex items-center gap-2">
@@ -354,23 +514,23 @@ export default function HeroPage() {
         </div>
       </section>
 
-      {/* Stats bar */}
-      <section className="border-y border-white/[0.06] bg-[#1e1e2a]/50">
+      {/* Stats bar (INTEREST - metrics) */}
+      <section className="stats-bar border-y border-white/[0.06] bg-[#1e1e2a]/50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-2 sm:grid-cols-4 gap-8">
           {[
             { label: "Races Tracked", value: 450 },
-            { label: "Drivers", value: 20 },
+            { label: "Telemetry Sample Rate", value: 3.7, suffix: "Hz", isDecimal: true },
             { label: "Data Points / Race", value: 50000 },
-            { label: "Sessions / Weekend", value: 5 },
+            { label: "Years of Data", value: 75 },
           ].map((stat) => (
-            <div key={stat.label} className="text-center">
+            <div key={stat.label} className="stat-item text-center">
               <div className="stat-number text-white mb-1">
-                {mounted ? (
-                  <AnimatedNumber target={stat.value} />
+                {"isDecimal" in stat && stat.isDecimal ? (
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{stat.value}</span>
                 ) : (
-                  0
+                  <AnimatedNumber target={stat.value} />
                 )}
-                {stat.value >= 1000 && "+"}
+                {"suffix" in stat ? stat.suffix : stat.value >= 1000 ? "+" : "+"}
               </div>
               <div className="section-title">{stat.label}</div>
             </div>
@@ -378,7 +538,10 @@ export default function HeroPage() {
         </div>
       </section>
 
-      {/* Features grid */}
+      {/* Live Standings Ticker */}
+      <StandingsTicker />
+
+      {/* Features grid (INTEREST - capabilities) */}
       <section id="features" className="py-20 sm:py-28 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
@@ -398,11 +561,10 @@ export default function HeroPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {features.map((feature, i) => (
+            {features.map((feature) => (
               <div
                 key={feature.title}
-                className="glass-card-hover p-6 group"
-                style={{ animationDelay: `${i * 100}ms` }}
+                className="feature-card glass-card-hover p-6 group"
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-[#e10600]/[0.08] border border-[#e10600]/[0.12] group-hover:bg-[#e10600]/[0.15] transition-colors">
@@ -424,21 +586,21 @@ export default function HeroPage() {
         </div>
       </section>
 
-      {/* Bottom CTA */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 border-t border-white/[0.06]">
+      {/* Bottom CTA (ACTION) */}
+      <section className="bottom-cta py-20 px-4 sm:px-6 lg:px-8 border-t border-white/[0.06]">
         <div className="max-w-3xl mx-auto text-center">
           <h2
             className="text-2xl sm:text-3xl font-black uppercase tracking-tight mb-4"
             style={{ fontFamily: "Titillium Web, sans-serif" }}
           >
-            Ready to{" "}
-            <span style={{ color: "#e10600" }}>dive in?</span>
+            Sign in to{" "}
+            <span style={{ color: "#e10600" }}>unlock full analytics</span>
           </h2>
           <p
             className="text-white/40 mb-8 max-w-md mx-auto"
             style={{ fontFamily: "Titillium Web, sans-serif" }}
           >
-            Sign up and get instant access to live telemetry, race strategy breakdowns, and championship analytics.
+            Live telemetry, race strategy breakdowns, head-to-head comparisons, and 75 years of championship data — all in one place.
           </p>
           <Link
             href="/sign-up"

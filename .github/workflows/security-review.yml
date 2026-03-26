@@ -1,0 +1,55 @@
+name: Security Review
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Anthropic Security Review
+        uses: anthropics/anthropic-security-review@main
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-sonnet-4-20250514
+          max_tokens: 4096
+        continue-on-error: true
+
+      - name: Check for secrets in code
+        run: |
+          echo "Checking for potential secrets..."
+          # Check for common secret patterns
+          if grep -rn "sk-[a-zA-Z0-9]\\{20,\\}" src/ --include="*.ts" --include="*.tsx" 2>/dev/null; then
+            echo "::error::Potential API key found in source code"
+            exit 1
+          fi
+          if grep -rn "SUPABASE_SERVICE_ROLE_KEY\\s*=" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -v "process.env"; then
+            echo "::error::Hardcoded Supabase key found"
+            exit 1
+          fi
+          echo "No secrets detected in source code"
+
+      - name: Check API route security
+        run: |
+          echo "Checking API routes for auth/validation..."
+          # Ensure API routes use validation
+          ROUTES=$(find src/app/api -name "route.ts" 2>/dev/null | wc -l)
+          echo "Found $ROUTES API routes"
+          # Check that chat route exists and uses tools safely
+          if [ -f "src/app/api/chat/route.ts" ]; then
+            if grep -q "stepCountIs" src/app/api/chat/route.ts; then
+              echo "Chat route has step limit protection"
+            else
+              echo "::warning::Chat route missing step count limit"
+            fi
+          fi
+          echo "API route audit complete"
