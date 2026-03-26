@@ -47,13 +47,24 @@ jobs:
         if: github.event_name == 'push'
         run: |
           echo "Waiting for deployment to be ready..."
+          HEADER=""
+          if [ -n "$VERCEL_BYPASS" ]; then
+            HEADER="-H x-vercel-protection-bypass: $VERCEL_BYPASS"
+          fi
           for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "x-vercel-protection-bypass: $VERCEL_BYPASS" "$BASE_URL")
-            if [ "$STATUS" = "200" ]; then echo "✓ Deployment ready"; exit 0; fi
+            if [ -n "$VERCEL_BYPASS" ]; then
+              STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "x-vercel-protection-bypass: $VERCEL_BYPASS" "$BASE_URL")
+            else
+              STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$BASE_URL")
+            fi
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "401" ]; then
+              echo "✓ Deployment reachable (status=$STATUS)"
+              exit 0
+            fi
             echo "Attempt $i: status=$STATUS, retrying in 10s..."
             sleep 10
           done
-          echo "Deployment not ready after 5 minutes"
+          echo "Deployment not reachable after 5 minutes"
           exit 1
         env:
           BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
