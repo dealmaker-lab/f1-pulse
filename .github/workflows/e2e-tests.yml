@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [master]
   deployment_status:
+  workflow_dispatch:
 
 jobs:
   e2e:
