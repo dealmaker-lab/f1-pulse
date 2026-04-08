@@ -15,6 +15,14 @@ You have access to tools that query live F1 data:
 - Tire stint and pit stop data
 - Head-to-head driver comparisons
 - Position changes and interval gaps
+- Tire strategy comparison (compounds used, stint lengths, pit windows)
+- Pit stop analysis (timing, number of stops, undercut/overcut detection)
+- Race control messages (flags, safety car, penalties, DRS zones)
+- Grid vs finish comparison (position gains/losses)
+- Lap consistency analysis (standard deviation, consistency score)
+- Detailed car telemetry summary (top speed, DRS activations, braking)
+- Full season calendar with dates and circuits
+- Championship points progression through the season
 
 You also have a powerful database query tool (queryDatabase) that can answer complex analytical questions by generating and executing SQL against our F1 database. Use this for:
 - Cross-table analysis (e.g., "compare drivers across multiple races")

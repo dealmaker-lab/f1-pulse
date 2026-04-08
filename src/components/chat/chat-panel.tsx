@@ -7,10 +7,10 @@ import { MessageSquare, X, Send, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SUGGESTIONS = [
-  "Who leads the 2026 championship?",
-  "Compare Hamilton vs Verstappen this season",
-  "What were the pit strategies at the last race?",
-  "Show me the constructor standings",
+  "Compare Verstappen vs Hamilton tire strategy at Silverstone",
+  "Who gained the most positions from grid at the last race?",
+  "Show race control messages from Bahrain 2025",
+  "Which driver had the most consistent lap times at Monza?",
 ];
 
 export default function ChatPanel() {

@@ -184,6 +184,215 @@ export const chatTools = {
     },
   }),
 
+  getTireStrategy: tool({
+    description:
+      "Get tire compound choices, stint lengths, and pit stop timing for all drivers in a session. Shows what compound each driver used per stint and how many laps they ran on it.",
+    inputSchema: z.object({
+      session_key: z.number().describe("Session key from getSessionInfo"),
+    }),
+    execute: async ({ session_key }) => {
+      const data = await fetchApi("/api/f1/stints", { session_key });
+      if (!Array.isArray(data)) return data;
+      const byDriver: Record<number, { stint: number; compound: string; lapStart: number; lapEnd: number; laps: number }[]> = {};
+      for (const s of data) {
+        if (!byDriver[s.driver_number]) byDriver[s.driver_number] = [];
+        byDriver[s.driver_number].push({
+          stint: s.stint_number,
+          compound: s.compound,
+          lapStart: s.lap_start,
+          lapEnd: s.lap_end,
+          laps: (s.lap_end || 0) - (s.lap_start || 0) + 1,
+        });
+      }
+      return { strategies: byDriver, totalDrivers: Object.keys(byDriver).length };
+    },
+  }),
+
+  getPitStopAnalysis: tool({
+    description:
+      "Analyze pit stop data: number of stops, when they pitted, and stint durations for a session. Optionally filter by driver.",
+    inputSchema: z.object({
+      session_key: z.number().describe("Session key"),
+      driver_number: z.number().optional().describe("Filter to specific driver"),
+    }),
+    execute: async ({ session_key, driver_number }) => {
+      const data = await fetchApi("/api/f1/stints", { session_key, driver_number });
+      if (!Array.isArray(data)) return data;
+      const byDriver: Record<number, { stops: number; pitLaps: number[]; compounds: string[] }> = {};
+      for (const s of data) {
+        if (!byDriver[s.driver_number])
+          byDriver[s.driver_number] = { stops: 0, pitLaps: [], compounds: [] };
+        const d = byDriver[s.driver_number];
+        if (s.stint_number > 1) {
+          d.stops++;
+          d.pitLaps.push(s.lap_start);
+        }
+        d.compounds.push(s.compound || "UNKNOWN");
+      }
+      return byDriver;
+    },
+  }),
+
+  getRaceControlMessages: tool({
+    description:
+      "Get FIA race control messages for a session: flags, safety car deployments, penalties, DRS enabled/disabled, VSC, and other official notifications.",
+    inputSchema: z.object({
+      session_key: z.number().describe("Session key"),
+    }),
+    execute: async ({ session_key }) => {
+      try {
+        const res = await fetch(
+          `https://api.openf1.org/v1/race_control?session_key=${session_key}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return { error: "Race control data not available for this session" };
+        const data = await res.json();
+        if (!Array.isArray(data)) return data;
+        return data.slice(0, 50).map((m: Record<string, unknown>) => ({
+          date: m.date,
+          lap: m.lap_number,
+          category: m.category,
+          flag: m.flag,
+          message: m.message,
+          scope: m.scope,
+          driver_number: m.driver_number,
+        }));
+      } catch {
+        return { error: "Failed to fetch race control data" };
+      }
+    },
+  }),
+
+  getGridVsFinish: tool({
+    description:
+      "Compare starting grid position vs finishing position for all drivers in a race. Shows who gained or lost the most positions.",
+    inputSchema: z.object({
+      year: z.number().min(1950).max(2026).describe("Season year"),
+      round: z.number().min(1).max(24).describe("Race round number"),
+    }),
+    execute: async ({ year, round }) => {
+      const data = await fetchApi("/api/f1/results", { year, round });
+      if (!Array.isArray(data)) return data;
+      return data
+        .map((r: Record<string, unknown>) => {
+          const driver = r.Driver as Record<string, string> | undefined;
+          const constructor = r.Constructor as Record<string, string> | undefined;
+          const grid = parseInt(r.grid as string) || 0;
+          const finish = parseInt(r.position as string) || 0;
+          return {
+            driver: driver?.code || driver?.familyName,
+            team: constructor?.name,
+            grid,
+            finish,
+            gained: grid - finish,
+            status: r.status,
+          };
+        })
+        .sort((a: { gained: number }, b: { gained: number }) => b.gained - a.gained);
+    },
+  }),
+
+  getLapConsistency: tool({
+    description:
+      "Calculate lap time consistency metrics for a driver in a session: average, median, standard deviation, best/worst lap, and consistency score.",
+    inputSchema: z.object({
+      session_key: z.number().describe("Session key"),
+      driver_number: z.number().describe("Driver car number"),
+    }),
+    execute: async ({ session_key, driver_number }) => {
+      const data = await fetchApi("/api/f1/laps", { session_key, driver_number });
+      if (!Array.isArray(data) || data.length === 0) return { error: "No lap data available" };
+      const times = data
+        .filter((l: Record<string, unknown>) => (l.lap_duration as number) > 0)
+        .map((l: Record<string, unknown>) => l.lap_duration as number);
+      if (times.length === 0) return { error: "No valid lap times" };
+      const avg = times.reduce((a: number, b: number) => a + b, 0) / times.length;
+      const sorted = [...times].sort((a: number, b: number) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const variance =
+        times.reduce((sum: number, t: number) => sum + (t - avg) ** 2, 0) / times.length;
+      const stdDev = Math.sqrt(variance);
+      return {
+        laps: times.length,
+        average: +avg.toFixed(3),
+        median: +median.toFixed(3),
+        best: +sorted[0].toFixed(3),
+        worst: +sorted[sorted.length - 1].toFixed(3),
+        stdDev: +stdDev.toFixed(3),
+        consistencyScore: Math.max(0, +(100 - stdDev * 50).toFixed(1)),
+      };
+    },
+  }),
+
+  getDriverTelemetry: tool({
+    description:
+      "Get detailed car telemetry for a driver: speed, throttle, brake, gear, DRS, RPM at each sample point. Useful for analyzing driving style and car performance.",
+    inputSchema: z.object({
+      session_key: z.number().describe("Session key"),
+      driver_number: z.number().describe("Driver car number"),
+    }),
+    execute: async ({ session_key, driver_number }) => {
+      const data = await fetchApi("/api/f1/car-data", { session_key, driver_number });
+      if (!Array.isArray(data)) return data;
+      const speeds = data
+        .map((d: Record<string, unknown>) => d.speed as number)
+        .filter((s: number) => s > 0);
+      const topSpeed = Math.max(...speeds);
+      const avgSpeed = speeds.reduce((a: number, b: number) => a + b, 0) / speeds.length;
+      const drsCount = data.filter(
+        (d: Record<string, unknown>) => (d.drs as number) >= 10 && (d.drs as number) <= 14,
+      ).length;
+      const heavyBraking = data.filter(
+        (d: Record<string, unknown>) => (d.brake as number) > 50,
+      ).length;
+      return {
+        samples: data.length,
+        topSpeed: +topSpeed.toFixed(1),
+        avgSpeed: +avgSpeed.toFixed(1),
+        drsActivations: drsCount,
+        heavyBrakingEvents: heavyBraking,
+        maxGear: Math.max(...data.map((d: Record<string, unknown>) => (d.n_gear as number) || 0)),
+        maxRpm: Math.max(...data.map((d: Record<string, unknown>) => (d.rpm as number) || 0)),
+      };
+    },
+  }),
+
+  getSeasonCalendar: tool({
+    description:
+      "Get the full F1 race calendar for a season with dates, circuits, countries, and round numbers.",
+    inputSchema: z.object({
+      year: z.number().min(1950).max(2026).describe("Season year"),
+    }),
+    execute: async ({ year }) => {
+      const data = await fetchApi("/api/f1/races", { year });
+      if (!Array.isArray(data)) return data;
+      return data.map((r: Record<string, unknown>) => {
+        const circuit = r.Circuit as Record<string, unknown> | undefined;
+        const location = circuit?.Location as Record<string, string> | undefined;
+        return {
+          round: r.round,
+          name: r.raceName,
+          circuit: circuit?.circuitName,
+          country: location?.country,
+          date: r.date,
+          time: r.time,
+        };
+      });
+    },
+  }),
+
+  getChampionshipProgression: tool({
+    description:
+      "Get championship points progression throughout a season, showing how each driver's points total changed race by race.",
+    inputSchema: z.object({
+      year: z.number().min(1950).max(2026).describe("Season year"),
+    }),
+    execute: async ({ year }) => {
+      const data = await fetchApi("/api/f1/standings/progression", { year });
+      return data;
+    },
+  }),
+
   queryDatabase: tool({
     description:
       "Execute a natural language query against the F1 database. Use for complex analytical questions that require SQL: comparing multiple drivers, aggregating across races, filtering by multiple conditions, or any question that the other specific tools can't answer directly.",

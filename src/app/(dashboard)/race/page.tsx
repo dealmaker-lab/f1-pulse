@@ -4,8 +4,14 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Play, Pause, SkipForward, SkipBack, Flag, Timer,
   Cloud, Thermometer, Droplets, Wind, Loader2,
-  Gauge, Zap, AlertTriangle, ChevronDown,
+  Gauge, Zap, AlertTriangle, ChevronDown, Radio,
 } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const RaceControlFeed = dynamic(
+  () => import("@/components/race-control/race-control-feed"),
+  { ssr: false }
+);
 import { cn } from "@/lib/utils";
 import { OPENF1_YEARS } from "@/lib/constants";
 import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
@@ -214,7 +220,12 @@ function TelemetryCard({
             <span className="text-white/30">+{gapToLeader.toFixed(1)}s</span>
           )}
           {interval !== null && interval > 0 && (
-            <span className="text-racing-amber/50">Δ{interval.toFixed(1)}</span>
+            <span className={cn(
+              "font-semibold",
+              interval < 1 ? "text-racing-green" : interval > 3 ? "text-racing-red/60" : "text-racing-amber/50"
+            )}>
+              Δ{interval.toFixed(1)}
+            </span>
           )}
         </div>
       </div>
@@ -1076,10 +1087,18 @@ export default function RaceReplayPage() {
                         </span>
                         <div className="w-0.5 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                         <span className="text-[11px] font-mono font-bold flex-1 truncate" style={{ color }}>{entry.driver.name_acronym}</span>
-                        <span className="text-[9px] font-mono text-white/25 tabular-nums">
+                        <span className={cn(
+                          "text-[9px] font-mono tabular-nums",
+                          entry.interval !== null && entry.interval < 1 ? "text-racing-green" :
+                          entry.interval !== null && entry.interval > 3 ? "text-racing-red/60" :
+                          "text-white/25"
+                        )}>
                           {entry.gapToLeader !== null && entry.gapToLeader > 0 ? `+${entry.gapToLeader.toFixed(1)}` : ""}
                         </span>
-                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: tireColor }} title={`${entry.compound} L${entry.tireAge}`} />
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <div className="w-2.5 h-2.5 rounded-full border border-white/10" style={{ backgroundColor: tireColor }} title={`${entry.compound} L${entry.tireAge}`} />
+                          <span className="text-[7px] font-mono text-white/15">{entry.tireAge}</span>
+                        </div>
                       </button>
                     );
                   })
@@ -1226,6 +1245,11 @@ export default function RaceReplayPage() {
               </div>
             </div>
           </div>
+
+          {/* Race Control Feed */}
+          {selectedSession && (
+            <RaceControlFeed sessionKey={selectedSession.session_key} />
+          )}
         </>
       )}
 

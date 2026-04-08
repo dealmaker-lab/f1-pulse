@@ -37,19 +37,29 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggle } = useTheme();
   const [raceLive, setRaceLive] = useState(false);
+  const [liveSessionName, setLiveSessionName] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("https://api.openf1.org/v1/sessions?session_type=Race&year=2025")
+    fetch("https://api.openf1.org/v1/sessions?year=2025")
       .then((r) => r.json())
-      .then((sessions: { date_start: string; date_end: string }[]) => {
-        const now = Date.now();
-        const live = sessions.some((s) => {
-          const start = new Date(s.date_start).getTime();
-          const end = new Date(s.date_end).getTime() + 30 * 60 * 1000;
-          return now >= start && now <= end;
-        });
-        setRaceLive(live);
-      })
+      .then(
+        (
+          sessions: {
+            date_start: string;
+            date_end: string;
+            session_name: string;
+          }[],
+        ) => {
+          const now = Date.now();
+          const liveSession = sessions.find((s) => {
+            const start = new Date(s.date_start).getTime();
+            const end = new Date(s.date_end).getTime() + 30 * 60 * 1000;
+            return now >= start && now <= end;
+          });
+          setRaceLive(!!liveSession);
+          setLiveSessionName(liveSession?.session_name ?? null);
+        },
+      )
       .catch(() => {});
   }, []);
 
@@ -111,6 +121,38 @@ export default function Sidebar() {
               <span className="text-[9px] text-white/25 uppercase tracking-[0.2em] mt-0.5">
                 Race Analytics
               </span>
+            </div>
+          )}
+        </div>
+
+        {/* Live indicator — below logo */}
+        <div className={cn("px-4 py-2.5 border-b border-white/[0.06]", collapsed && "px-2")}>
+          {raceLive ? (
+            <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
+              <span className="relative flex h-2 w-2 flex-shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-racing-red opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-racing-red" />
+              </span>
+              {!collapsed && (
+                <span
+                  className="text-[10px] font-bold uppercase tracking-[0.15em] text-racing-red truncate"
+                  style={{ fontFamily: "Titillium Web, sans-serif" }}
+                >
+                  Live{liveSessionName ? ` \u00b7 ${liveSessionName}` : ""}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
+              <span className="h-2 w-2 rounded-full bg-white/15 flex-shrink-0" />
+              {!collapsed && (
+                <span
+                  className="text-[10px] text-white/25 uppercase tracking-[0.12em]"
+                  style={{ fontFamily: "Titillium Web, sans-serif" }}
+                >
+                  No active session
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -218,16 +260,6 @@ export default function Sidebar() {
               )}
             </button>
           </div>
-
-          {/* Live badge */}
-          {!collapsed && (
-            <div className="px-4 py-3 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-racing-red animate-pulse flex-shrink-0" />
-              <span className="text-[9px] text-white/25 uppercase tracking-[0.18em] font-bold" style={{ fontFamily: 'Titillium Web, sans-serif' }}>
-                Live Data
-              </span>
-            </div>
-          )}
 
           {/* Collapse toggle (desktop) */}
           <div className="hidden lg:flex p-2">

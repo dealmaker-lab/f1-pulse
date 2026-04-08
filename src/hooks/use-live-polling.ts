@@ -79,6 +79,31 @@ export function useLivePolling<T = any>({ url, interval = 10000, enabled = true,
 }
 
 /**
+ * Returns appropriate polling interval based on session type and whether live.
+ * Race day: 3s (sub-second feel), Practice/Qualifying: 10s, No session: 60s
+ */
+export function getAdaptiveInterval(
+  sessionType?: string,
+  isLive?: boolean,
+): number {
+  if (!isLive) return 60_000; // 60s calendar check
+  switch (sessionType) {
+    case "Race":
+    case "Sprint":
+      return 3_000; // 3s during races
+    case "Qualifying":
+    case "Sprint Qualifying":
+      return 5_000; // 5s during qualifying
+    case "Practice 1":
+    case "Practice 2":
+    case "Practice 3":
+      return 10_000; // 10s during practice
+    default:
+      return 10_000;
+  }
+}
+
+/**
  * Checks if we're in an active F1 race weekend.
  * Accepts ALL session types (FP1, FP2, FP3, Quali, Sprint, Race).
  * Returns true if:
