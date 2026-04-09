@@ -107,7 +107,7 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
       <div className={cn("glass-card p-4", className)}>
         <div className="flex items-center gap-2 mb-3">
           <Radio className="w-4 h-4 text-f1-red" />
-          <span className="text-xs font-semibold uppercase tracking-wider">
+          <span className="ferrari-label font-semibold">
             Race Control
           </span>
         </div>
@@ -123,11 +123,11 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
       <div className={cn("glass-card p-4", className)}>
         <div className="flex items-center gap-2 mb-3">
           <Radio className="w-4 h-4 text-f1-muted" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-f1-muted">
+          <span className="ferrari-label font-semibold text-f1-muted">
             Race Control
           </span>
         </div>
-        <p className="text-xs text-f1-muted text-center py-4">
+        <p className="text-ferrari-caption text-f1-muted text-center py-4">
           No race control messages for this session
         </p>
       </div>
@@ -143,10 +143,10 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
       >
         <div className="flex items-center gap-2">
           <Radio className="w-4 h-4 text-f1-red" />
-          <span className="text-xs font-semibold uppercase tracking-wider">
+          <span className="ferrari-label font-semibold">
             Race Control
           </span>
-          <span className="text-[10px] font-mono text-f1-muted bg-[var(--f1-hover)] px-1.5 py-0.5 rounded">
+          <span className="text-ferrari-micro font-mono text-f1-muted bg-[var(--f1-hover)] px-1.5 py-0.5 rounded-ferrari">
             {messages.length}
           </span>
         </div>
@@ -177,7 +177,7 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
             return (
               <div
                 key={i}
-                className="flex items-start gap-2 px-2.5 py-2 rounded-lg transition-all duration-300"
+                className="flex items-start gap-2 px-2.5 py-2 rounded-ferrari-dialog transition-all duration-300"
                 style={{
                   backgroundColor: style.bg,
                   borderLeft: `2px solid ${style.border}`,

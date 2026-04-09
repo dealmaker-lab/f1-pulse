@@ -118,7 +118,7 @@ export default function Sidebar() {
               >
                 Pulse
               </span>
-              <span className="text-[9px] text-white/25 uppercase tracking-[0.2em] mt-0.5">
+              <span className="ferrari-micro-label text-white/25 mt-0.5">
                 Race Analytics
               </span>
             </div>
@@ -134,10 +134,7 @@ export default function Sidebar() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-racing-red" />
               </span>
               {!collapsed && (
-                <span
-                  className="text-[10px] font-bold uppercase tracking-[0.15em] text-racing-red truncate"
-                  style={{ fontFamily: "Titillium Web, sans-serif" }}
-                >
+                <span className="ferrari-micro-label font-bold text-racing-red truncate">
                   Live{liveSessionName ? ` \u00b7 ${liveSessionName}` : ""}
                 </span>
               )}
@@ -146,10 +143,7 @@ export default function Sidebar() {
             <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
               <span className="h-2 w-2 rounded-full bg-white/15 flex-shrink-0" />
               {!collapsed && (
-                <span
-                  className="text-[10px] text-white/25 uppercase tracking-[0.12em]"
-                  style={{ fontFamily: "Titillium Web, sans-serif" }}
-                >
+                <span className="ferrari-micro-label text-white/25">
                   No active session
                 </span>
               )}
@@ -167,7 +161,7 @@ export default function Sidebar() {
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 cursor-pointer group",
+                  "relative flex items-center gap-3 px-3 py-2.5 rounded-ferrari-dialog transition-all duration-200 cursor-pointer group",
                   collapsed && "justify-center px-0",
                   isActive
                     ? "bg-white/[0.07] text-white"
@@ -191,10 +185,9 @@ export default function Sidebar() {
                   <span className="flex items-center gap-2 min-w-0">
                     <span
                       className={cn(
-                        "text-[13px] font-semibold truncate",
+                        "text-ferrari-nav truncate",
                         isActive ? "text-white" : ""
                       )}
-                      style={{ fontFamily: 'Titillium Web, sans-serif', letterSpacing: '0.02em' }}
                     >
                       {item.label}
                     </span>
@@ -251,10 +244,7 @@ export default function Sidebar() {
                 <Moon className="w-[18px] h-[18px] flex-shrink-0 text-white/35 group-hover:text-white/60 transition-colors" />
               )}
               {!collapsed && (
-                <span
-                  className="text-[13px] font-semibold"
-                  style={{ fontFamily: 'Titillium Web, sans-serif', letterSpacing: '0.02em' }}
-                >
+                <span className="text-ferrari-nav">
                   {theme === "dark" ? "Light Mode" : "Dark Mode"}
                 </span>
               )}

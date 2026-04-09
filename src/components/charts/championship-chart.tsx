@@ -25,7 +25,7 @@ export default function ChampionshipChart({ drivers, races }: Props) {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
           <XAxis
             dataKey="race"
-            tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11, fontFamily: "Fira Code" }}
+            tick={{ fill: "#8F8F8F", fontSize: 11, fontFamily: "Fira Code" }}
             axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
             tickLine={false}
             interval="preserveStartEnd"
@@ -34,22 +34,24 @@ export default function ChampionshipChart({ drivers, races }: Props) {
             height={60}
           />
           <YAxis
-            tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 11, fontFamily: "Fira Code" }}
+            tick={{ fill: "#8F8F8F", fontSize: 11, fontFamily: "Fira Code" }}
             axisLine={false}
             tickLine={false}
           />
           <Tooltip
             contentStyle={{
-              background: "#151820",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "12px",
+              background: "rgba(21,21,30,0.97)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "2px",
               fontSize: "13px",
               fontFamily: "Fira Code",
+              backdropFilter: "blur(12px)",
+              boxShadow: "rgb(153,153,153) 1px 1px 1px 0px",
             }}
-            labelStyle={{ color: "rgba(255,255,255,0.5)" }}
+            labelStyle={{ color: "#969696", fontSize: "11px", letterSpacing: "1px", textTransform: "uppercase" as const }}
           />
           <Legend
-            wrapperStyle={{ fontSize: "12px", fontFamily: "Fira Code" }}
+            wrapperStyle={{ fontSize: "11px", fontFamily: "Fira Code", letterSpacing: "0.5px" }}
           />
           {drivers.map((d) => (
             <Line

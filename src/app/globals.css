@@ -30,6 +30,25 @@ html, body {
     --f1-red:        #e10600;
     --f1-red-dim:    rgba(225,6,0,0.12);
 
+    /* Ferrari-inspired red state hierarchy */
+    --accent-hover:   #B01E0A;
+    --accent-pressed: #9D2211;
+
+    /* Ferrari-inspired neutral grays (achromatic) */
+    --neutral-dark:   #666666;
+    --neutral-mid:    #8F8F8F;
+    --neutral-silver: #969696;
+    --neutral-border: #CCCCCC;
+
+    /* Ferrari overlay system */
+    --overlay-dark:   hsla(0, 0%, 7%, 0.8);
+    --overlay-light:  hsla(0, 0%, 7%, 0.5);
+
+    /* Semantic status (Ferrari system) */
+    --status-warning: #F13A2C;
+    --status-success: #03904A;
+    --status-info:    #4C98B9;
+
     /* Legacy tokens kept for compatibility */
     --carbon-950:    #15151e;
     --carbon-900:    #1e1e2a;
@@ -58,6 +77,25 @@ html, body {
     /* F1 Brand stays same */
     --f1-red:        #e10600;
     --f1-red-dim:    rgba(225,6,0,0.10);
+
+    /* Ferrari-inspired red state hierarchy */
+    --accent-hover:   #B01E0A;
+    --accent-pressed: #9D2211;
+
+    /* Ferrari-inspired neutral grays */
+    --neutral-dark:   #666666;
+    --neutral-mid:    #8F8F8F;
+    --neutral-silver: #969696;
+    --neutral-border: #D2D2D2;
+
+    /* Ferrari overlay system */
+    --overlay-dark:   hsla(0, 0%, 0%, 0.6);
+    --overlay-light:  hsla(0, 0%, 0%, 0.3);
+
+    /* Semantic status */
+    --status-warning: #F13A2C;
+    --status-success: #03904A;
+    --status-info:    #4C98B9;
 
     /* Legacy tokens */
     --carbon-950:    #f3f3f4;
@@ -308,6 +346,81 @@ html, body {
     transition: background-color 0.25s ease;
   }
 
+  /* ── Ferrari Elevation System ── */
+  .elevation-0 {
+    box-shadow: none;
+    border: none;
+  }
+  .elevation-1 {
+    box-shadow: rgb(153, 153, 153) 1px 1px 1px 0px;
+  }
+  .elevation-overlay {
+    background: var(--overlay-dark);
+    backdrop-filter: blur(8px);
+  }
+  .elevation-border {
+    border: 1px solid var(--neutral-border);
+  }
+
+  /* ── Ferrari Button System ── */
+  .btn-ferrari {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 10px;
+    border-radius: 2px;
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    font-weight: 400;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .btn-ferrari-primary {
+    @apply btn-ferrari;
+    background: var(--f1-red);
+    color: #FFFFFF;
+    border: 1px solid var(--f1-red);
+  }
+  .btn-ferrari-primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+  }
+  .btn-ferrari-primary:active {
+    background: var(--accent-pressed);
+    border-color: var(--accent-pressed);
+  }
+  .btn-ferrari-ghost {
+    @apply btn-ferrari;
+    background: transparent;
+    color: #FFFFFF;
+    border: 1px solid rgba(255,255,255,0.5);
+  }
+  .btn-ferrari-ghost:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.7);
+  }
+
+  /* ── Ferrari Label Typography ── */
+  .ferrari-label {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.27;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .ferrari-micro-label {
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.27;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* ── Status Indicators ── */
+  .status-warning { color: var(--status-warning); }
+  .status-success { color: var(--status-success); }
+  .status-info    { color: var(--status-info); }
+
   /* ── Misc ── */
   .track-dot {
     @apply w-3 h-3 rounded-full;
@@ -354,6 +467,13 @@ html, body {
   .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
   .animate-shimmer { animation: shimmer 2s linear infinite; }
   .tabular-nums { font-variant-numeric: tabular-nums; }
+  /* Ferrari overlay utility */
+  .bg-overlay-dark  { background: var(--overlay-dark); }
+  .bg-overlay-light { background: var(--overlay-light); }
+  /* Ferrari neutral text utilities */
+  .text-neutral-dark   { color: var(--neutral-dark); }
+  .text-neutral-mid    { color: var(--neutral-mid); }
+  .text-neutral-silver { color: var(--neutral-silver); }
 }
 
 /* ── Focus-visible — accessible focus indicators ── */

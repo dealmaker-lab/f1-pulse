@@ -37,6 +37,27 @@ const config: Config = {
           purple: '#9b5de5',
           cyan:   '#06b6d4',
         },
+        /* Ferrari-inspired neutral gray scale (achromatic) */
+        neutral: {
+          'near-black': '#181818',
+          'dark':       '#666666',
+          'mid':        '#8F8F8F',
+          'silver':     '#969696',
+          'border':     '#CCCCCC',
+          'light':      '#D2D2D2',
+        },
+        /* Ferrari-inspired red state hierarchy */
+        accent: {
+          DEFAULT: '#e10600',    // F1 red (primary — unchanged)
+          hover:   '#B01E0A',    // darker for hover/pressed
+          pressed: '#9D2211',    // deepest for active state
+        },
+        /* Semantic status colors (Ferrari system) */
+        status: {
+          warning: '#F13A2C',
+          success: '#03904A',
+          info:    '#4C98B9',
+        },
         /* Tire compound colours (unchanged) */
         tire: {
           soft:   '#ff3333',
@@ -65,6 +86,16 @@ const config: Config = {
         'f1-lg':  ['18px', { lineHeight: '1.2', letterSpacing: '-0.01em', fontWeight: '900' }],
         'f1-xl':  ['24px', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '900' }],
         'f1-2xl': ['32px', { lineHeight: '1.0', letterSpacing: '-0.02em', fontWeight: '900' }],
+        /* Ferrari-inspired editorial hierarchy (medium weights) */
+        'ferrari-section':  ['26px', { lineHeight: '1.20', fontWeight: '500' }],
+        'ferrari-card':     ['24px', { lineHeight: 'normal', fontWeight: '400' }],
+        'ferrari-sub':      ['18px', { lineHeight: '1.20', fontWeight: '700' }],
+        'ferrari-ui':       ['16px', { lineHeight: '1.40', letterSpacing: '0.005em', fontWeight: '500' }],
+        'ferrari-button':   ['16px', { lineHeight: 'normal', letterSpacing: '0.08em', fontWeight: '400' }],
+        'ferrari-nav':      ['13px', { lineHeight: '1.20', letterSpacing: '0.01em', fontWeight: '600' }],
+        'ferrari-caption':  ['13px', { lineHeight: '1.50', letterSpacing: '0.015em', fontWeight: '400' }],
+        'ferrari-label':    ['12px', { lineHeight: '1.27', letterSpacing: '0.083em', fontWeight: '400' }],
+        'ferrari-micro':    ['11px', { lineHeight: '1.27', letterSpacing: '0.083em', fontWeight: '400' }],
       },
       animation: {
         'pulse-glow':    'pulse-glow 2s ease-in-out infinite',
@@ -132,7 +163,13 @@ const config: Config = {
         'spring': 'cubic-bezier(0.16, 1, 0.3, 1)',
       },
       borderRadius: {
-        'f1': '4px',   // F1 uses tighter radii on data rows
+        'f1':       '4px',   // F1 uses tighter radii on data rows
+        'ferrari':  '2px',   // Ferrari razor-precision default
+        'ferrari-dialog': '8px', // Ferrari modal/dialog radius
+      },
+      screens: {
+        'xs': '375px',    // Ferrari mobile small
+        'tablet': '960px', // Ferrari tablet-to-desktop threshold
       },
     },
   },
