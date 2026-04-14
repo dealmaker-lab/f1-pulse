@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Play, Pause, SkipForward, SkipBack, Flag, Timer,
   Cloud, Thermometer, Droplets, Wind, Loader2,
-  Gauge, Zap, AlertTriangle, ChevronDown, Radio,
+  Gauge, AlertTriangle,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 
