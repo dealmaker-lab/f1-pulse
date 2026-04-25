@@ -25,12 +25,33 @@ export default defineConfig({
   },
 
   projects: [
+    // Step 1 — mint a Clerk session via @clerk/testing/playwright and save
+    // storageState. All projects that need a real auth context depend on this.
+    {
+      name: "setup",
+      testMatch: /auth\.setup\.ts$/,
+    },
+    // Tests for Clerk-protected pages (e.g. /dashboard/*). Reuse the saved
+    // storageState so every test inherits a real session — no per-test sign-in.
+    {
+      name: "authenticated",
+      testMatch: /\.auth\.spec\.ts$/,
+      dependencies: ["setup"],
+      use: {
+        viewport: { width: 1440, height: 900 },
+        storageState: "playwright/.clerk/user.json",
+      },
+    },
+    // Public-route tests — explicitly ignore auth setup and auth specs so they
+    // don't accidentally run under desktop/mobile without a session.
     {
       name: "desktop",
+      testIgnore: [/\.auth\.spec\.ts$/, /auth\.setup\.ts$/],
       use: { viewport: { width: 1440, height: 900 } },
     },
     {
       name: "mobile",
+      testIgnore: [/\.auth\.spec\.ts$/, /auth\.setup\.ts$/],
       use: { viewport: { width: 390, height: 844 }, isMobile: true },
     },
   ],

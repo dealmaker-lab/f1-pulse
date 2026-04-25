@@ -1,4 +1,5 @@
 import { test as base, chromium, BrowserContext, Page } from '@playwright/test';
+import { readFileSync, existsSync } from 'fs';
 
 const CDP_ENDPOINT = process.env.CDP_ENDPOINT || 'http://127.0.0.1:9222';
 const MAX_RETRIES = 3;
@@ -17,16 +18,62 @@ async function connectWithRetry(): Promise<import('@playwright/test').Browser> {
   throw new Error('Unreachable');
 }
 
+type StorageStateFile = {
+  cookies?: Array<{ name: string; value: string; domain: string; path: string; expires?: number; httpOnly?: boolean; secure?: boolean; sameSite?: 'Strict' | 'Lax' | 'None' }>;
+  origins?: Array<{ origin: string; localStorage: Array<{ name: string; value: string }> }>;
+};
+
+// Lightpanda's newContext({ storageState }) silently hangs context setup
+// (the option exists but isn't applied). Apply it manually.
+async function applyStorageState(context: BrowserContext, storageState: string | StorageStateFile | undefined) {
+  if (!storageState) return;
+  const data: StorageStateFile = typeof storageState === 'string'
+    ? (existsSync(storageState) ? JSON.parse(readFileSync(storageState, 'utf8')) : { cookies: [], origins: [] })
+    : storageState;
+  if (data.cookies?.length) {
+    await context.addCookies(data.cookies as any);
+  }
+  // localStorage is per-origin and Lightpanda only sets it after navigation.
+  // Defer to first navigation via init script.
+  if (data.origins?.length) {
+    for (const o of data.origins) {
+      const ls = o.localStorage || [];
+      if (!ls.length) continue;
+      await context.addInitScript((entries: Array<{ name: string; value: string }>) => {
+        try {
+          for (const { name, value } of entries) {
+            window.localStorage.setItem(name, value);
+          }
+        } catch {}
+      }, ls);
+    }
+  }
+}
+
 // Custom fixture that connects to Lightpanda via connectOverCDP
 // Lightpanda speaks raw CDP, not the Playwright wire protocol
-// Includes retry logic because Lightpanda CDP can drop connections between tests
+// - Retries CDP connect because Lightpanda can drop connections between tests
+// - Honors `storageState` from project config (used by Clerk auth tests),
+//   applied manually because Lightpanda doesn't load it via newContext()
 export const test = base.extend<{ context: BrowserContext; page: Page }>({
-  context: async ({ viewport, extraHTTPHeaders }, use) => {
+  context: async ({ viewport, extraHTTPHeaders, storageState, baseURL }, use) => {
     const browser = await connectWithRetry();
+    // Lightpanda hangs on `browser.newContext()`; always reuse the default
+    // context. For storageState tests, open a throwaway page first because
+    // Lightpanda's `addCookies` requires the context to have a loaded page.
     const context = browser.contexts()[0] || await browser.newContext({
       viewport: viewport || undefined,
       extraHTTPHeaders: extraHTTPHeaders || undefined,
     });
+    if (storageState) {
+      const warmup = await context.newPage();
+      try {
+        await warmup.goto(baseURL || 'about:blank', { waitUntil: 'domcontentloaded', timeout: 10_000 });
+      } catch { /* doesn't matter — we just need the context loaded */ }
+      try { await context.clearCookies(); } catch {}
+      await applyStorageState(context, storageState as any);
+      try { await warmup.close(); } catch {}
+    }
     await use(context);
     try { await browser.close(); } catch { /* already closed */ }
   },

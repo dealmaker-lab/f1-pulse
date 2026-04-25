@@ -72,6 +72,24 @@ jobs:
           BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
 
+      # ── Mint Clerk session (storageState saved to playwright/.clerk/user.json) ──
+      - name: Authenticate with Clerk
+        run: npx playwright test --project=setup
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
+          CDP_ENDPOINT: http://127.0.0.1:9222
+          E2E_CLERK_USER_EMAIL: ${{ secrets.E2E_CLERK_USER_EMAIL }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+
+      - name: Run authenticated tests (Clerk-protected pages)
+        run: npx playwright test --project=authenticated
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
+          CDP_ENDPOINT: http://127.0.0.1:9222
+
       - name: Run smoke tests
         run: npx playwright test e2e/smoke.spec.ts --project=desktop
         env:
