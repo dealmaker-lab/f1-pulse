@@ -47,6 +47,20 @@ export interface MarshalSectorFlag {
   status: MarshalFlagStatus;
 }
 
+/**
+ * Mini-sector fastest-driver mapping. Each entry colors one mini-sector arc
+ * on the circuit by the driver currently fastest through that arc. Pair with
+ * `numMiniSectors` to control granularity (default 25).
+ */
+export interface MiniSectorBest {
+  /** 1-indexed mini-sector (1..numMiniSectors). */
+  sector: number;
+  /** Driver number with the best time in this mini-sector, or null if no data. */
+  fastestDriver: number | null;
+  /** Best time through this mini-sector in seconds, or null if no data. */
+  fastestTime: number | null;
+}
+
 interface CircuitMapProps {
   sessionKey: number | null;
   compact?: boolean;
@@ -63,6 +77,15 @@ interface CircuitMapProps {
   marshalFlags?: MarshalSectorFlag[];
   /** Number of marshal sectors on this circuit. Defaults to 20 (F1 average). */
   numMarshalSectors?: number;
+  /**
+   * Mini-sector fastest-driver mapping (1-indexed sector → driver_number with
+   * overall best time, or null if no data). When provided, each mini-sector
+   * arc is tinted with the leading driver's team color, revealing where each
+   * car gains/loses time around the lap.
+   */
+  miniSectors?: MiniSectorBest[];
+  /** Number of mini-sectors to render. Default 25. */
+  numMiniSectors?: number;
 }
 
 /**
@@ -134,6 +157,8 @@ export default function CircuitMap({
   className,
   marshalFlags,
   numMarshalSectors = 20,
+  miniSectors,
+  numMiniSectors = 25,
 }: CircuitMapProps) {
   const [trackOutline, setTrackOutline] = useState<TrackPoint[]>([]);
   const [carPositions, setCarPositions] = useState<CarPosition[]>([]);
@@ -235,6 +260,46 @@ export default function CircuitMap({
     }
     return paths;
   }, [normalizedTrack, marshalFlags, numMarshalSectors]);
+
+  /**
+   * Slice the normalized track into per-mini-sector path segments so each
+   * mini-sector can be tinted by the fastest driver through that arc.
+   * Identical sliding-window strategy as marshalSectorPaths but uses
+   * `numMiniSectors` as the divisor (default 25). The 1-point overlap
+   * keeps adjacent segments visually connected.
+   */
+  const miniSectorPaths = useMemo<string[]>(() => {
+    if (!miniSectors?.length || normalizedTrack.length < 30) return [];
+    const n = Math.max(1, numMiniSectors);
+    const len = normalizedTrack.length;
+    const paths: string[] = [];
+    for (let s = 0; s < n; s++) {
+      const start = Math.floor((s * len) / n);
+      const end = Math.min(len, Math.floor(((s + 1) * len) / n) + 1);
+      const slice = normalizedTrack.slice(start, end);
+      paths.push(slice.length >= 2 ? pointsToSmoothPath(slice) : "");
+    }
+    return paths;
+  }, [normalizedTrack, miniSectors, numMiniSectors]);
+
+  /**
+   * Compute the top-3 fastest drivers across all mini-sectors for the legend.
+   * Counts how many mini-sectors each driver leads, then picks the top 3.
+   */
+  const miniSectorLeaders = useMemo<
+    Array<{ driver_number: number; sectorCount: number }>
+  >(() => {
+    if (!miniSectors?.length) return [];
+    const counts = new Map<number, number>();
+    for (const ms of miniSectors) {
+      if (ms.fastestDriver == null) continue;
+      counts.set(ms.fastestDriver, (counts.get(ms.fastestDriver) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([driver_number, sectorCount]) => ({ driver_number, sectorCount }))
+      .sort((a, b) => b.sectorCount - a.sectorCount)
+      .slice(0, 3);
+  }, [miniSectors]);
 
   const normalizedCars = useMemo(() => {
     if (!carPositions.length || !bounds) return [];
@@ -461,6 +526,41 @@ export default function CircuitMap({
                 );
               })}
 
+            {/* Mini-sector heatmap overlay — colored by fastest driver per arc.
+                Renders above marshal flags, below start/finish + cars. */}
+            {miniSectors && miniSectors.length > 0 &&
+              miniSectors.map((ms) => {
+                if (ms.fastestDriver == null) return null;
+                const idx = ms.sector - 1; // 1-indexed → 0-indexed
+                if (idx < 0 || idx >= miniSectorPaths.length) return null;
+                const d = miniSectorPaths[idx];
+                if (!d) return null;
+                const driver = driverMap.get(ms.fastestDriver);
+                // Fall back to a neutral gray if we can't resolve the team.
+                const stroke = driver
+                  ? getTeamColor(driver.team_name)
+                  : "#7a7a85";
+                return (
+                  <path
+                    key={`mini-${ms.sector}-${ms.fastestDriver}`}
+                    d={d}
+                    fill="none"
+                    stroke={stroke}
+                    strokeWidth={6}
+                    strokeOpacity={0.45}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    pointerEvents="none"
+                  >
+                    <title>
+                      {`Mini-sector ${ms.sector}: ${
+                        driver?.name_acronym ?? `#${ms.fastestDriver}`
+                      }${ms.fastestTime != null ? ` · ${ms.fastestTime.toFixed(3)}s` : ""}`}
+                    </title>
+                  </path>
+                );
+              })}
+
             {/* Start/finish line */}
             {startFinish && (
               <g>
@@ -594,6 +694,49 @@ export default function CircuitMap({
           </div>
           <div className="text-sm font-bold text-f1-sub mt-0.5">
             {displayName ?? circuitName}
+          </div>
+        </div>
+      )}
+
+      {/* Mini-sector legend — top 3 fastest drivers across the lap.
+          Positioned above the circuit-name label when both are visible. */}
+      {miniSectors && miniSectors.length > 0 && miniSectorLeaders.length > 0 && (
+        <div
+          className={cn(
+            "absolute left-4 flex flex-col gap-1",
+            !compact && (displayName || circuitName) ? "bottom-14" : "bottom-3",
+          )}
+        >
+          <div className="text-[9px] font-mono uppercase tracking-[0.2em] text-f1-muted">
+            Fastest Mini-Sectors
+          </div>
+          <div className="flex items-center gap-1.5">
+            {miniSectorLeaders.map((leader) => {
+              const driver = driverMap.get(leader.driver_number);
+              const color = driver
+                ? getTeamColor(driver.team_name)
+                : "#7a7a85";
+              const code = driver?.name_acronym ?? `#${leader.driver_number}`;
+              return (
+                <div
+                  key={`legend-${leader.driver_number}`}
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-sm bg-black/30 dark:bg-white/[0.04] backdrop-blur-sm"
+                  title={`${code} leads ${leader.sectorCount} mini-sector${leader.sectorCount === 1 ? "" : "s"}`}
+                >
+                  <span
+                    className="inline-block w-2 h-2 rounded-sm"
+                    style={{ backgroundColor: color }}
+                    aria-hidden="true"
+                  />
+                  <span className="text-[10px] font-mono font-bold text-f1-sub">
+                    {code}
+                  </span>
+                  <span className="text-[9px] font-mono text-f1-muted">
+                    ×{leader.sectorCount}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

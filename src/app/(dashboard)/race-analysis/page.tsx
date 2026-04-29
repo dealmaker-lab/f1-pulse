@@ -11,6 +11,7 @@ import {
   ArrowUpDown,
   GitBranch,
   Gauge,
+  LineChart as LineChartIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OPENF1_YEARS } from "@/lib/constants";
@@ -26,12 +27,39 @@ import TyreDegradationChart from "@/components/charts/tyre-degradation-chart";
 import SectorIndicators, {
   computeSectorColors,
 } from "@/components/race/sector-indicators";
+import MultiDriverOverlay from "@/components/telemetry/multi-driver-overlay";
+import type { SessionCode } from "@/lib/fastf1-client";
 
 const YEARS = OPENF1_YEARS;
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
-type AnalysisTab = "trace" | "positions" | "degradation" | "sectors";
+type AnalysisTab = "trace" | "positions" | "degradation" | "sectors" | "telemetry";
+
+/**
+ * Map OpenF1 `session_name` to the FastF1 session code expected by the
+ * Python sidecar. Returns `null` if the session type isn't supported.
+ */
+function openF1SessionToFastF1(sessionName: string): SessionCode | null {
+  switch (sessionName) {
+    case "Race":
+      return "R";
+    case "Qualifying":
+      return "Q";
+    case "Sprint":
+      return "S";
+    case "Sprint Qualifying":
+      return "SQ";
+    case "Practice 1":
+      return "FP1";
+    case "Practice 2":
+      return "FP2";
+    case "Practice 3":
+      return "FP3";
+    default:
+      return null;
+  }
+}
 
 type Compound = "SOFT" | "MEDIUM" | "HARD" | "INTERMEDIATE" | "WET" | "UNKNOWN";
 
@@ -225,6 +253,83 @@ function RaceSelector({
   );
 }
 
+// ─── Driver picker (telemetry overlay tab) ───────────────────────────────
+
+const MAX_OVERLAY_DRIVERS = 4;
+
+interface DriverMeta {
+  code: string;
+  name: string;
+  teamColor: string;
+  driverNumber: number;
+}
+
+function DriverPicker({
+  driverMetas,
+  selected,
+  onChange,
+}: {
+  driverMetas: DriverMeta[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+}) {
+  if (driverMetas.length === 0) return null;
+
+  function toggle(code: string) {
+    if (selected.includes(code)) {
+      onChange(selected.filter((c) => c !== code));
+    } else if (selected.length < MAX_OVERLAY_DRIVERS) {
+      onChange([...selected, code]);
+    }
+  }
+
+  return (
+    <div className="rounded-xl p-3 sm:p-4 border border-[var(--f1-border)] bg-[var(--f1-hover)]">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[9px] font-black uppercase tracking-[0.2em] font-mono text-racing-red">
+          Compare drivers
+        </div>
+        <div className="text-[10px] font-mono text-f1-muted">
+          {selected.length}/{MAX_OVERLAY_DRIVERS}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {driverMetas.map((d) => {
+          const isOn = selected.includes(d.code);
+          const disabled = !isOn && selected.length >= MAX_OVERLAY_DRIVERS;
+          return (
+            <button
+              key={d.driverNumber}
+              type="button"
+              onClick={() => toggle(d.code)}
+              disabled={disabled}
+              aria-pressed={isOn}
+              className={cn(
+                "rounded-lg border px-2.5 py-1.5 text-xs font-mono font-bold transition-all",
+                isOn
+                  ? "shadow-sm"
+                  : "border-[var(--f1-border)] text-f1-muted hover:text-f1",
+                disabled && "opacity-40 cursor-not-allowed",
+              )}
+              style={
+                isOn
+                  ? {
+                      borderColor: `${d.teamColor}80`,
+                      backgroundColor: `${d.teamColor}25`,
+                      color: d.teamColor,
+                    }
+                  : undefined
+              }
+            >
+              {d.code}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ───────────────────────────────────────────────────────────
 
 export default function RaceAnalysisPage() {
@@ -242,6 +347,11 @@ export default function RaceAnalysisPage() {
   const [errorData, setErrorData] = useState<string | null>(null);
 
   const [tab, setTab] = useState<AnalysisTab>("trace");
+
+  // Up to 4 driver codes (e.g. ["VER","NOR"]) for the telemetry overlay.
+  // Defaults to the top 2 fastest qualifiers once data loads (see effect below).
+  const [overlayDrivers, setOverlayDrivers] = useState<string[]>([]);
+  const [overlayUserPicked, setOverlayUserPicked] = useState(false);
 
   // ── Load race list when year changes ──
   useEffect(() => {
@@ -408,6 +518,65 @@ export default function RaceAnalysisPage() {
     return out;
   }, [stints, laps, drivers, maxLap]);
 
+  // ── FastF1 round mapping ──
+  // OpenF1 doesn't expose a "round" field, but FastF1 needs one. We derive it
+  // by chronologically ordering the unique meeting_keys for the year and
+  // returning the 1-based index of the selected race's meeting.
+  const roundForFastF1 = useMemo(() => {
+    if (!race || allRaces.length === 0) return null;
+    // Earliest date_start per meeting_key
+    const earliestByMeeting = new Map<number, number>();
+    for (const s of allRaces) {
+      const t = new Date(s.date_start).getTime();
+      const cur = earliestByMeeting.get(s.meeting_key);
+      if (cur === undefined || t < cur) earliestByMeeting.set(s.meeting_key, t);
+    }
+    const ordered = Array.from(earliestByMeeting.entries())
+      .sort((a, b) => a[1] - b[1])
+      .map(([mk]) => mk);
+    const idx = ordered.indexOf(race.meeting_key);
+    return idx >= 0 ? idx + 1 : null;
+  }, [race, allRaces]);
+
+  // ── FastF1 session code (Q, R, FP1, …) for the currently selected race ──
+  const sessionCodeForFastF1 = useMemo<SessionCode | null>(
+    () => (race ? openF1SessionToFastF1(race.session_name) : null),
+    [race],
+  );
+
+  // ── Default driver picker: top-2 fastest by personal best lap_duration ──
+  const fastestTwoCodes = useMemo<string[]>(() => {
+    if (laps.length === 0 || drivers.length === 0) return [];
+    const bestByDriver = new Map<number, number>();
+    for (const l of laps) {
+      if (typeof l.lap_duration !== "number" || l.lap_duration <= 0) continue;
+      const cur = bestByDriver.get(l.driver_number);
+      if (cur === undefined || l.lap_duration < cur) {
+        bestByDriver.set(l.driver_number, l.lap_duration);
+      }
+    }
+    const driverByNumber = new Map(drivers.map((d) => [d.driver_number, d]));
+    return Array.from(bestByDriver.entries())
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, 2)
+      .map(([num]) => driverByNumber.get(num)?.name_acronym)
+      .filter((c): c is string => Boolean(c));
+  }, [laps, drivers]);
+
+  // Reset user-picked flag when the race changes — defaults take over again
+  useEffect(() => {
+    setOverlayUserPicked(false);
+    setOverlayDrivers([]);
+  }, [race?.session_key]);
+
+  // Apply the fastest-two default once data is in, unless the user has picked
+  useEffect(() => {
+    if (overlayUserPicked) return;
+    if (fastestTwoCodes.length > 0) {
+      setOverlayDrivers(fastestTwoCodes);
+    }
+  }, [fastestTwoCodes, overlayUserPicked]);
+
   // ─── Render helpers ─────────────────────────────────────────────────
 
   const TABS: Array<{ id: AnalysisTab; label: string; icon: JSX.Element }> = [
@@ -430,6 +599,11 @@ export default function RaceAnalysisPage() {
       id: "sectors",
       label: "Sectors",
       icon: <Gauge className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "telemetry",
+      label: "Telemetry Overlay",
+      icon: <LineChartIcon className="w-3.5 h-3.5" />,
     },
   ];
 
@@ -547,49 +721,76 @@ export default function RaceAnalysisPage() {
       );
     }
 
-    // tab === "sectors" — F1 broadcast-style sector colors per driver
-    return (
-      <div className="glass-card p-3 sm:p-5 rounded-xl">
-        {laps.length === 0 ? (
-          <InsufficientCard message="No lap data available for sector analysis" />
-        ) : (
-          <div className="space-y-1">
-            <div className="grid grid-cols-[40px_1fr_auto] gap-3 px-3 py-2 text-ferrari-micro text-f1-muted uppercase">
-              <span>Pos</span>
-              <span>Driver</span>
-              <span>Sectors</span>
-            </div>
-            {driverMetas.map((d, i) => {
-              const sectors = computeSectorColors(laps, d.driverNumber);
-              return (
-                <div
-                  key={d.driverNumber}
-                  className="grid grid-cols-[40px_1fr_auto] gap-3 px-3 py-2 rounded-ferrari-dialog hover:bg-[var(--f1-hover)] items-center"
-                >
-                  <span className="font-mono text-xs text-f1-muted tabular-nums">
-                    {i + 1}
-                  </span>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div
-                      className="w-1 h-4 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: d.teamColor }}
-                    />
-                    <span
-                      className="font-mono text-xs font-bold truncate"
-                      style={{ color: d.teamColor }}
-                    >
-                      {d.code}
+    if (tab === "sectors") {
+      // F1 broadcast-style sector colors per driver
+      return (
+        <div className="glass-card p-3 sm:p-5 rounded-xl">
+          {laps.length === 0 ? (
+            <InsufficientCard message="No lap data available for sector analysis" />
+          ) : (
+            <div className="space-y-1">
+              <div className="grid grid-cols-[40px_1fr_auto] gap-3 px-3 py-2 text-ferrari-micro text-f1-muted uppercase">
+                <span>Pos</span>
+                <span>Driver</span>
+                <span>Sectors</span>
+              </div>
+              {driverMetas.map((d, i) => {
+                const sectors = computeSectorColors(laps, d.driverNumber);
+                return (
+                  <div
+                    key={d.driverNumber}
+                    className="grid grid-cols-[40px_1fr_auto] gap-3 px-3 py-2 rounded-ferrari-dialog hover:bg-[var(--f1-hover)] items-center"
+                  >
+                    <span className="font-mono text-xs text-f1-muted tabular-nums">
+                      {i + 1}
                     </span>
-                    <span className="text-[10px] text-f1-muted truncate hidden sm:inline">
-                      {d.name}
-                    </span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className="w-1 h-4 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: d.teamColor }}
+                      />
+                      <span
+                        className="font-mono text-xs font-bold truncate"
+                        style={{ color: d.teamColor }}
+                      >
+                        {d.code}
+                      </span>
+                      <span className="text-[10px] text-f1-muted truncate hidden sm:inline">
+                        {d.name}
+                      </span>
+                    </div>
+                    <SectorIndicators sectors={sectors} variant="full" />
                   </div>
-                  <SectorIndicators sectors={sectors} variant="full" />
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // tab === "telemetry" — multi-driver distance-aligned overlay
+    if (!sessionCodeForFastF1 || roundForFastF1 === null) {
+      return (
+        <InsufficientCard message="Telemetry not available for this session" />
+      );
+    }
+    return (
+      <div className="space-y-3">
+        <DriverPicker
+          driverMetas={driverMetas}
+          selected={overlayDrivers}
+          onChange={(next) => {
+            setOverlayUserPicked(true);
+            setOverlayDrivers(next);
+          }}
+        />
+        <MultiDriverOverlay
+          year={year}
+          round={roundForFastF1}
+          session={sessionCodeForFastF1}
+          drivers={overlayDrivers}
+        />
       </div>
     );
   }
@@ -604,7 +805,7 @@ export default function RaceAnalysisPage() {
             Race Analysis
           </h1>
           <p className="text-xs sm:text-sm text-f1-muted mt-1">
-            Race trace · lap chart · tyre degradation · sectors
+            Race trace · lap chart · tyre degradation · sectors · telemetry overlay
           </p>
         </div>
       </div>
