@@ -251,7 +251,7 @@ function TireProgressBar({
         const end = stint.lap_end || totalLaps;
         const widthPct = ((end - start + 1) / totalLaps) * 100;
         const isCurrent = currentLap >= start && currentLap <= end;
-        const color = TIRE_COLORS[stint.compound && stint.compound !== "None" ? stint.compound : "UNKNOWN"] || TIRE_COLORS.UNKNOWN;
+        const color = getTireColor(stint.compound && stint.compound !== "None" ? stint.compound : "UNKNOWN");
 
         return (
           <div
@@ -1161,7 +1161,7 @@ export default function RaceReplayPage() {
                   {/* Tire + Gap */}
                   <div className="flex items-center gap-3 ml-auto">
                     <div className="flex items-center gap-1.5">
-                      <div className="w-3.5 h-3.5 rounded-full border border-white/10" style={{ backgroundColor: TIRE_COLORS[entry.compound] || "#666" }} />
+                      <div className="w-3.5 h-3.5 rounded-full border border-white/10" style={{ backgroundColor: getTireColor(entry.compound) }} />
                       <span className="text-[10px] font-mono text-f1-muted">{entry.compound}</span>
                       <span className="text-[10px] font-mono text-white/20">L{entry.tireAge}</span>
                     </div>
