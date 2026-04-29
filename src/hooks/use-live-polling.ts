@@ -10,9 +10,22 @@ interface PollingOptions {
 }
 
 /**
+ * djb2 hash — small, fast, collision-resistant enough for change detection.
+ * Returns a 32-bit unsigned integer as a string.
+ */
+function djb2(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/**
  * Cheap signature for change detection — avoids deep equality.
- * Uses array length + last item's `date` for time-series payloads,
- * falls back to JSON length for everything else.
+ * Time-series arrays: length + last item's `date` (cheap, content-aware).
+ * Everything else: djb2 hash of JSON, which catches content changes that
+ * preserve string length (e.g. `{"a":"OK"}` vs `{"a":"NO"}`).
  */
 function signature(json: unknown): string {
   if (Array.isArray(json)) {
@@ -20,7 +33,8 @@ function signature(json: unknown): string {
     const last = json[json.length - 1] as Record<string, unknown> | undefined;
     return `${json.length}:${last?.date ?? last?.timestamp ?? ""}`;
   }
-  return JSON.stringify(json)?.length.toString() ?? "0";
+  if (json === null || json === undefined) return "null";
+  return djb2(JSON.stringify(json));
 }
 
 /**

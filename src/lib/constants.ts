@@ -2,7 +2,12 @@
  * Shared constants for F1 Pulse
  */
 
-const CURRENT_YEAR = new Date().getFullYear();
+/**
+ * Current calendar year — used as the default season for live polling and
+ * "this season" filters. Computed at module load on the server, so it follows
+ * the deployment's clock.
+ */
+export const CURRENT_YEAR = new Date().getFullYear();
 
 /**
  * Full historical year range — Jolpica/Ergast data goes back to 1950.

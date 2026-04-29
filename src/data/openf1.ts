@@ -1,11 +1,23 @@
 // OpenF1 API client — free, no auth required for historical data
 const BASE = "https://api.openf1.org/v1";
 
-async function fetchAPI<T>(endpoint: string, params: Record<string, string | number> = {}): Promise<T[]> {
+interface FetchOptions {
+  /** Disable caching — required for live-session data (race_control, position, etc). */
+  noCache?: boolean;
+}
+
+async function fetchAPI<T>(
+  endpoint: string,
+  params: Record<string, string | number> = {},
+  opts: FetchOptions = {},
+): Promise<T[]> {
   const url = new URL(`${BASE}/${endpoint}`);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
 
-  const res = await fetch(url.toString(), { next: { revalidate: 3600 } });
+  const init: RequestInit = opts.noCache
+    ? { cache: "no-store" }
+    : { next: { revalidate: 3600 } };
+  const res = await fetch(url.toString(), init);
   if (!res.ok) throw new Error(`OpenF1 error: ${res.status}`);
   return res.json();
 }
@@ -46,8 +58,10 @@ export async function getPitStops(sessionKey: number) {
 }
 
 // Get race control messages (flags, safety car, etc.)
+// Always no-cache: this is the most time-critical surface — flags and safety
+// car deployments must surface within seconds, never minutes.
 export async function getRaceControl(sessionKey: number) {
-  return fetchAPI<any>("race_control", { session_key: sessionKey });
+  return fetchAPI<any>("race_control", { session_key: sessionKey }, { noCache: true });
 }
 
 // Get weather during session

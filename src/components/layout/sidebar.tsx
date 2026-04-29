@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/layout/theme-provider";
 import { useLivePolling } from "@/hooks/use-live-polling";
 import { findLiveSession } from "@/lib/session-filters";
+import { CURRENT_YEAR } from "@/lib/constants";
 import {
   LayoutDashboard, PlayCircle, Activity, Swords,
   PieChart, Users, Trophy, Lock, CloudRain, Radio,
@@ -51,7 +52,7 @@ export default function Sidebar() {
   // Poll OpenF1 every minute so the LIVE badge tracks real session state.
   // useLivePolling skips re-render when payload is unchanged (cheap signature).
   const { data: sessions } = useLivePolling<OpenF1Session[]>({
-    url: "https://api.openf1.org/v1/sessions?year=2025",
+    url: `https://api.openf1.org/v1/sessions?year=${CURRENT_YEAR}`,
     interval: SIDEBAR_POLL_MS,
   });
   const liveSession = sessions ? findLiveSession(sessions) : null;
