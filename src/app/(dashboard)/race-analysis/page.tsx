@@ -28,13 +28,15 @@ import SectorIndicators, {
   computeSectorColors,
 } from "@/components/race/sector-indicators";
 import MultiDriverOverlay from "@/components/telemetry/multi-driver-overlay";
+import StewardsTimeline from "@/components/fia/stewards-timeline";
+import FanReactionChart from "@/components/reddit/fan-reaction-chart";
 import type { SessionCode } from "@/lib/fastf1-client";
 
 const YEARS = OPENF1_YEARS;
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
-type AnalysisTab = "trace" | "positions" | "degradation" | "sectors" | "telemetry";
+type AnalysisTab = "trace" | "positions" | "degradation" | "sectors" | "telemetry" | "stewards" | "reactions";
 
 /**
  * Map OpenF1 `session_name` to the FastF1 session code expected by the
@@ -605,6 +607,16 @@ export default function RaceAnalysisPage() {
       label: "Telemetry Overlay",
       icon: <LineChartIcon className="w-3.5 h-3.5" />,
     },
+    {
+      id: "stewards",
+      label: "Stewards",
+      icon: <AlertTriangle className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "reactions",
+      label: "Reactions",
+      icon: <Flag className="w-3.5 h-3.5" />,
+    },
   ];
 
   // Skeleton card while data loads
@@ -769,29 +781,54 @@ export default function RaceAnalysisPage() {
       );
     }
 
-    // tab === "telemetry" — multi-driver distance-aligned overlay
-    if (!sessionCodeForFastF1 || roundForFastF1 === null) {
+    if (tab === "telemetry") {
+      // multi-driver distance-aligned overlay
+      if (!sessionCodeForFastF1 || roundForFastF1 === null) {
+        return (
+          <InsufficientCard message="Telemetry not available for this session" />
+        );
+      }
       return (
-        <InsufficientCard message="Telemetry not available for this session" />
+        <div className="space-y-3">
+          <DriverPicker
+            driverMetas={driverMetas}
+            selected={overlayDrivers}
+            onChange={(next) => {
+              setOverlayUserPicked(true);
+              setOverlayDrivers(next);
+            }}
+          />
+          <MultiDriverOverlay
+            year={year}
+            round={roundForFastF1}
+            session={sessionCodeForFastF1}
+            drivers={overlayDrivers}
+          />
+        </div>
       );
     }
-    return (
-      <div className="space-y-3">
-        <DriverPicker
-          driverMetas={driverMetas}
-          selected={overlayDrivers}
-          onChange={(next) => {
-            setOverlayUserPicked(true);
-            setOverlayDrivers(next);
-          }}
-        />
-        <MultiDriverOverlay
+
+    if (tab === "stewards") {
+      // FIA stewards' decisions, reprimands, summons for this event
+      return (
+        <StewardsTimeline
           year={year}
-          round={roundForFastF1}
-          session={sessionCodeForFastF1}
-          drivers={overlayDrivers}
+          eventName={race.circuit_short_name}
         />
-      </div>
+      );
+    }
+
+    // tab === "reactions" — Reddit r/formula1 race-day comment volume
+    // Approximate race window: start..start+3h (typical F1 race length)
+    const startTime = new Date(race.date_start);
+    const endTime = new Date(startTime.getTime() + 3 * 60 * 60 * 1000);
+    const raceTitle = `${race.circuit_short_name} ${year}`;
+    return (
+      <FanReactionChart
+        raceTitle={raceTitle}
+        raceStart={startTime.toISOString()}
+        raceEnd={endTime.toISOString()}
+      />
     );
   }
 
@@ -805,7 +842,7 @@ export default function RaceAnalysisPage() {
             Race Analysis
           </h1>
           <p className="text-xs sm:text-sm text-f1-muted mt-1">
-            Race trace · lap chart · tyre degradation · sectors · telemetry overlay
+            Race trace · lap chart · tyre degradation · sectors · telemetry · stewards · fan reactions
           </p>
         </div>
       </div>

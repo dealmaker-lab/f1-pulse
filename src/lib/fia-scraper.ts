@@ -270,11 +270,15 @@ export async function enrichWithPdf(doc: FiaDocument): Promise<FiaDocument> {
   let text: string;
   try {
     // Lazy-load pdf-parse — it's only needed at request time, and a missing
-    // module shouldn't fail-open the whole route.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pdfParseMod: any = await import("pdf-parse").catch(() => null);
-    if (!pdfParseMod) return doc;
-    const pdfParse = pdfParseMod.default ?? pdfParseMod;
+    // module shouldn't fail-open the whole route. pdf-parse ships no types,
+    // so we go through `unknown` to avoid pulling in a missing-type dependency.
+    type PdfParseFn = (b: Buffer) => Promise<{ text?: string }>;
+    type PdfParseMod = PdfParseFn & { default?: PdfParseFn };
+    const mod = (await (
+      import("pdf-parse" as string) as Promise<unknown>
+    ).catch(() => null)) as PdfParseMod | null;
+    if (!mod) return doc;
+    const pdfParse: PdfParseFn = mod.default ?? mod;
     const result = await pdfParse(Buffer.from(buf));
     text = typeof result?.text === "string" ? result.text : "";
     if (!text) return doc;

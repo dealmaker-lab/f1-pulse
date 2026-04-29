@@ -16,6 +16,7 @@ import { cn, getTireColor, intervalColorClass } from "@/lib/utils";
 import { OPENF1_YEARS } from "@/lib/constants";
 import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 import PitWindowPredictor from "@/components/race/pit-window-predictor";
+import { LiveStatusBanner } from "@/components/live-timing/live-status-banner";
 
 // ===== Speed Presets =====
 const SPEED_PRESETS = [
@@ -848,6 +849,10 @@ export default function RaceReplayPage() {
 
   return (
     <div className="space-y-3 animate-fade-in">
+      {/* Live Timing banner — only renders when SignalR upstream is connected.
+          Surfaces flag state, race control ticker, and update count above the fold. */}
+      <LiveStatusBanner />
+
       {/* Header + Selectors */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">

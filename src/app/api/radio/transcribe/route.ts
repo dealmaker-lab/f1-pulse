@@ -42,7 +42,7 @@ async function fetchWithTimeout(
 export async function GET(req: NextRequest) {
   // Auth gate: Whisper costs money. Anonymous callers cannot trigger billing.
   // Authenticated users via Clerk only.
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
       { error: "Authentication required" },
