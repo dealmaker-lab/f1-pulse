@@ -84,13 +84,16 @@ export default function PitWindowPredictor({
     tireDegPerLap,
   });
 
+  // Badge logic:
+  //  - isUndercut: pitting now WILL net a smaller gap → green "UNDERCUT" recommendation
+  //  - isOvercut: staying out (rival's tyres degrading faster than yours) → amber "OVERCUT" hold
+  //  - neither: mixed / inconclusive → neutral em-dash
   let badgeLabel = "—";
   let badgeClasses = "text-f1-muted bg-white/5 border border-white/10";
   if (prediction.isUndercut) {
     badgeLabel = "UNDERCUT";
     badgeClasses = "text-racing-green bg-racing-green/10 border border-racing-green/30";
-  } else if (!prediction.isOvercut) {
-    // Per spec: amber "OVERCUT" tag when isOvercut is FALSE.
+  } else if (prediction.isOvercut) {
     badgeLabel = "OVERCUT";
     badgeClasses = "text-racing-amber bg-racing-amber/10 border border-racing-amber/30";
   }

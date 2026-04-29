@@ -15,6 +15,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getServiceClient } from "@/lib/supabase";
+import { DEFAULT_2026_DRIVER_PRICES } from "@/lib/fantasy";
+
+/** Allow-list of valid driver codes — keeps tallies clean against bogus input. */
+const VALID_DRIVER_CODES = new Set(Object.keys(DEFAULT_2026_DRIVER_PRICES));
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -39,6 +43,9 @@ export async function POST(req: NextRequest) {
   }
   if (!driver_code || driver_code.length < 2 || driver_code.length > 4) {
     return NextResponse.json({ error: "driver_code must be a 3-letter code" }, { status: 400 });
+  }
+  if (!VALID_DRIVER_CODES.has(driver_code)) {
+    return NextResponse.json({ error: `Unknown driver code: ${driver_code}` }, { status: 400 });
   }
 
   try {

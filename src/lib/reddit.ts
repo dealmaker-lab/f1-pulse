@@ -76,57 +76,66 @@ interface RedditCommentsListing {
  * the unauthenticated path. Cached in module memory until ~60s before
  * expiry. Never persisted.
  */
+// In-flight latch — collapses N concurrent cold-start callers onto a single
+// Reddit token request so we don't get rate-limited issuing duplicate tokens.
+let inflightTokenFetch: Promise<string | null> | null = null;
+
 async function getAuthToken(): Promise<string | null> {
   const clientId = process.env.REDDIT_CLIENT_ID;
   const clientSecret = process.env.REDDIT_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
 
-  // Reuse cached token until it's about to expire. We refresh 60s early
-  // so a request that just barely beats the deadline doesn't burn on the
-  // upstream side after our clock check passed.
   const now = Date.now();
   if (cachedToken && cachedToken.expiresAt - 60_000 > now) {
     return cachedToken.token;
   }
 
-  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-  const body = new URLSearchParams({ grant_type: "client_credentials" });
+  // Concurrent callers all await the same in-flight fetch; first one to
+  // arrive triggers the network call.
+  if (inflightTokenFetch) return inflightTokenFetch;
 
-  try {
-    const res = await fetch("https://www.reddit.com/api/v1/access_token", {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${basic}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": USER_AGENT,
-      },
-      body: body.toString(),
-      // Token call itself is not cached — Next's fetch cache wouldn't
-      // help here, and we already cache the result in module memory.
-      cache: "no-store",
-    });
+  inflightTokenFetch = (async (): Promise<string | null> => {
+    const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    const body = new URLSearchParams({ grant_type: "client_credentials" });
 
-    if (!res.ok) {
-      console.error(`Reddit OAuth token fetch failed: status=${res.status}`);
+    try {
+      const res = await fetch("https://www.reddit.com/api/v1/access_token", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${basic}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": USER_AGENT,
+        },
+        body: body.toString(),
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        console.error(`Reddit OAuth token fetch failed: status=${res.status}`);
+        return null;
+      }
+
+      const json = (await res.json()) as {
+        access_token?: string;
+        expires_in?: number;
+      };
+      if (!json.access_token) return null;
+
+      const expiresIn = typeof json.expires_in === "number" ? json.expires_in : 3600;
+      cachedToken = {
+        token: json.access_token,
+        expiresAt: Date.now() + expiresIn * 1000,
+      };
+      return cachedToken.token;
+    } catch (err) {
+      console.error("Reddit OAuth token fetch error:", err);
       return null;
+    } finally {
+      inflightTokenFetch = null;
     }
+  })();
 
-    const json = (await res.json()) as {
-      access_token?: string;
-      expires_in?: number;
-    };
-    if (!json.access_token) return null;
-
-    const expiresIn = typeof json.expires_in === "number" ? json.expires_in : 3600;
-    cachedToken = {
-      token: json.access_token,
-      expiresAt: now + expiresIn * 1000,
-    };
-    return cachedToken.token;
-  } catch (err) {
-    console.error("Reddit OAuth token fetch error:", err);
-    return null;
-  }
+  return inflightTokenFetch;
 }
 
 /**

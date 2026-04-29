@@ -95,18 +95,25 @@ export function buildDegradationCurve(
   // Sort defensively — callers may pass unsorted slices.
   const sorted = [...stintLaps].sort((a, b) => a.lap_number - b.lap_number);
 
-  const lastLapNumber = sorted[sorted.length - 1]?.lap_number;
-
-  // First pass: drop pit-out, pit-in, and unusable laps.
-  const usable = sorted.filter((lap, idx) => {
+  // Step 1 — drop laps with no usable duration (null, zero, NaN, negative).
+  // These can't contribute to a degradation curve at all.
+  const valid = sorted.filter((lap) => {
     if (lap.lap_duration === null || lap.lap_duration === undefined) return false;
     if (!Number.isFinite(lap.lap_duration) || lap.lap_duration <= 0) return false;
-    // Pit-out lap (first of stint) — either flagged explicitly or
-    // implicitly the first lap of the input.
+    return true;
+  });
+
+  if (valid.length === 0) return [];
+
+  // Step 2 — drop pit-out (first valid lap or explicitly flagged) and pit-in
+  // (last valid lap when stint > 1 valid lap). Critical: indexing on the
+  // FILTERED list, not the original — otherwise null durations preceding the
+  // real pit-out cause us to drop the wrong lap.
+  const lastValidLapNumber = valid[valid.length - 1].lap_number;
+  const usable = valid.filter((lap, idx) => {
     if (lap.is_pit_out_lap) return false;
-    if (idx === 0) return false;
-    // Pit-in lap (last of stint) — only if there's more than one lap.
-    if (sorted.length > 1 && lap.lap_number === lastLapNumber) return false;
+    if (idx === 0) return false; // pit-out by position
+    if (valid.length > 1 && lap.lap_number === lastValidLapNumber) return false; // pit-in
     return true;
   });
 

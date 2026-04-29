@@ -19,6 +19,8 @@ import {
   FANTASY_BUDGET_M,
   FANTASY_DRIVERS_COUNT,
   FANTASY_CONSTRUCTORS_COUNT,
+  DEFAULT_2026_DRIVER_PRICES,
+  DEFAULT_2026_CONSTRUCTOR_PRICES,
 } from "@/lib/fantasy";
 
 export async function GET(req: NextRequest) {
@@ -76,7 +78,35 @@ export async function POST(req: NextRequest) {
   if ("error" in parsed) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
-  const { year, round, drivers, constructor, budget_used } = parsed;
+  const { year, round, drivers, constructor } = parsed;
+
+  // Server-authoritative budget recompute. Client-supplied budget_used is
+  // ignored — a malicious client could set it to 0 and cheat the cap otherwise.
+  let budget_used = 0;
+  for (const code of drivers) {
+    const price = DEFAULT_2026_DRIVER_PRICES[code];
+    if (price === undefined) {
+      return NextResponse.json(
+        { error: `Unknown driver code: ${code}` },
+        { status: 400 },
+      );
+    }
+    budget_used += price;
+  }
+  const ctorPrice = DEFAULT_2026_CONSTRUCTOR_PRICES[constructor];
+  if (ctorPrice === undefined) {
+    return NextResponse.json(
+      { error: `Unknown constructor: ${constructor}` },
+      { status: 400 },
+    );
+  }
+  budget_used += ctorPrice;
+  if (budget_used > FANTASY_BUDGET_M + 0.01) {
+    return NextResponse.json(
+      { error: `Lineup costs $${budget_used.toFixed(1)}M, exceeds $${FANTASY_BUDGET_M}M cap` },
+      { status: 400 },
+    );
+  }
 
   try {
     const supabase = getServiceClient();

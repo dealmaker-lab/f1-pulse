@@ -91,13 +91,17 @@ export default function LapPositionChart({
   }
 
   // Build chart rows: { lap, [code]: position }.
+  // Track the maximum position observed so the Y-axis can extend beyond
+  // the default [1, 20] when rare data lands a P21+ entry.
   type Row = { lap: number } & Record<string, number | null>;
   const data: Row[] = [];
+  let observedMaxPosition = 1;
   for (let lap = 1; lap <= lastLap; lap++) {
     const row: Row = { lap };
     for (const d of driversWithData) {
       const pos = indexed[d.driverNumber].get(lap);
       row[d.code] = pos ?? null;
+      if (pos !== undefined && pos > observedMaxPosition) observedMaxPosition = pos;
     }
     data.push(row);
   }
@@ -218,8 +222,11 @@ export default function LapPositionChart({
               // P1 at top, P20 at bottom.
               reversed
               type="number"
-              domain={[1, 20]}
-              ticks={[1, 5, 10, 15, 20]}
+              domain={[1, Math.max(20, observedMaxPosition)]}
+              ticks={Array.from(
+                { length: Math.ceil(Math.max(20, observedMaxPosition) / 5) + 1 },
+                (_, i) => Math.min(Math.max(20, observedMaxPosition), Math.max(1, i * 5)),
+              )}
               tick={{ fill: "#8F8F8F", fontSize: 11, fontFamily: "Fira Code" }}
               axisLine={false}
               tickLine={false}
@@ -245,7 +252,9 @@ export default function LapPositionChart({
                   strokeOpacity={dimmed ? 0.2 : 1}
                   dot={false}
                   activeDot={{ r: 4, strokeWidth: 0 }}
-                  connectNulls
+                  // connectNulls=false: a retired driver's line stops at their last
+                  // known position rather than smearing forward to the chart edge.
+                  connectNulls={false}
                   isAnimationActive={false}
                   onMouseEnter={() => setHovered(d.code)}
                   onMouseLeave={() => setHovered(null)}

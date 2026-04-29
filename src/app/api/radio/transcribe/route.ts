@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sanitizeError } from "@/lib/api-validation";
+import { auth } from "@clerk/nextjs/server";
 
 // Whisper transcription needs Node runtime — Edge runtime body limit is 4MB,
 // but radio mp3s plus form-data overhead can exceed that. Node also gives us
@@ -39,6 +40,16 @@ async function fetchWithTimeout(
 }
 
 export async function GET(req: NextRequest) {
+  // Auth gate: Whisper costs money. Anonymous callers cannot trigger billing.
+  // Authenticated users via Clerk only.
+  const { userId } = auth();
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 },
+    );
+  }
+
   const url = req.nextUrl.searchParams.get("url");
 
   if (!url) {

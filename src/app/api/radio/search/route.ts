@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateSessionKey, sanitizeError } from "@/lib/api-validation";
 import { getTeamRadio } from "@/data/openf1";
+import { auth } from "@clerk/nextjs/server";
 
 // Each radio file individually exits to Whisper, so we want generous time.
 export const runtime = "nodejs";
@@ -34,6 +35,15 @@ function getTranscribeUrl(req: NextRequest, recordingUrl: string): string {
 }
 
 export async function GET(req: NextRequest) {
+  // Auth gate: each search fan-outs up to 20 paid Whisper calls.
+  const { userId } = auth();
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Authentication required" },
+      { status: 401 },
+    );
+  }
+
   const sessionKey = validateSessionKey(req.nextUrl.searchParams.get("session_key"));
   const rawQuery = req.nextUrl.searchParams.get("q") ?? "";
   const query = rawQuery.trim();
