@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getTeamLogoUrl, getTeamShortName, getDriverHeadshot, DRIVER_HEADSHOTS } from "@/lib/team-logos";
 import { filterAllPastSessions, VALID_SESSION_NAMES } from "@/lib/session-filters";
+import RadioSearch from "@/components/radio/radio-search";
 
 // ===== Types =====
 interface SessionInfo {
@@ -667,6 +668,11 @@ export default function RadioPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ===== RADIO TRANSCRIPT SEARCH (Whisper) ===== */}
+      {selectedSession && (
+        <RadioSearch sessionKey={selectedSession.session_key} />
       )}
 
       {/* ===== DRIVER & TEAM FILTERS ===== */}

@@ -14,6 +14,7 @@ import { DriverStanding, ConstructorStanding } from "@/types/f1";
 import PredictionPanel from "@/components/predictions/prediction-panel";
 import CircuitMap from "@/components/circuit-map/circuit-map";
 import ForecastWidget from "@/components/weather/forecast-widget";
+import CompoundPreview from "@/components/pirelli/compound-preview";
 import { HISTORICAL_YEARS } from "@/lib/constants";
 import { SESSION_FILTER_OPTIONS, filterPastSessions, VALID_SESSION_NAMES } from "@/lib/session-filters";
 import Link from "next/link";
@@ -839,12 +840,15 @@ export default function DashboardPage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════════════
-          WEEKEND FORECAST — Open-Meteo forecast for the next race's circuit
+          WEEKEND BRIEFING — Forecast + Pirelli compounds for the next race
           ════════════════════════════════════════════════════════════════════ */}
       {nextRace?.circuit_short_name && (
         <section className="px-4 sm:px-6 lg:px-8 py-6">
           <div className="max-w-[1600px] mx-auto">
-            <ForecastWidget circuitShortName={nextRace.circuit_short_name} hours={48} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ForecastWidget circuitShortName={nextRace.circuit_short_name} hours={48} />
+              <CompoundPreview circuitShortName={nextRace.circuit_short_name} />
+            </div>
           </div>
         </section>
       )}

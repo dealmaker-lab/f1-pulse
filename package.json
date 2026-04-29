@@ -27,6 +27,7 @@
     "gsap": "^3.14.2",
     "lucide-react": "^0.383.0",
     "next": "^14.2.35",
+    "pdf-parse": "^1.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.12.0",
