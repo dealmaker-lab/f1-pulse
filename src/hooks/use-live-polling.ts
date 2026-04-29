@@ -1,12 +1,26 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 interface PollingOptions {
   url: string;
   interval?: number;       // ms, default 10000 (10s)
   enabled?: boolean;       // default true
   onData?: (data: any) => void;
+}
+
+/**
+ * Cheap signature for change detection — avoids deep equality.
+ * Uses array length + last item's `date` for time-series payloads,
+ * falls back to JSON length for everything else.
+ */
+function signature(json: unknown): string {
+  if (Array.isArray(json)) {
+    if (json.length === 0) return "0";
+    const last = json[json.length - 1] as Record<string, unknown> | undefined;
+    return `${json.length}:${last?.date ?? last?.timestamp ?? ""}`;
+  }
+  return JSON.stringify(json)?.length.toString() ?? "0";
 }
 
 /**
@@ -22,19 +36,32 @@ export function useLivePolling<T = any>({ url, interval = 10000, enabled = true,
   const [isLive, setIsLive] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
+  // Stash onData in a ref so an inline lambda from the parent doesn't
+  // re-create fetchData (which would tear down the polling interval).
+  const onDataRef = useRef(onData);
+  onDataRef.current = onData;
+  // Track last response signature for change detection — skip setData
+  // and skip onData when the payload is identical.
+  const lastSigRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
+      if (!mountedRef.current) return;
 
-      if (mountedRef.current) {
+      const sig = signature(json);
+      const changed = sig !== lastSigRef.current;
+      lastSigRef.current = sig;
+
+      setError(null);
+      setLastUpdated(new Date());
+      setIsLive(true);
+
+      if (changed) {
         setData(json);
-        setError(null);
-        setLastUpdated(new Date());
-        setIsLive(true);
-        onData?.(json);
+        onDataRef.current?.(json);
       }
     } catch (err: any) {
       if (mountedRef.current) {
@@ -44,7 +71,12 @@ export function useLivePolling<T = any>({ url, interval = 10000, enabled = true,
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, [url, onData]);
+  }, [url]);
+
+  // Reset signature when url changes so first fetch always commits state.
+  useEffect(() => {
+    lastSigRef.current = null;
+  }, [url]);
 
   // Initial fetch
   useEffect(() => {
@@ -112,30 +144,33 @@ export function getAdaptiveInterval(
  */
 export function useIsRaceWeekend(sessions: { date_start: string }[]): boolean {
   const [isActive, setIsActive] = useState(false);
+  // Pre-parse session start timestamps once per sessions change — saves
+  // re-parsing every 30s for 100+ sessions × every consumer of this hook.
+  const starts = useMemo(
+    () => sessions.map((s) => new Date(s.date_start).getTime()),
+    [sessions],
+  );
 
   useEffect(() => {
+    const RACE_WINDOW_MS = 3 * 60 * 60 * 1000;
+    const WEEKEND_WINDOW_MS = 12 * 60 * 60 * 1000;
+
     const check = () => {
-      const now = new Date();
-      // Check if a session is actively running
-      const liveNow = sessions.some((s) => {
-        const start = new Date(s.date_start);
-        const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
-        return now >= start && now <= end;
-      });
-      if (liveNow) { setIsActive(true); return; }
-      // Check if we're in a race weekend window (±12h from any session)
-      const nearSession = sessions.some((s) => {
-        const start = new Date(s.date_start);
-        const diff = Math.abs(now.getTime() - start.getTime());
-        return diff < 12 * 60 * 60 * 1000;
-      });
-      setIsActive(nearSession);
+      const now = Date.now();
+      let active = false;
+      for (const start of starts) {
+        // Active right now (within session window)
+        if (now >= start && now <= start + RACE_WINDOW_MS) { active = true; break; }
+        // Or within ±12h of any session
+        if (Math.abs(now - start) < WEEKEND_WINDOW_MS) { active = true; break; }
+      }
+      setIsActive((prev) => (prev === active ? prev : active));
     };
 
     check();
-    const timer = setInterval(check, 30000); // re-check every 30s
+    const timer = setInterval(check, 30000);
     return () => clearInterval(timer);
-  }, [sessions]);
+  }, [starts]);
 
   return isActive;
 }

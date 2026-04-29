@@ -92,3 +92,23 @@ export function filterAllPastSessions<
         new Date(a.date_start).getTime() - new Date(b.date_start).getTime()
     );
 }
+
+/** 30 minutes — replay stays unlocked after the chequered flag. */
+export const POST_SESSION_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * Find the currently live session in a list (now between start and end),
+ * or the most recent one still inside the post-session window.
+ * Returns null when nothing is active.
+ */
+export function findLiveSession<
+  T extends { date_start: string; date_end: string }
+>(sessions: T[], postWindowMs: number = POST_SESSION_WINDOW_MS): T | null {
+  const now = Date.now();
+  for (const s of sessions) {
+    const start = new Date(s.date_start).getTime();
+    const end = new Date(s.date_end).getTime();
+    if (now >= start && now <= end + postWindowMs) return s;
+  }
+  return null;
+}

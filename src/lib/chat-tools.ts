@@ -1,17 +1,15 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { getRaceControl } from "@/data/openf1";
 
-/**
- * Base URL for internal API calls.
- * In server context, we need the full URL for fetch().
- */
-function getBaseUrl() {
+// Hoisted once — getBaseUrl() reads env vars that don't change at runtime.
+const BASE_URL = (() => {
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
   return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-}
+})();
 
 async function fetchApi(path: string, params: Record<string, string | number | undefined> = {}) {
-  const url = new URL(path, getBaseUrl());
+  const url = new URL(path, BASE_URL);
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined) url.searchParams.set(k, String(v));
   }
@@ -241,12 +239,7 @@ export const chatTools = {
     }),
     execute: async ({ session_key }) => {
       try {
-        const res = await fetch(
-          `https://api.openf1.org/v1/race_control?session_key=${session_key}`,
-          { cache: "no-store" },
-        );
-        if (!res.ok) return { error: "Race control data not available for this session" };
-        const data = await res.json();
+        const data = await getRaceControl(session_key);
         if (!Array.isArray(data)) return data;
         return data.slice(0, 50).map((m: Record<string, unknown>) => ({
           date: m.date,
@@ -277,8 +270,8 @@ export const chatTools = {
         .map((r: Record<string, unknown>) => {
           const driver = r.Driver as Record<string, string> | undefined;
           const constructor = r.Constructor as Record<string, string> | undefined;
-          const grid = parseInt(r.grid as string) || 0;
-          const finish = parseInt(r.position as string) || 0;
+          const grid = Number(r.grid) || 0;
+          const finish = Number(r.position) || 0;
           return {
             driver: driver?.code || driver?.familyName,
             team: constructor?.name,
@@ -334,25 +327,33 @@ export const chatTools = {
     execute: async ({ session_key, driver_number }) => {
       const data = await fetchApi("/api/f1/car-data", { session_key, driver_number });
       if (!Array.isArray(data)) return data;
-      const speeds = data
-        .map((d: Record<string, unknown>) => d.speed as number)
-        .filter((s: number) => s > 0);
-      const topSpeed = Math.max(...speeds);
-      const avgSpeed = speeds.reduce((a: number, b: number) => a + b, 0) / speeds.length;
-      const drsCount = data.filter(
-        (d: Record<string, unknown>) => (d.drs as number) >= 10 && (d.drs as number) <= 14,
-      ).length;
-      const heavyBraking = data.filter(
-        (d: Record<string, unknown>) => (d.brake as number) > 50,
-      ).length;
+      if (data.length === 0) return { error: "No telemetry data available" };
+
+      // Single pass over the array — Math.max(...arr) on multi-thousand-element
+      // arrays risks stack overflow and traverses 5x for no reason.
+      let speedSum = 0, speedCount = 0;
+      let topSpeed = 0, maxGear = 0, maxRpm = 0;
+      let drsCount = 0, heavyBraking = 0;
+      for (const row of data as Record<string, unknown>[]) {
+        const speed = (row.speed as number) || 0;
+        if (speed > 0) { speedSum += speed; speedCount++; if (speed > topSpeed) topSpeed = speed; }
+        const gear = (row.n_gear as number) || 0;
+        if (gear > maxGear) maxGear = gear;
+        const rpm = (row.rpm as number) || 0;
+        if (rpm > maxRpm) maxRpm = rpm;
+        const drs = (row.drs as number) || 0;
+        if (drs >= 10 && drs <= 14) drsCount++;
+        if ((row.brake as number) > 50) heavyBraking++;
+      }
+      const avgSpeed = speedCount > 0 ? speedSum / speedCount : 0;
       return {
         samples: data.length,
         topSpeed: +topSpeed.toFixed(1),
         avgSpeed: +avgSpeed.toFixed(1),
         drsActivations: drsCount,
         heavyBrakingEvents: heavyBraking,
-        maxGear: Math.max(...data.map((d: Record<string, unknown>) => (d.n_gear as number) || 0)),
-        maxRpm: Math.max(...data.map((d: Record<string, unknown>) => (d.rpm as number) || 0)),
+        maxGear,
+        maxRpm,
       };
     },
   }),

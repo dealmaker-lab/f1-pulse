@@ -12,7 +12,7 @@ const RaceControlFeed = dynamic(
   () => import("@/components/race-control/race-control-feed"),
   { ssr: false }
 );
-import { cn } from "@/lib/utils";
+import { cn, getTireColor, intervalColorClass } from "@/lib/utils";
 import { OPENF1_YEARS } from "@/lib/constants";
 import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 
@@ -103,11 +103,6 @@ interface SessionInfo {
   year: number;
 }
 
-const TIRE_COLORS: Record<string, string> = {
-  SOFT: "#FF3333", MEDIUM: "#FFC906", HARD: "#FFFFFF",
-  INTERMEDIATE: "#39B54A", WET: "#0067FF", UNKNOWN: "#666666",
-};
-
 // ===== Telemetry Card Component =====
 function TelemetryCard({
   driver,
@@ -131,7 +126,7 @@ function TelemetryCard({
   onSelect: () => void;
 }) {
   const color = `#${driver.team_colour || "888888"}`;
-  const tireColor = TIRE_COLORS[compound] || TIRE_COLORS.UNKNOWN;
+  const tireColor = getTireColor(compound);
   const speed = carData?.speed ?? 0;
   const throttle = carData?.throttle ?? 0;
   const brake = carData?.brake ?? 0;
@@ -220,10 +215,7 @@ function TelemetryCard({
             <span className="text-white/30">+{gapToLeader.toFixed(1)}s</span>
           )}
           {interval !== null && interval > 0 && (
-            <span className={cn(
-              "font-semibold",
-              interval < 1 ? "text-racing-green" : interval > 3 ? "text-racing-red/60" : "text-racing-amber/50"
-            )}>
+            <span className={cn("font-semibold", intervalColorClass(interval))}>
               Δ{interval.toFixed(1)}
             </span>
           )}
@@ -1065,7 +1057,7 @@ export default function RaceReplayPage() {
                   // Compact leaderboard
                   leaderboard.map((entry, i) => {
                     const color = `#${entry.driver.team_colour || "888888"}`;
-                    const tireColor = TIRE_COLORS[entry.compound] || TIRE_COLORS.UNKNOWN;
+                    const tireColor = getTireColor(entry.compound);
                     const isSel = selectedDriver === entry.driver.driver_number;
                     return (
                       <button
@@ -1089,9 +1081,9 @@ export default function RaceReplayPage() {
                         <span className="text-[11px] font-mono font-bold flex-1 truncate" style={{ color }}>{entry.driver.name_acronym}</span>
                         <span className={cn(
                           "text-[9px] font-mono tabular-nums",
-                          entry.interval !== null && entry.interval < 1 ? "text-racing-green" :
-                          entry.interval !== null && entry.interval > 3 ? "text-racing-red/60" :
-                          "text-white/25"
+                          entry.interval !== null
+                            ? intervalColorClass(entry.interval)
+                            : "text-white/25",
                         )}>
                           {entry.gapToLeader !== null && entry.gapToLeader > 0 ? `+${entry.gapToLeader.toFixed(1)}` : ""}
                         </span>

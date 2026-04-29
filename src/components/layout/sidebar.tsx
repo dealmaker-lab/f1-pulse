@@ -1,16 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/layout/theme-provider";
+import { useLivePolling } from "@/hooks/use-live-polling";
+import { findLiveSession } from "@/lib/session-filters";
 import {
   LayoutDashboard, PlayCircle, Activity, Swords,
   PieChart, Users, Trophy, Lock, CloudRain, Radio,
   ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
+
+interface OpenF1Session {
+  date_start: string;
+  date_end: string;
+  session_name: string;
+}
+
+/** Recheck for active sessions every minute — cheap and avoids stale UI. */
+const SIDEBAR_POLL_MS = 60_000;
 
 interface NavItem {
   href: string;
@@ -36,32 +47,15 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggle } = useTheme();
-  const [raceLive, setRaceLive] = useState(false);
-  const [liveSessionName, setLiveSessionName] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("https://api.openf1.org/v1/sessions?year=2025")
-      .then((r) => r.json())
-      .then(
-        (
-          sessions: {
-            date_start: string;
-            date_end: string;
-            session_name: string;
-          }[],
-        ) => {
-          const now = Date.now();
-          const liveSession = sessions.find((s) => {
-            const start = new Date(s.date_start).getTime();
-            const end = new Date(s.date_end).getTime() + 30 * 60 * 1000;
-            return now >= start && now <= end;
-          });
-          setRaceLive(!!liveSession);
-          setLiveSessionName(liveSession?.session_name ?? null);
-        },
-      )
-      .catch(() => {});
-  }, []);
+  // Poll OpenF1 every minute so the LIVE badge tracks real session state.
+  // useLivePolling skips re-render when payload is unchanged (cheap signature).
+  const { data: sessions } = useLivePolling<OpenF1Session[]>({
+    url: "https://api.openf1.org/v1/sessions?year=2025",
+    interval: SIDEBAR_POLL_MS,
+  });
+  const liveSession = sessions ? findLiveSession(sessions) : null;
+  const raceLive = !!liveSession;
 
   return (
     <>
@@ -127,28 +121,28 @@ export default function Sidebar() {
 
         {/* Live indicator — below logo */}
         <div className={cn("px-4 py-2.5 border-b border-white/[0.06]", collapsed && "px-2")}>
-          {raceLive ? (
-            <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
+          <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
+            {raceLive ? (
               <span className="relative flex h-2 w-2 flex-shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-racing-red opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-racing-red" />
               </span>
-              {!collapsed && (
-                <span className="ferrari-micro-label font-bold text-racing-red truncate">
-                  Live{liveSessionName ? ` \u00b7 ${liveSessionName}` : ""}
-                </span>
-              )}
-            </div>
-          ) : (
-            <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
+            ) : (
               <span className="h-2 w-2 rounded-full bg-white/15 flex-shrink-0" />
-              {!collapsed && (
-                <span className="ferrari-micro-label text-white/25">
-                  No active session
-                </span>
-              )}
-            </div>
-          )}
+            )}
+            {!collapsed && (
+              <span
+                className={cn(
+                  "ferrari-micro-label truncate",
+                  raceLive ? "font-bold text-racing-red" : "text-white/25",
+                )}
+              >
+                {raceLive
+                  ? `Live${liveSession?.session_name ? ` \u00b7 ${liveSession.session_name}` : ""}`
+                  : "No active session"}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Nav */}

@@ -137,13 +137,8 @@ const CIRCUIT_ALIASES: Record<string, string> = {
   qatar: "losail",
   abudhabi: "yas-marina",
   yasmarina: "yas-marina",
-  jeddah: "jeddah",
   jedda: "jeddah",
-  monza: "monza",
-  baku: "baku",
   azerbaijan: "baku",
-  imola: "imola",
-  zandvoort: "zandvoort",
   netherlands: "zandvoort",
   dutch: "zandvoort",
   hungary: "hungaroring",
@@ -169,30 +164,18 @@ export function getCircuitSvg(
 ): CircuitSvgPaths | null {
   if (!circuitShortName) return null;
 
-  // Normalize: lowercase, strip non-alpha characters (keep hyphens for exact match first)
   const cleaned = circuitShortName.toLowerCase().trim();
+  // Two normalizations: keep hyphens for canonical key match, strip them for alias match.
   const normalized = cleaned.replace(/[^a-z-]/g, "");
   const alphaOnly = cleaned.replace(/[^a-z]/g, "");
 
-  // 1. Exact match on canonical key
-  if (CIRCUIT_SVG_MAP[normalized]) {
-    return CIRCUIT_SVG_MAP[normalized];
-  }
+  if (CIRCUIT_SVG_MAP[normalized]) return CIRCUIT_SVG_MAP[normalized];
+  if (CIRCUIT_ALIASES[alphaOnly]) return CIRCUIT_SVG_MAP[CIRCUIT_ALIASES[alphaOnly]] ?? null;
 
-  // 2. Alias match
-  if (CIRCUIT_ALIASES[alphaOnly]) {
-    return CIRCUIT_SVG_MAP[CIRCUIT_ALIASES[alphaOnly]] ?? null;
-  }
-
-  // 3. Fuzzy substring match against canonical keys
   for (const [key, value] of Object.entries(CIRCUIT_SVG_MAP)) {
     const keyAlpha = key.replace(/[^a-z]/g, "");
-    if (keyAlpha.includes(alphaOnly) || alphaOnly.includes(keyAlpha)) {
-      return value;
-    }
+    if (keyAlpha.includes(alphaOnly) || alphaOnly.includes(keyAlpha)) return value;
   }
-
-  // 4. Fuzzy substring match against aliases
   for (const [alias, canonical] of Object.entries(CIRCUIT_ALIASES)) {
     if (alias.includes(alphaOnly) || alphaOnly.includes(alias)) {
       return CIRCUIT_SVG_MAP[canonical] ?? null;

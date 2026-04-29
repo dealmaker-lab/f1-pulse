@@ -20,6 +20,18 @@ export function formatGap(gap: number | null): string {
   return `+${gap.toFixed(3)}`;
 }
 
+/**
+ * Tailwind class for an interval-to-leader value, signaling whether the
+ * driver is closing (green), neutral (amber), or falling back (red).
+ * Used in TelemetryCard and the compact leaderboard so they stay in sync.
+ */
+export function intervalColorClass(interval: number | null): string {
+  if (interval === null || interval === undefined) return "text-racing-amber/50";
+  if (interval < 1) return "text-racing-green";
+  if (interval > 3) return "text-racing-red/60";
+  return "text-racing-amber/50";
+}
+
 // Get team color by constructor name
 export function getTeamColor(team: string): string {
   const colors: Record<string, string> = {

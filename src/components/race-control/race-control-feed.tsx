@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useLivePolling } from "@/hooks/use-live-polling";
 import {
   Flag,
   AlertTriangle,
@@ -63,44 +64,42 @@ const CATEGORY_COLORS: Record<
   },
 };
 
+const RED_FLAG_STYLE = {
+  bg: "rgba(225,6,0,0.1)",
+  text: "#e10600",
+  border: "rgba(225,6,0,0.3)",
+  icon: AlertTriangle,
+};
+
 function getCategoryStyle(category: string, flag: string | null) {
-  if (flag === "RED")
-    return {
-      bg: "rgba(225,6,0,0.1)",
-      text: "#e10600",
-      border: "rgba(225,6,0,0.3)",
-      icon: AlertTriangle,
-    };
-  if (flag === "YELLOW" || flag === "DOUBLE YELLOW")
-    return CATEGORY_COLORS.Flag;
-  if (category === "SafetyCar" || category === "Vsc")
-    return CATEGORY_COLORS.SafetyCar;
+  // Flags take priority over category — a YELLOW under SafetyCar is still
+  // a yellow flag visually, but RED supersedes everything.
+  if (flag === "RED") return RED_FLAG_STYLE;
+  if (flag === "YELLOW" || flag === "DOUBLE YELLOW") return CATEGORY_COLORS.Flag;
+  if (category === "SafetyCar" || category === "Vsc") return CATEGORY_COLORS.SafetyCar;
   if (category === "Drs") return CATEGORY_COLORS.Drs;
   return CATEGORY_COLORS.Other;
 }
 
+// Race control is the most time-critical "live" surface — flags and SC
+// deployments need to surface within seconds. Poll at 5s while session is
+// open; useLivePolling skips state updates when payload is unchanged.
+const RACE_CONTROL_POLL_MS = 5_000;
+
 export default function RaceControlFeed({ sessionKey, className }: Props) {
-  const [messages, setMessages] = useState<RaceControlMessage[]>([]);
-  const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!sessionKey) return;
-    setLoading(true);
+  const { data, loading } = useLivePolling<RaceControlMessage[]>({
+    url: sessionKey
+      ? `https://api.openf1.org/v1/race_control?session_key=${sessionKey}`
+      : "",
+    interval: RACE_CONTROL_POLL_MS,
+    enabled: !!sessionKey,
+  });
 
-    fetch(
-      `https://api.openf1.org/v1/race_control?session_key=${sessionKey}`,
-    )
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          setMessages(data.reverse()); // newest first
-        }
-      })
-      .catch(() => setMessages([]))
-      .finally(() => setLoading(false));
-  }, [sessionKey]);
+  // OpenF1 returns oldest-first; reverse for newest-first display.
+  const messages = Array.isArray(data) ? [...data].reverse() : [];
 
   if (loading) {
     return (
@@ -163,7 +162,7 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
           ref={scrollRef}
           className="max-h-[300px] overflow-y-auto px-3 pb-3 space-y-1.5"
         >
-          {messages.map((msg, i) => {
+          {messages.map((msg) => {
             const style = getCategoryStyle(msg.category, msg.flag);
             const Icon = style.icon;
             const time = msg.date
@@ -173,10 +172,12 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
                   second: "2-digit",
                 })
               : "";
+            // Stable key: date+message resists reordering when polling prepends.
+            const key = `${msg.date}-${msg.message}`;
 
             return (
               <div
-                key={i}
+                key={key}
                 className="flex items-start gap-2 px-2.5 py-2 rounded-ferrari-dialog transition-all duration-300"
                 style={{
                   backgroundColor: style.bg,
