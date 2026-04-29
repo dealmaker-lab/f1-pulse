@@ -13,6 +13,7 @@ import ConstructorBarChart from "@/components/charts/constructor-bar-chart";
 import { DriverStanding, ConstructorStanding } from "@/types/f1";
 import PredictionPanel from "@/components/predictions/prediction-panel";
 import CircuitMap from "@/components/circuit-map/circuit-map";
+import ForecastWidget from "@/components/weather/forecast-widget";
 import { HISTORICAL_YEARS } from "@/lib/constants";
 import { SESSION_FILTER_OPTIONS, filterPastSessions, VALID_SESSION_NAMES } from "@/lib/session-filters";
 import Link from "next/link";
@@ -836,6 +837,17 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          WEEKEND FORECAST — Open-Meteo forecast for the next race's circuit
+          ════════════════════════════════════════════════════════════════════ */}
+      {nextRace?.circuit_short_name && (
+        <section className="px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-[1600px] mx-auto">
+            <ForecastWidget circuitShortName={nextRace.circuit_short_name} hours={48} />
+          </div>
+        </section>
+      )}
 
       {/* ════════════════════════════════════════════════════════════════════
           PODIUM — Selected race results with editorial hierarchy

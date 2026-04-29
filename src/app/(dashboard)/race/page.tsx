@@ -15,6 +15,7 @@ const RaceControlFeed = dynamic(
 import { cn, getTireColor, intervalColorClass } from "@/lib/utils";
 import { OPENF1_YEARS } from "@/lib/constants";
 import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
+import PitWindowPredictor from "@/components/race/pit-window-predictor";
 
 // ===== Speed Presets =====
 const SPEED_PRESETS = [
@@ -1237,6 +1238,27 @@ export default function RaceReplayPage() {
               </div>
             </div>
           </div>
+
+          {/* Pit Window Predictor — undercut/overcut decision panel */}
+          {selectedDriver && selectedSession && (() => {
+            const entry = leaderboard.find((e) => e.driver.driver_number === selectedDriver);
+            if (!entry) return null;
+            const lapsRemaining = Math.max(0, totalLaps - estimatedLap);
+            return (
+              <PitWindowPredictor
+                selectedDriver={{
+                  code: entry.driver.name_acronym,
+                  teamColor: `#${entry.driver.team_colour || "888888"}`,
+                  driverNumber: entry.driver.driver_number,
+                }}
+                currentGap={entry.gapToLeader}
+                lapsRemaining={lapsRemaining}
+                circuitShortName={selectedSession.circuit_short_name}
+                tireAge={entry.tireAge}
+                compound={entry.compound}
+              />
+            );
+          })()}
 
           {/* Race Control Feed */}
           {selectedSession && (

@@ -12,6 +12,7 @@ import {
   LayoutDashboard, PlayCircle, Activity, Swords,
   PieChart, Users, Trophy, Lock, CloudRain, Radio,
   ChevronLeft, ChevronRight, Menu, X, Sun, Moon,
+  LineChart,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
@@ -32,15 +33,16 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { href: "/dashboard",   label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/race",        label: "Race Replay",  icon: PlayCircle, liveLocked: true },
-  { href: "/h2h",         label: "Head to Head", icon: Swords },
-  { href: "/telemetry",  label: "Telemetry",    icon: Activity },
-  { href: "/strategy",   label: "Strategy",     icon: PieChart },
-  { href: "/weather",    label: "Weather",      icon: CloudRain },
-  { href: "/radio",      label: "Team Radio",   icon: Radio },
-  { href: "/drivers",    label: "Drivers",      icon: Users },
-  { href: "/constructors", label: "Constructors", icon: Trophy },
+  { href: "/dashboard",     label: "Dashboard",    icon: LayoutDashboard },
+  { href: "/race",          label: "Race Replay",  icon: PlayCircle, liveLocked: true },
+  { href: "/race-analysis", label: "Analysis",     icon: LineChart },
+  { href: "/h2h",           label: "Head to Head", icon: Swords },
+  { href: "/telemetry",     label: "Telemetry",    icon: Activity },
+  { href: "/strategy",      label: "Strategy",     icon: PieChart },
+  { href: "/weather",       label: "Weather",      icon: CloudRain },
+  { href: "/radio",         label: "Team Radio",   icon: Radio },
+  { href: "/drivers",       label: "Drivers",      icon: Users },
+  { href: "/constructors",  label: "Constructors", icon: Trophy },
 ];
 
 export default function Sidebar() {
