@@ -10,8 +10,10 @@ export const maxDuration = 60;
 const MAX_QUERY_LEN = 200;
 const MAX_TRANSCRIPTIONS_PER_REQUEST = 20;
 
-/** Permit letters, digits, spaces, and a small safe punctuation set. */
-const QUERY_PATTERN = /^[\p{L}\p{N} '\-]+$/u;
+/** Permit letters, digits, spaces, and a small safe punctuation set.
+ *  ASCII-only — \p{L}/\p{N} unicode classes require ES6 target which the
+ *  project's tsconfig doesn't ship; F1 driver radio queries are English. */
+const QUERY_PATTERN = /^[a-zA-Z0-9 '\-]+$/;
 
 interface RadioRecord {
   driver_number: number;

@@ -34,7 +34,8 @@ type ViewState =
 
 const DEBOUNCE_MS = 500;
 // Mirror the API server-side validation so users get instant feedback.
-const QUERY_PATTERN = /^[\p{L}\p{N} '\-]*$/u;
+// ASCII-only — \p{L}/\p{N} unicode classes require ES6 target.
+const QUERY_PATTERN = /^[a-zA-Z0-9 '\-]*$/;
 const MAX_QUERY_LEN = 200;
 
 function formatTime(dateStr: string): string {

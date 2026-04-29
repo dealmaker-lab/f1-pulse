@@ -24,7 +24,8 @@ function validateRaceTitle(val: string | null): string | null {
   if (trimmed.length === 0 || trimmed.length > MAX_TITLE_LEN) return null;
   // Allow letters, numbers, spaces, and a few punctuation marks that show
   // up in race names ("Sao Paulo Grand Prix", "Emilia-Romagna GP", etc.).
-  if (!/^[\p{L}\p{N}\s.\-'_&:()]+$/u.test(trimmed)) return null;
+  // ASCII-only — \p{L}/\p{N} unicode classes require ES6 target.
+  if (!/^[a-zA-Z0-9\s.\-'_&:()]+$/.test(trimmed)) return null;
   return trimmed;
 }
 
