@@ -2,20 +2,192 @@ import { tool } from "ai";
 import { z } from "zod";
 import { getRaceControl } from "@/data/openf1";
 
-// Hoisted once — getBaseUrl() reads env vars that don't change at runtime.
-const BASE_URL = (() => {
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-})();
+/**
+ * Chat tools call upstream public APIs directly instead of looping through
+ * our own /api/f1/* proxies. Looping through our routes hits Vercel
+ * Deployment Protection (server-to-server fetch sees a 401), which would
+ * silently break every tool call. Going direct also saves a cold-start
+ * hop per tool call.
+ *
+ * Upstream targets:
+ *   OpenF1   → https://api.openf1.org/v1/{endpoint}
+ *   Jolpica  → https://api.jolpi.ca/ergast/f1/{path}.json
+ *
+ * Internal paths kept for backward compatibility with the existing tool
+ * bodies — the dispatch table below maps them to the right upstream.
+ */
+const OPENF1 = "https://api.openf1.org/v1";
+const JOLPICA = "https://api.jolpi.ca/ergast/f1";
 
-async function fetchApi(path: string, params: Record<string, string | number | undefined> = {}) {
-  const url = new URL(path, BASE_URL);
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined) url.searchParams.set(k, String(v));
+const FETCH_TIMEOUT_MS = 8_000;
+
+/** Minimal Jolpica/Ergast envelope shapes for the routes we consume. */
+interface JolpicaRoot {
+  MRData?: {
+    StandingsTable?: {
+      StandingsLists?: Array<{
+        DriverStandings?: JolpicaDriverStanding[];
+        ConstructorStandings?: JolpicaConstructorStanding[];
+      }>;
+    };
+    RaceTable?: {
+      Races?: Array<{
+        round: string;
+        raceName: string;
+        date: string;
+        Results?: JolpicaResult[];
+      }>;
+    };
+  };
+}
+interface JolpicaDriverStanding {
+  position: string; points: string; wins: string;
+  Driver?: { code?: string; givenName?: string; familyName?: string; nationality?: string };
+  Constructors?: Array<{ name?: string }>;
+}
+interface JolpicaConstructorStanding {
+  position: string; points: string; wins: string;
+  Constructor?: { name?: string; nationality?: string };
+}
+interface JolpicaResult {
+  position: string; grid: string; points: string; status?: string;
+  Driver?: { code?: string; givenName?: string; familyName?: string };
+  Constructor?: { name?: string };
+}
+
+/** Pull-with-timeout — keeps the chat stream from hanging on a flaky upstream. */
+async function safeFetch(url: string): Promise<unknown> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+    if (!res.ok) throw new Error(`Upstream ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
   }
-  const res = await fetch(url.toString(), { cache: "no-store" });
-  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
-  return res.json();
+}
+
+function qs(params: Record<string, string | number | undefined>): string {
+  const u = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") u.set(k, String(v));
+  }
+  const s = u.toString();
+  return s ? `?${s}` : "";
+}
+
+/** Translate a legacy "/api/f1/..." path into a real upstream call. */
+async function fetchApi(
+  path: string,
+  params: Record<string, string | number | undefined> = {},
+): Promise<unknown> {
+  const { year, round, session_key, driver_number, driver1, driver2, session_name } = params;
+
+  // ── Jolpica (historical) ────────────────────────────────────────────
+  // Each branch unwraps Jolpica's nested MRData envelope into the flat
+  // shape the existing tool bodies expect (so we don't have to rewrite
+  // every tool's downstream consumption code).
+  if (path === "/api/f1/standings/drivers") {
+    const json = (await safeFetch(
+      `${JOLPICA}/${year}/driverstandings.json?limit=100`,
+    )) as JolpicaRoot;
+    const standings = json?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings ?? [];
+    return standings.map((s) => ({
+      position: parseInt(s.position),
+      points: parseFloat(s.points),
+      wins: parseInt(s.wins),
+      driver: {
+        code: s.Driver?.code,
+        name: `${s.Driver?.givenName ?? ""} ${s.Driver?.familyName ?? ""}`.trim(),
+        nationality: s.Driver?.nationality,
+        team: s.Constructors?.[0]?.name,
+      },
+    }));
+  }
+  if (path === "/api/f1/standings/constructors") {
+    const json = (await safeFetch(
+      `${JOLPICA}/${year}/constructorstandings.json?limit=100`,
+    )) as JolpicaRoot;
+    const standings = json?.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings ?? [];
+    return standings.map((s) => ({
+      position: parseInt(s.position),
+      points: parseFloat(s.points),
+      wins: parseInt(s.wins),
+      team: s.Constructor?.name,
+      nationality: s.Constructor?.nationality,
+    }));
+  }
+  if (path === "/api/f1/results") {
+    const r = round !== undefined ? `/${round}` : "";
+    const json = (await safeFetch(
+      `${JOLPICA}/${year}${r}/results.json?limit=100`,
+    )) as JolpicaRoot;
+    const races = json?.MRData?.RaceTable?.Races ?? [];
+    // Flat array of results when a single round is requested; otherwise return per-race rows.
+    if (round !== undefined && races[0]) {
+      return (races[0].Results ?? []).map((r) => ({
+        position: parseInt(r.position),
+        grid: parseInt(r.grid),
+        points: parseFloat(r.points),
+        status: r.status,
+        driver: {
+          code: r.Driver?.code,
+          name: `${r.Driver?.givenName ?? ""} ${r.Driver?.familyName ?? ""}`.trim(),
+        },
+        team: r.Constructor?.name,
+      }));
+    }
+    return races.map((race) => ({
+      round: race.round,
+      raceName: race.raceName,
+      date: race.date,
+      results: (race.Results ?? []).slice(0, 3).map((r) => ({
+        position: parseInt(r.position),
+        driver: r.Driver?.code,
+        team: r.Constructor?.name,
+      })),
+    }));
+  }
+  if (path === "/api/f1/h2h" && driver1 && driver2) {
+    // Pull both drivers' season results; tool body does the comparison.
+    const [a, b] = await Promise.all([
+      safeFetch(`${JOLPICA}/${year}/drivers/${driver1}/results.json?limit=100`),
+      safeFetch(`${JOLPICA}/${year}/drivers/${driver2}/results.json?limit=100`),
+    ]);
+    return { driver1: a, driver2: b };
+  }
+
+  // ── OpenF1 (live + recent telemetry, 2023+) ─────────────────────────
+  if (path === "/api/f1/sessions") {
+    return safeFetch(`${OPENF1}/sessions${qs({ year, session_name })}`);
+  }
+  if (path === "/api/f1/meetings") {
+    return safeFetch(`${OPENF1}/meetings${qs({ year })}`);
+  }
+  if (path === "/api/f1/laps") {
+    return safeFetch(`${OPENF1}/laps${qs({ session_key, driver_number })}`);
+  }
+  if (path === "/api/f1/weather") {
+    return safeFetch(`${OPENF1}/weather${qs({ session_key })}`);
+  }
+  if (path === "/api/f1/stints") {
+    return safeFetch(`${OPENF1}/stints${qs({ session_key, driver_number })}`);
+  }
+  if (path === "/api/f1/positions") {
+    return safeFetch(`${OPENF1}/position${qs({ session_key })}`);
+  }
+  if (path === "/api/f1/intervals") {
+    return safeFetch(`${OPENF1}/intervals${qs({ session_key })}`);
+  }
+  if (path === "/api/f1/car-data") {
+    return safeFetch(`${OPENF1}/car_data${qs({ session_key, driver_number })}`);
+  }
+  if (path === "/api/f1/pit") {
+    return safeFetch(`${OPENF1}/pit${qs({ session_key, driver_number })}`);
+  }
+
+  throw new Error(`Unmapped tool path: ${path}`);
 }
 
 export const chatTools = {

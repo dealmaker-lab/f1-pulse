@@ -1,8 +1,17 @@
 import { convertToModelMessages, streamText, UIMessage, stepCountIs } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
+import { auth } from "@clerk/nextjs/server";
 import { chatTools } from "@/lib/chat-tools";
 
 export const maxDuration = 30;
+
+/**
+ * Anthropic costs real money per token. Caps below put a hard ceiling on
+ * how much any single request can consume.
+ */
+const MAX_MESSAGES = 30;            // entire conversation length
+const MAX_MESSAGE_LEN = 4000;       // characters in any single message
+const MAX_TOTAL_INPUT_LEN = 30_000; // total characters across messages
 
 const SYSTEM_PROMPT = `You are F1 Pulse AI, an expert Formula 1 data analyst assistant. You help users explore F1 race data, standings, lap times, strategy, and more.
 
@@ -50,7 +59,52 @@ Common driver IDs for H2H comparisons:
 Keep responses concise and data-focused.`;
 
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json();
+  // Auth gate — Anthropic costs real money; anonymous callers cannot bill us.
+  const { userId } = await auth();
+  if (!userId) {
+    return Response.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  let body: { messages: UIMessage[] };
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const messages = body.messages;
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return Response.json({ error: "messages must be a non-empty array" }, { status: 400 });
+  }
+  if (messages.length > MAX_MESSAGES) {
+    return Response.json(
+      { error: `Conversation too long; max ${MAX_MESSAGES} messages` },
+      { status: 400 },
+    );
+  }
+  // Body size cap — sum of all message text. Defends against giant prompts
+  // designed to drive up token usage.
+  let totalLen = 0;
+  for (const m of messages) {
+    const parts = Array.isArray(m?.parts) ? m.parts : [];
+    for (const p of parts) {
+      const text = (p as { text?: string })?.text;
+      if (typeof text === "string") {
+        if (text.length > MAX_MESSAGE_LEN) {
+          return Response.json(
+            { error: `Single message too long; max ${MAX_MESSAGE_LEN} chars` },
+            { status: 400 },
+          );
+        }
+        totalLen += text.length;
+      }
+    }
+  }
+  if (totalLen > MAX_TOTAL_INPUT_LEN) {
+    return Response.json(
+      { error: `Conversation too large; max ${MAX_TOTAL_INPUT_LEN} chars total` },
+      { status: 400 },
+    );
+  }
 
   const result = streamText({
     model: anthropic("claude-sonnet-4-20250514"),

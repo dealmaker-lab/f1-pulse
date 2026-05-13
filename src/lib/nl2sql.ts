@@ -5,31 +5,32 @@ import { DB_SCHEMA } from "./db-schema";
 
 // SQL validation -- only allow SELECT queries
 function validateSQL(sql: string): { valid: boolean; error?: string } {
-  const trimmed = sql.trim().toUpperCase();
+  // Strip both `-- line comments` and `/* block comments */` before validating
+  // so an attacker can't smuggle DML past the keyword check by hiding it
+  // inside a comment.
+  const stripped = sql
+    .replace(/--[^\n\r]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ");
+  const trimmed = stripped.trim().toUpperCase();
 
-  // Must start with SELECT or WITH (CTE)
   if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
     return { valid: false, error: "Only SELECT queries are allowed" };
   }
 
-  // Block dangerous keywords
+  // Disallow multi-statement payloads. Strip a single trailing semicolon
+  // but reject anything else with `;` mid-query.
+  const withoutTrailingSemi = trimmed.replace(/;+\s*$/, "");
+  if (withoutTrailingSemi.includes(";")) {
+    return { valid: false, error: "Multiple statements are not allowed" };
+  }
+
   const blocked = [
-    "INSERT",
-    "UPDATE",
-    "DELETE",
-    "DROP",
-    "ALTER",
-    "CREATE",
-    "TRUNCATE",
-    "GRANT",
-    "REVOKE",
-    "EXECUTE",
-    "EXEC",
+    "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE",
+    "GRANT", "REVOKE", "EXECUTE", "EXEC", "MERGE", "REPLACE", "CALL",
   ];
   for (const keyword of blocked) {
-    // Check for keyword as a standalone word (not part of another word)
     const regex = new RegExp(`\\b${keyword}\\b`, "i");
-    if (regex.test(sql)) {
+    if (regex.test(stripped)) {
       return { valid: false, error: `Query contains blocked keyword: ${keyword}` };
     }
   }
