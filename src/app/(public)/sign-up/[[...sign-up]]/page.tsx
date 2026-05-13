@@ -32,6 +32,11 @@ export default function SignUpPage() {
           </div>
         </div>
         <SignUp
+          // Same reason as on the sign-in page: OAuth (SSO) callbacks were
+          // landing on `/` because Clerk's flow-synthesized redirect_url
+          // won against `fallbackRedirectUrl`. `forceRedirectUrl`
+          // unconditionally overrides it.
+          forceRedirectUrl="/dashboard"
           fallbackRedirectUrl="/dashboard"
           signInUrl="/sign-in"
           appearance={{

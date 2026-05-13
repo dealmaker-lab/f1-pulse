@@ -32,6 +32,12 @@ export default function SignInPage() {
           </div>
         </div>
         <SignIn
+          // `fallbackRedirectUrl` only kicks in when no redirect_url query
+          // param is present. OAuth (SSO) flows synthesize their own
+          // redirect_url that points back to `/`, which is why successful
+          // logins were bouncing to the hero page. `forceRedirectUrl`
+          // unconditionally overrides whatever Clerk's flow tries to do.
+          forceRedirectUrl="/dashboard"
           fallbackRedirectUrl="/dashboard"
           signUpUrl="/sign-up"
           appearance={{
