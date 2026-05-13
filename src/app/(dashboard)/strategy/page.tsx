@@ -1122,43 +1122,57 @@ export default function StrategyPage() {
   // ── Load race 1 data
   useEffect(() => {
     if (!race1) return;
+    const ctrl = new AbortController();
+    const signal = ctrl.signal;
     setLoading1(true);
     setStints1([]); setDrivers1([]); setPositions1([]); setVisible1([]);
     Promise.all([
-      fetch(`/api/f1/stints?session_key=${race1.session_key}`).then((r) => r.json()),
-      fetch(`/api/f1/drivers?session_key=${race1.session_key}`).then((r) => r.json()),
-      fetch(`/api/f1/positions?session_key=${race1.session_key}`).then((r) => r.json()),
+      fetch(`/api/f1/stints?session_key=${race1.session_key}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/drivers?session_key=${race1.session_key}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/positions?session_key=${race1.session_key}`, { signal }).then((r) => r.json()),
     ])
       .then(([sJson, dJson, pJson]) => {
+        if (signal.aborted) return;
         const s: StintData[] = Array.isArray(sJson) ? sJson : [];
         const d: DriverData[] = Array.isArray(dJson) ? dJson : [];
         const p: PositionData[] = Array.isArray(pJson) ? pJson : [];
         setStints1(s); setDrivers1(d); setPositions1(p);
         setVisible1(Array.from(new Set(s.map((x) => x.driver_number))));
       })
-      .catch(() => {})
-      .finally(() => setLoading1(false));
+      .catch((err) => {
+        if (signal.aborted) return;
+        console.warn("Strategy race1 load failed:", err);
+      })
+      .finally(() => { if (!signal.aborted) setLoading1(false); });
+    return () => ctrl.abort();
   }, [race1]);
 
   // ── Load race 2 data
   useEffect(() => {
     if (!race2 || !compareMode) return;
+    const ctrl = new AbortController();
+    const signal = ctrl.signal;
     setLoading2(true);
     setStints2([]); setDrivers2([]); setPositions2([]); setVisible2([]);
     Promise.all([
-      fetch(`/api/f1/stints?session_key=${race2.session_key}`).then((r) => r.json()),
-      fetch(`/api/f1/drivers?session_key=${race2.session_key}`).then((r) => r.json()),
-      fetch(`/api/f1/positions?session_key=${race2.session_key}`).then((r) => r.json()),
+      fetch(`/api/f1/stints?session_key=${race2.session_key}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/drivers?session_key=${race2.session_key}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/positions?session_key=${race2.session_key}`, { signal }).then((r) => r.json()),
     ])
       .then(([sJson, dJson, pJson]) => {
+        if (signal.aborted) return;
         const s: StintData[] = Array.isArray(sJson) ? sJson : [];
         const d: DriverData[] = Array.isArray(dJson) ? dJson : [];
         const p: PositionData[] = Array.isArray(pJson) ? pJson : [];
         setStints2(s); setDrivers2(d); setPositions2(p);
         setVisible2(Array.from(new Set(s.map((x) => x.driver_number))));
       })
-      .catch(() => {})
-      .finally(() => setLoading2(false));
+      .catch((err) => {
+        if (signal.aborted) return;
+        console.warn("Strategy race2 load failed:", err);
+      })
+      .finally(() => { if (!signal.aborted) setLoading2(false); });
+    return () => ctrl.abort();
   }, [race2, compareMode]);
 
   const toggleCompare = () => {

@@ -247,28 +247,36 @@ export default function H2HPage() {
   // Fetch H2H data
   useEffect(() => {
     if (!d1Code || !d2Code || d1Code === d2Code) return;
+    const ctrl = new AbortController();
+    const signal = ctrl.signal;
     setLoading(true);
-    fetch(`/api/f1/h2h?year=${year}&d1=${d1Code}&d2=${d2Code}`)
+    fetch(`/api/f1/h2h?year=${year}&d1=${d1Code}&d2=${d2Code}`, { signal })
       .then((r) => r.json())
       .then((d) => {
+        if (signal.aborted) return;
         if (d.stats) setData(d);
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch((err) => { if (!signal.aborted) console.error(err); })
+      .finally(() => { if (!signal.aborted) setLoading(false); });
+    return () => ctrl.abort();
   }, [year, d1Code, d2Code]);
 
   // Fetch Career H2H data when career mode is toggled
   useEffect(() => {
     if (!careerMode || !d1Code || !d2Code || d1Code === d2Code) return;
+    const ctrl = new AbortController();
+    const signal = ctrl.signal;
     setCareerLoading(true);
     setCareerData(null);
-    fetch(`/api/f1/h2h/career?d1=${d1Code}&d2=${d2Code}`)
+    fetch(`/api/f1/h2h/career?d1=${d1Code}&d2=${d2Code}`, { signal })
       .then((r) => r.json())
       .then((d) => {
+        if (signal.aborted) return;
         if (d.stats) setCareerData(d);
       })
-      .catch(console.error)
-      .finally(() => setCareerLoading(false));
+      .catch((err) => { if (!signal.aborted) console.error(err); })
+      .finally(() => { if (!signal.aborted) setCareerLoading(false); });
+    return () => ctrl.abort();
   }, [careerMode, d1Code, d2Code]);
 
   const d1 = data?.driver1;

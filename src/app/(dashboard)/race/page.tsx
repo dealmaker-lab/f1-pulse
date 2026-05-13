@@ -338,6 +338,8 @@ export default function RaceReplayPage() {
   useEffect(() => {
     if (!selectedSession) return;
     const sk = selectedSession.session_key;
+    const ctrl = new AbortController();
+    const signal = ctrl.signal;
     setDataReady(false);
     setCurrentFrame(0);
     setIsPlaying(false);
@@ -352,12 +354,14 @@ export default function RaceReplayPage() {
 
         // Phase 1: core data
         const [driversRes, positionsRes, stintsRes, weatherRes, intervalsRes] = await Promise.all([
-          fetch(`/api/f1/drivers?session_key=${sk}`).then((r) => r.json()),
-          fetch(`/api/f1/positions?session_key=${sk}`).then((r) => r.json()),
-          fetch(`/api/f1/stints?session_key=${sk}`).then((r) => r.json()),
-          fetch(`/api/f1/weather?session_key=${sk}`).then((r) => r.json()),
-          fetch(`/api/f1/intervals?session_key=${sk}`).then((r) => r.json()).catch(() => []),
+          fetch(`/api/f1/drivers?session_key=${sk}`, { signal }).then((r) => r.json()),
+          fetch(`/api/f1/positions?session_key=${sk}`, { signal }).then((r) => r.json()),
+          fetch(`/api/f1/stints?session_key=${sk}`, { signal }).then((r) => r.json()),
+          fetch(`/api/f1/weather?session_key=${sk}`, { signal }).then((r) => r.json()),
+          fetch(`/api/f1/intervals?session_key=${sk}`, { signal }).then((r) => r.json()).catch(() => []),
         ]);
+
+        if (signal.aborted) return;
 
         const drvs: DriverInfo[] = Array.isArray(driversRes) ? driversRes : [];
         setDrivers(drvs);
@@ -371,17 +375,20 @@ export default function RaceReplayPage() {
         // Phase 2: location data — sample every 4th point for higher density
         const locMap: Record<number, LocationPoint[]> = {};
         for (let i = 0; i < driverNums.length; i += 5) {
+          if (signal.aborted) return;
           const batch = driverNums.slice(i, i + 5);
           setLoadingMsg(`Loading car positions... ${Math.min(i + 5, driverNums.length)}/${driverNums.length}`);
 
           const results = await Promise.all(
             batch.map((num) =>
-              fetch(`/api/f1/location?session_key=${sk}&driver_number=${num}`)
+              fetch(`/api/f1/location?session_key=${sk}&driver_number=${num}`, { signal })
                 .then((r) => r.json())
                 .then((data) => ({ num, data: Array.isArray(data) ? data : [] }))
                 .catch(() => ({ num, data: [] as LocationPoint[] }))
             )
           );
+
+          if (signal.aborted) return;
 
           results.forEach(({ num, data }) => {
             // Filter out (0,0) points (pit/grid) and sample every 4th (~1/sec)
@@ -435,6 +442,7 @@ export default function RaceReplayPage() {
           }
         }
 
+        if (signal.aborted) return;
         setLocationData(locMap);
 
         // Phase 3: car telemetry — load top 10 drivers for better coverage
@@ -443,8 +451,9 @@ export default function RaceReplayPage() {
         const cdMap: Record<number, CarDataEntry[]> = {};
 
         for (const num of telemetryDrivers) {
+          if (signal.aborted) return;
           try {
-            const res = await fetch(`/api/f1/car-data?session_key=${sk}&driver_number=${num}`);
+            const res = await fetch(`/api/f1/car-data?session_key=${sk}&driver_number=${num}`, { signal });
             const data = await res.json();
             if (Array.isArray(data)) {
               // Filter to only entries with actual data (speed > 0 or during race)
@@ -456,19 +465,22 @@ export default function RaceReplayPage() {
             // Skip individual driver failures
           }
         }
+        if (signal.aborted) return;
         setCarDataMap(cdMap);
 
         setSelectedDriver(driverNums[0] || null);
         setDataReady(true);
       } catch (err) {
+        if (signal.aborted) return;
         console.error("Load error:", err);
         setLoadingMsg("Failed to load data. Try another session.");
       } finally {
-        setLoading(false);
+        if (!signal.aborted) setLoading(false);
       }
     }
 
     loadData();
+    return () => ctrl.abort();
   }, [selectedSession]);
 
   // Lazy-load telemetry for a selected driver if not already loaded
@@ -477,9 +489,12 @@ export default function RaceReplayPage() {
     if (carDataMap[selectedDriver]) return; // Already loaded
 
     const sk = selectedSession.session_key;
-    fetch(`/api/f1/car-data?session_key=${sk}&driver_number=${selectedDriver}`)
+    const ctrl = new AbortController();
+    const signal = ctrl.signal;
+    fetch(`/api/f1/car-data?session_key=${sk}&driver_number=${selectedDriver}`, { signal })
       .then((r) => r.json())
       .then((data) => {
+        if (signal.aborted) return;
         if (Array.isArray(data)) {
           setCarDataMap((prev) => ({
             ...prev,
@@ -488,6 +503,7 @@ export default function RaceReplayPage() {
         }
       })
       .catch(() => {});
+    return () => ctrl.abort();
   }, [selectedDriver, selectedSession, dataReady, carDataMap]);
 
   // ===== Build unified timeline =====
