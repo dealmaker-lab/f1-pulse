@@ -67,7 +67,11 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
                         borderRadius: i === 0 ? "6px 0 0 6px" : i === driver.stints.length - 1 ? "0 6px 6px 0" : "0",
                         borderRight: i < driver.stints.length - 1 ? "2px solid #0a0a0f" : "none",
                       }}
-                      title={`${compound} | Laps ${stint.startLap ?? "?"}-${stint.endLap ?? "?"} | Avg: ${(stint.avgPace ?? 0).toFixed(1)}s`}
+                      title={
+                        stint.avgPace !== undefined
+                          ? `${compound} | Laps ${stint.startLap ?? "?"}-${stint.endLap ?? "?"} | Avg: ${stint.avgPace.toFixed(1)}s`
+                          : `${compound} | Laps ${stint.startLap ?? "?"}-${stint.endLap ?? "?"}`
+                      }
                     >
                       <span className="drop-shadow-sm">
                         {laps > 8 ? `${compound.charAt(0)} · ${laps}L` : compound.charAt(0)}

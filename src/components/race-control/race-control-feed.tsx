@@ -90,9 +90,12 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
   const [expanded, setExpanded] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Route through our /api/f1/race-control proxy rather than hitting OpenF1
+  // directly — keeps session_key validation, error sanitization, and any
+  // future caching server-side.
   const { data, loading } = useLivePolling<RaceControlMessage[]>({
     url: sessionKey
-      ? `https://api.openf1.org/v1/race_control?session_key=${sessionKey}`
+      ? `/api/f1/race-control?session_key=${sessionKey}`
       : "",
     interval: RACE_CONTROL_POLL_MS,
     enabled: !!sessionKey,

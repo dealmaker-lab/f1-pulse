@@ -153,7 +153,8 @@ function StrategyPanel({
             compound: (s.compound || "UNKNOWN") as import("@/types/f1").TireCompound,
             startLap: s.lap_start,
             endLap: s.lap_end,
-            avgPace: 93.0,
+            // avgPace omitted — we don't fetch /laps here, so a constant
+            // would be misleading. Strategy chart tooltip handles undefined.
             laps: Math.max(1, s.lap_end - s.lap_start + 1),
           })),
       };
@@ -327,7 +328,12 @@ function PitStopsPanel({
     if (!byDriver.has(s.driver_number)) byDriver.set(s.driver_number, []);
     byDriver.get(s.driver_number)!.push(s);
   });
-  const pitData: any[] = [];
+  // pit-stop count chart — uses real stint data only.
+  // (Prior version showed a randomized "avg pit time" — see commit history.
+  // OpenF1's /pit endpoint has real pit_duration but it's a separate fetch
+  // we don't make here; rather than fabricate, we surface stop count which
+  // is already accurate from stint_number > 1.)
+  const pitData: Array<{ driver: string; team: string; stops: number }> = [];
   byDriver.forEach((ss, n) => {
     if (!visible.includes(n) || !driverMap.has(n)) return;
     const d = driverMap.get(n)!;
@@ -337,10 +343,10 @@ function PitStopsPanel({
       driver: d.name_acronym,
       team: d.team_name,
       stops,
-      avgTime: parseFloat((2.2 + Math.random() * 0.6).toFixed(1)),
     });
   });
-  pitData.sort((a, b) => a.avgTime - b.avgTime);
+  // Most stops first (highlights aggressive strategies).
+  pitData.sort((a, b) => b.stops - a.stops);
 
   if (loading)
     return (
@@ -361,10 +367,11 @@ function PitStopsPanel({
         <BarChart data={pitData} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
           <XAxis
             type="number"
-            domain={[0, 5]}
+            domain={[0, 'dataMax + 1']}
+            allowDecimals={false}
             tick={{ fill: "rgba(255,255,255,0.25)", fontSize: 9, fontFamily: "Fira Code" }}
             axisLine={false} tickLine={false}
-            tickFormatter={(v) => `${v}s`}
+            tickFormatter={(v) => `${v}`}
           />
           <YAxis
             type="category"
@@ -380,11 +387,9 @@ function PitStopsPanel({
               fontSize: "10px",
               fontFamily: "Fira Code",
             }}
-            formatter={(v: any, _, props) =>
-              [`${v}s avg · ${props.payload.stops} stop${props.payload.stops !== 1 ? "s" : ""}`, "Pit"]
-            }
+            formatter={(v: number) => [`${v} stop${v !== 1 ? "s" : ""}`, "Pit"]}
           />
-          <Bar dataKey="avgTime" radius={[0, 5, 5, 0]} barSize={14}>
+          <Bar dataKey="stops" radius={[0, 5, 5, 0]} barSize={14}>
             {pitData.map((e, i) => (
               <Cell key={i} fill={getTeamColor(e.team)} fillOpacity={0.85} />
             ))}

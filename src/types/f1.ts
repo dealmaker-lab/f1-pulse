@@ -147,7 +147,8 @@ export interface StrategyStint {
     compound: TireCompound;
     startLap: number;
     endLap: number;
-    avgPace: number;
+    /** Optional — only set when real lap-time data is fetched alongside stints. */
+    avgPace?: number;
     laps: number;
   }[];
 }

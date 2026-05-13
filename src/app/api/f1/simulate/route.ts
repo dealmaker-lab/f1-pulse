@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+
+/** Hard cap on the `scenario` JSON length. Keeps a single request from
+ *  pinning a function with megabyte payloads + O(laps) work. */
+const MAX_SCENARIO_LEN = 4_096;
 
 /**
  * Pit Strategy Simulator API
@@ -47,12 +52,26 @@ const TIRE_DEG: Record<string, number> = {
 const PIT_LOSS_SECONDS = 22;
 
 export async function GET(req: NextRequest) {
+  // Auth gate — this endpoint fetches twice from OpenF1 then does O(laps²)
+  // work per request. Anonymous callers should not be able to soak the
+  // function pool with this.
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   const sessionKey = req.nextUrl.searchParams.get("session_key");
   const driverNumber = req.nextUrl.searchParams.get("driver_number");
   const scenarioParam = req.nextUrl.searchParams.get("scenario"); // JSON array of { lap: number, compound: string }[]
 
   if (!sessionKey || !driverNumber) {
     return NextResponse.json({ error: "session_key and driver_number required" }, { status: 400 });
+  }
+  if (scenarioParam && scenarioParam.length > MAX_SCENARIO_LEN) {
+    return NextResponse.json(
+      { error: `scenario payload too large; max ${MAX_SCENARIO_LEN} chars` },
+      { status: 400 },
+    );
   }
 
   try {
