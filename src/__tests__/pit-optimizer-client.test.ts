@@ -18,14 +18,12 @@ describe("fetchPitOptimization — input validation", () => {
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = fetchSpy;
+    (global as unknown as { fetch: typeof fetchSpy }).fetch = fetchSpy;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (global as any).fetch;
+    delete (global as unknown as { fetch?: unknown }).fetch;
   });
 
   it("throws PitOptimizerError(400) when driver is empty", async () => {
@@ -72,14 +70,12 @@ describe("fetchPitOptimization — fetch + parsing", () => {
 
   beforeEach(() => {
     fetchSpy = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (global as any).fetch = fetchSpy;
+    (global as unknown as { fetch: typeof fetchSpy }).fetch = fetchSpy;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    delete (global as any).fetch;
+    delete (global as unknown as { fetch?: unknown }).fetch;
   });
 
   it("parses a valid OptimizerResult and re-sorts strategies by rank", async () => {
