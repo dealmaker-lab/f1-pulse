@@ -12,6 +12,7 @@ import {
   GitBranch,
   Gauge,
   LineChart as LineChartIcon,
+  Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OPENF1_YEARS } from "@/lib/constants";
@@ -28,6 +29,7 @@ import SectorIndicators, {
   computeSectorColors,
 } from "@/components/race/sector-indicators";
 import MultiDriverOverlay from "@/components/telemetry/multi-driver-overlay";
+import PitOptimizerOverlay from "@/components/race/pit-optimizer-overlay";
 import StewardsTimeline from "@/components/fia/stewards-timeline";
 import FanReactionChart from "@/components/reddit/fan-reaction-chart";
 import type { SessionCode } from "@/lib/fastf1-client";
@@ -36,7 +38,15 @@ const YEARS = OPENF1_YEARS;
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
-type AnalysisTab = "trace" | "positions" | "degradation" | "sectors" | "telemetry" | "stewards" | "reactions";
+type AnalysisTab =
+  | "trace"
+  | "positions"
+  | "degradation"
+  | "sectors"
+  | "telemetry"
+  | "optimizer"
+  | "stewards"
+  | "reactions";
 
 /**
  * Map OpenF1 `session_name` to the FastF1 session code expected by the
@@ -332,6 +342,60 @@ function DriverPicker({
   );
 }
 
+// ─── Single-driver picker (pit optimizer tab) ────────────────────────────
+
+function SingleDriverPicker({
+  driverMetas,
+  selected,
+  onChange,
+}: {
+  driverMetas: DriverMeta[];
+  selected: string;
+  onChange: (next: string) => void;
+}) {
+  if (driverMetas.length === 0) return null;
+
+  return (
+    <div className="rounded-xl p-3 sm:p-4 border border-[var(--f1-border)] bg-[var(--f1-hover)]">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[9px] font-black uppercase tracking-[0.2em] font-mono text-racing-red">
+          Select driver
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {driverMetas.map((d) => {
+          const isOn = selected === d.code;
+          return (
+            <button
+              key={d.driverNumber}
+              type="button"
+              onClick={() => onChange(d.code)}
+              aria-pressed={isOn}
+              className={cn(
+                "rounded-lg border px-2.5 py-1.5 text-xs font-mono font-bold transition-all",
+                isOn
+                  ? "shadow-sm"
+                  : "border-[var(--f1-border)] text-f1-muted hover:text-f1",
+              )}
+              style={
+                isOn
+                  ? {
+                      borderColor: `${d.teamColor}80`,
+                      backgroundColor: `${d.teamColor}25`,
+                      color: d.teamColor,
+                    }
+                  : undefined
+              }
+            >
+              {d.code}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ───────────────────────────────────────────────────────────
 
 export default function RaceAnalysisPage() {
@@ -354,6 +418,11 @@ export default function RaceAnalysisPage() {
   // Defaults to the top 2 fastest qualifiers once data loads (see effect below).
   const [overlayDrivers, setOverlayDrivers] = useState<string[]>([]);
   const [overlayUserPicked, setOverlayUserPicked] = useState(false);
+
+  // Single driver code for the pit optimizer tab. Defaults to the
+  // fastest qualifier once data loads.
+  const [optimizerDriver, setOptimizerDriver] = useState<string>("");
+  const [optimizerUserPicked, setOptimizerUserPicked] = useState(false);
 
   // ── Load race list when year changes ──
   useEffect(() => {
@@ -569,6 +638,8 @@ export default function RaceAnalysisPage() {
   useEffect(() => {
     setOverlayUserPicked(false);
     setOverlayDrivers([]);
+    setOptimizerUserPicked(false);
+    setOptimizerDriver("");
   }, [race?.session_key]);
 
   // Apply the fastest-two default once data is in, unless the user has picked
@@ -578,6 +649,14 @@ export default function RaceAnalysisPage() {
       setOverlayDrivers(fastestTwoCodes);
     }
   }, [fastestTwoCodes, overlayUserPicked]);
+
+  // Apply the fastest-one default for the optimizer, unless the user has picked
+  useEffect(() => {
+    if (optimizerUserPicked) return;
+    if (fastestTwoCodes.length > 0) {
+      setOptimizerDriver(fastestTwoCodes[0]);
+    }
+  }, [fastestTwoCodes, optimizerUserPicked]);
 
   // ─── Render helpers ─────────────────────────────────────────────────
 
@@ -606,6 +685,11 @@ export default function RaceAnalysisPage() {
       id: "telemetry",
       label: "Telemetry Overlay",
       icon: <LineChartIcon className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "optimizer",
+      label: "Pit Optimizer",
+      icon: <Wrench className="w-3.5 h-3.5" />,
     },
     {
       id: "stewards",
@@ -808,6 +892,40 @@ export default function RaceAnalysisPage() {
       );
     }
 
+    if (tab === "optimizer") {
+      // Pit-strategy optimizer — runs a deterministic Monte-Carlo search
+      // over every viable pit-window combination for the selected driver.
+      if (!sessionCodeForFastF1 || roundForFastF1 === null) {
+        return (
+          <InsufficientCard message="Pit optimizer unavailable for this session" />
+        );
+      }
+      // Only Race + Sprint produce a meaningful "total race time".
+      if (sessionCodeForFastF1 !== "R" && sessionCodeForFastF1 !== "S") {
+        return (
+          <InsufficientCard message="Pit optimizer only runs on Race and Sprint sessions" />
+        );
+      }
+      return (
+        <div className="space-y-3">
+          <SingleDriverPicker
+            driverMetas={driverMetas}
+            selected={optimizerDriver}
+            onChange={(next) => {
+              setOptimizerUserPicked(true);
+              setOptimizerDriver(next);
+            }}
+          />
+          <PitOptimizerOverlay
+            year={year}
+            round={roundForFastF1}
+            driverCode={optimizerDriver}
+            session={sessionCodeForFastF1}
+          />
+        </div>
+      );
+    }
+
     if (tab === "stewards") {
       // FIA stewards' decisions, reprimands, summons for this event
       return (
@@ -842,7 +960,7 @@ export default function RaceAnalysisPage() {
             Race Analysis
           </h1>
           <p className="text-xs sm:text-sm text-f1-muted mt-1">
-            Race trace · lap chart · tyre degradation · sectors · telemetry · stewards · fan reactions
+            Race trace · lap chart · tyre degradation · sectors · telemetry · pit optimizer · stewards · fan reactions
           </p>
         </div>
       </div>

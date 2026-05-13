@@ -108,6 +108,10 @@ export const CIRCUIT_SVG_MAP: Record<string, CircuitSvgPaths> = {
     white: "/circuits/yas-marina-white.svg",
     outline: "/circuits/yas-marina-white-outline.svg",
   },
+  madring: {
+    white: "/circuits/madring-white.svg",
+    outline: "/circuits/madring-white-outline.svg",
+  },
 };
 
 /**
@@ -150,6 +154,11 @@ const CIRCUIT_ALIASES: Record<string, string> = {
   china: "shanghai",
   britain: "silverstone",
   greatbritain: "silverstone",
+  madrid: "madring",
+  ifema: "madring",
+  ifemamadring: "madring",
+  madridring: "madring",
+  spainmadrid: "madring",
 };
 
 /**
@@ -213,4 +222,5 @@ export const CIRCUIT_DISPLAY_NAMES: Record<string, string> = {
   "las-vegas": "Las Vegas Strip Circuit",
   losail: "Losail International Circuit",
   "yas-marina": "Yas Marina Circuit",
+  madring: "Circuito de Madrid",
 };
