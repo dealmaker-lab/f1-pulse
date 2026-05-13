@@ -200,7 +200,7 @@ export async function GET(req: NextRequest) {
 
 async function fetchJSON(url: string) {
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    const res = await fetch(url, { next: { revalidate: 300 } });
     return res.json();
   } catch {
     return {};

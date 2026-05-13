@@ -413,7 +413,8 @@ export const chatTools = {
       try {
         const data = await getRaceControl(session_key);
         if (!Array.isArray(data)) return data;
-        return data.slice(0, 50).map((m: Record<string, unknown>) => ({
+        // getRaceControl returns unknown[]; narrow each entry to a record.
+        return (data as Record<string, unknown>[]).slice(0, 50).map((m) => ({
           date: m.date,
           lap: m.lap_number,
           category: m.category,
@@ -491,7 +492,7 @@ export const chatTools = {
 
   getDriverTelemetry: tool({
     description:
-      "Get detailed car telemetry for a driver: speed, throttle, brake, gear, DRS, RPM at each sample point. Useful for analyzing driving style and car performance.",
+      "Get detailed car telemetry for a driver: speed, throttle, brake, gear, RPM, plus 2026 active-aero mode (Z/X) and Override boost activations at each sample point. Falls back to legacy DRS counts for 2023-2025 sessions.",
     inputSchema: z.object({
       session_key: z.number().describe("Session key"),
       driver_number: z.number().describe("Driver car number"),
@@ -506,6 +507,15 @@ export const chatTools = {
       let speedSum = 0, speedCount = 0;
       let topSpeed = 0, maxGear = 0, maxRpm = 0;
       let drsCount = 0, heavyBraking = 0;
+      // 2026 active aero + override counters. OpenF1's exact schema for these
+      // is unconfirmed — we read each field defensively and only emit the
+      // distribution if the upstream actually populated values.
+      let overrideActivations = 0;
+      let aeroZCount = 0;
+      let aeroXCount = 0;
+      let aeroSampleCount = 0;
+      let overrideBudgetSeen = false;
+      let overrideBudgetMin = 1;
       for (const row of data as Record<string, unknown>[]) {
         const speed = (row.speed as number) || 0;
         if (speed > 0) { speedSum += speed; speedCount++; if (speed > topSpeed) topSpeed = speed; }
@@ -516,17 +526,51 @@ export const chatTools = {
         const drs = (row.drs as number) || 0;
         if (drs >= 10 && drs <= 14) drsCount++;
         if ((row.brake as number) > 50) heavyBraking++;
+
+        // 2026 fields — all optional. Guard each read.
+        const aeroMode = row.aero_mode;
+        if (aeroMode === "Z") { aeroZCount++; aeroSampleCount++; }
+        else if (aeroMode === "X") { aeroXCount++; aeroSampleCount++; }
+
+        if (row.override_active === true) overrideActivations++;
+
+        const budget = row.override_budget_remaining;
+        if (typeof budget === "number" && Number.isFinite(budget)) {
+          overrideBudgetSeen = true;
+          if (budget < overrideBudgetMin) overrideBudgetMin = budget;
+        }
       }
       const avgSpeed = speedCount > 0 ? speedSum / speedCount : 0;
-      return {
+
+      // Output both shapes — the LLM can pick whichever matches the session
+      // era. We always emit drsActivations (legacy) so historical 2023-2025
+      // questions still work; we only emit the 2026 aeroMode block when the
+      // upstream actually provided aero_mode samples.
+      const base = {
         samples: data.length,
         topSpeed: +topSpeed.toFixed(1),
         avgSpeed: +avgSpeed.toFixed(1),
         drsActivations: drsCount,
+        overrideActivations,
         heavyBrakingEvents: heavyBraking,
         maxGear,
         maxRpm,
       };
+      if (aeroSampleCount > 0) {
+        return {
+          ...base,
+          aeroMode: {
+            z: aeroZCount,
+            x: aeroXCount,
+            xPercent: +((aeroXCount / aeroSampleCount) * 100).toFixed(1),
+            samples: aeroSampleCount,
+          },
+          overrideBudget: overrideBudgetSeen
+            ? { minRemaining: +overrideBudgetMin.toFixed(3) }
+            : undefined,
+        };
+      }
+      return base;
     },
   }),
 

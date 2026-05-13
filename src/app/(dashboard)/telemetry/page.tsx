@@ -49,9 +49,16 @@ interface CarDataPoint {
   throttle: number;
   brake: number;
   n_gear: number;
+  /** @deprecated 2023-2025 legacy DRS state. 2026+ uses the aero/override fields below. */
   drs: number;
   rpm: number;
   driver_number: number;
+  /** 2026+ active aero state. Optional — OpenF1 schema may not emit yet. */
+  aero_mode?: "Z" | "X" | null;
+  /** 2026+ override boost active flag. */
+  override_active?: boolean | null;
+  /** 2026+ per-lap override energy budget remaining, 0..1. */
+  override_budget_remaining?: number | null;
 }
 
 interface TelemetryPoint {
@@ -60,8 +67,15 @@ interface TelemetryPoint {
   throttle: number;
   brake: number;
   gear: number;
+  /** @deprecated 2023-2025 legacy DRS state. 2026+ uses aeroMode + overrideActive below. */
   drs: number;
   rpm: number;
+  /** 2026+ active aero state. */
+  aeroMode?: "Z" | "X" | null;
+  /** 2026+ override boost active flag. */
+  overrideActive?: boolean | null;
+  /** 2026+ per-lap override energy budget remaining, 0..1. */
+  overrideBudgetRemaining?: number | null;
 }
 
 // ===== Helpers =====
@@ -96,6 +110,11 @@ function sliceTelemetryForLap(
       gear: d.n_gear,
       drs: d.drs,
       rpm: d.rpm,
+      // 2026 optional fields — passed through verbatim. Null/undefined on
+      // pre-2026 sessions; consumers must guard with === checks.
+      aeroMode: d.aero_mode ?? null,
+      overrideActive: d.override_active ?? null,
+      overrideBudgetRemaining: d.override_budget_remaining ?? null,
     }));
 }
 

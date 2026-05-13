@@ -16,7 +16,9 @@ import { cn, getTireColor, intervalColorClass } from "@/lib/utils";
 import { OPENF1_YEARS } from "@/lib/constants";
 import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 import PitWindowPredictor from "@/components/race/pit-window-predictor";
+import AeroOverrideBadge from "@/components/race/aero-override-badge";
 import { LiveStatusBanner } from "@/components/live-timing/live-status-banner";
+import { PipToggleButton } from "@/components/pip/pip-toggle-button";
 
 // ===== Speed Presets =====
 const SPEED_PRESETS = [
@@ -75,8 +77,15 @@ interface CarDataEntry {
   throttle: number;
   brake: number;
   n_gear: number;
+  /** @deprecated 2023-2025 legacy DRS state. 2026+ uses aero/override fields. */
   drs: number | null;
   rpm: number;
+  /** 2026+ active aero state. OpenF1 may not emit this yet — read defensively. */
+  aero_mode?: "Z" | "X" | null;
+  /** 2026+ override (battery boost) active for this sample. */
+  override_active?: boolean | null;
+  /** 2026+ per-lap override energy budget remaining, 0..1. */
+  override_budget_remaining?: number | null;
 }
 
 interface IntervalEntry {
@@ -134,7 +143,15 @@ function TelemetryCard({
   const brake = carData?.brake ?? 0;
   const gear = carData?.n_gear ?? 0;
   const drs = carData?.drs;
-  const isDrsOpen = drs != null && drs >= 10 && drs <= 14;
+  // 2026 fields — read defensively, OpenF1 may not emit them yet.
+  const aeroMode = carData?.aero_mode ?? null;
+  const overrideActive = carData?.override_active ?? null;
+  const overrideBudget = carData?.override_budget_remaining ?? null;
+  const has2026Aero =
+    aeroMode === "Z" || aeroMode === "X" || overrideActive === true ||
+    (typeof overrideBudget === "number" && Number.isFinite(overrideBudget));
+  // Legacy DRS fallback: pre-2026 sessions only carry the drs field.
+  const isDrsOpen = !has2026Aero && drs != null && drs >= 10 && drs <= 14;
 
   return (
     <button
@@ -151,7 +168,7 @@ function TelemetryCard({
       <div className="h-[2px]" style={{ background: `linear-gradient(90deg, ${color}, transparent)` }} />
 
       <div className="px-3 py-2 space-y-2">
-        {/* Header: position + name + DRS */}
+        {/* Header: position + name + aero/override (2026) or DRS (legacy) */}
         <div className="flex items-center gap-2">
           <span className={cn(
             "text-[10px] font-mono font-black w-5 text-center",
@@ -165,11 +182,21 @@ function TelemetryCard({
           <span className="text-xs font-mono font-bold flex-1" style={{ color }}>
             {driver.name_acronym}
           </span>
-          {isDrsOpen && (
+          {has2026Aero ? (
+            <AeroOverrideBadge
+              aeroMode={aeroMode}
+              overrideActive={overrideActive}
+              budgetRemaining={overrideBudget}
+              compact
+            />
+          ) : isDrsOpen ? (
             <span className="text-[8px] font-mono font-bold bg-racing-green/30 text-racing-green px-1.5 py-0.5 rounded animate-pulse">
               DRS
             </span>
-          )}
+          ) : carData && drs == null ? (
+            // 2026 session with no aero data yet — show placeholder so the card doesn't shift.
+            <span className="text-[8px] font-mono text-white/20">—</span>
+          ) : null}
         </div>
 
         {/* Speed + Gear */}
@@ -883,13 +910,19 @@ export default function RaceReplayPage() {
                 : "Select a session to replay"}
             </p>
           </div>
-          {dataReady && (
-            <div className="flex items-center gap-2 text-[9px] font-mono text-white/30">
-              <span>SPACE=play</span>
-              <span>←→=seek</span>
-              <span>↑↓=speed</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {dataReady && (
+              <div className="hidden sm:flex items-center gap-2 text-[9px] font-mono text-white/30">
+                <span>SPACE=play</span>
+                <span>←→=seek</span>
+                <span>↑↓=speed</span>
+              </div>
+            )}
+            {/* Picture-in-Picture floating leaderboard — opens a small
+                always-on-top window with the live top-8 + flag + RC ticker.
+                Hidden on mobile because the API is desktop-only. */}
+            <PipToggleButton className="hidden sm:inline-flex" />
+          </div>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
@@ -1009,15 +1042,26 @@ export default function RaceReplayPage() {
                     const color = `#${driver.team_colour || "888888"}`;
                     const isSel = selectedDriver === driver.driver_number;
                     const entry = leaderboard.find((e) => e.driver.driver_number === driver.driver_number);
-                    const isDrsOpen = entry?.carData?.drs != null && entry.carData.drs >= 10 && entry.carData.drs <= 14;
+                    // 2026: override-active ring (amber) takes priority over legacy DRS ring.
+                    const overrideActive = entry?.carData?.override_active === true;
+                    const drsLegacy =
+                      !overrideActive &&
+                      entry?.carData?.drs != null &&
+                      entry.carData.drs >= 10 &&
+                      entry.carData.drs <= 14;
 
                     return (
                       <g key={driver.driver_number} onClick={() => setSelectedDriver(driver.driver_number)} className="cursor-pointer">
                         {/* Outer aura */}
                         <circle cx={x} cy={y} r={isSel ? 18 : 14} fill={color} opacity={0.08}
                           filter={isSel ? "url(#carGlowSelected)" : "url(#carGlow)"} />
-                        {/* DRS ring — green when DRS open */}
-                        {isDrsOpen && (
+                        {/* Override ring (2026, amber) or legacy DRS ring (pre-2026, green) */}
+                        {overrideActive && (
+                          <circle cx={x} cy={y} r={isSel ? 15 : 11} fill="none" stroke="#FFC906" strokeWidth="2.5" opacity={0.85}>
+                            <animate attributeName="opacity" values="0.85;0.4;0.85" dur="0.8s" repeatCount="indefinite" />
+                          </circle>
+                        )}
+                        {drsLegacy && (
                           <circle cx={x} cy={y} r={isSel ? 15 : 11} fill="none" stroke="#39B54A" strokeWidth="2" opacity={0.7} />
                         )}
                         {/* Inner glow */}
@@ -1171,12 +1215,44 @@ export default function RaceReplayPage() {
                           <span className="text-[8px] font-mono text-white/30 w-6 text-right tabular-nums">{cd.brake > 0 ? `${cd.brake}%` : ""}</span>
                         </div>
                       </div>
-                      {/* DRS indicator */}
-                      {cd.drs != null && cd.drs >= 10 && cd.drs <= 14 && (
-                        <div className="px-2 py-1 rounded-lg bg-racing-green/20 border border-racing-green/30">
-                          <span className="text-[10px] font-mono font-bold text-racing-green">DRS</span>
-                        </div>
-                      )}
+                      {/* Aero / Override (2026) — falls back to legacy DRS for pre-2026 sessions */}
+                      {(() => {
+                        const aeroMode = cd.aero_mode ?? null;
+                        const overrideActive = cd.override_active ?? null;
+                        const overrideBudget = cd.override_budget_remaining ?? null;
+                        const has2026 =
+                          aeroMode === "Z" || aeroMode === "X" ||
+                          overrideActive === true ||
+                          (typeof overrideBudget === "number" && Number.isFinite(overrideBudget));
+                        if (has2026) {
+                          return (
+                            <div className="px-2 py-1 rounded-lg bg-white/[0.03] border border-white/10">
+                              <AeroOverrideBadge
+                                aeroMode={aeroMode}
+                                overrideActive={overrideActive}
+                                budgetRemaining={overrideBudget}
+                              />
+                            </div>
+                          );
+                        }
+                        // Legacy DRS path (2023-2025 historical sessions)
+                        if (cd.drs != null && cd.drs >= 10 && cd.drs <= 14) {
+                          return (
+                            <div className="px-2 py-1 rounded-lg bg-racing-green/20 border border-racing-green/30">
+                              <span className="text-[10px] font-mono font-bold text-racing-green">DRS</span>
+                            </div>
+                          );
+                        }
+                        // 2026 session with no aero data and no legacy DRS — small placeholder.
+                        if (cd.drs == null) {
+                          return (
+                            <div className="px-2 py-1 rounded-lg border border-white/5">
+                              <span className="text-[10px] font-mono text-white/20">—</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   )}
 

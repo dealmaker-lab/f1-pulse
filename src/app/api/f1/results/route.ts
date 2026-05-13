@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     if (round) {
       const res = await fetch(
         `${JOLPICA_BASE}/${year}/${round}/results/?format=json`,
-        { cache: "no-store" }
+        { next: { revalidate: 300 } }
       );
       const json = await res.json();
       races = json?.MRData?.RaceTable?.Races || [];

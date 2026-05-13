@@ -53,6 +53,9 @@ export const DEFAULT_2026_DRIVER_PRICES: Record<string, number> = {
   COL: 7.0,  // Colapinto
   BOR: 6.5,  // Bortoleto
   DOO: 6.0,  // Doohan
+  // Cadillac F1 Team (2026 entry)
+  PER: 8.5,  // Perez (Cadillac)
+  BOT: 8.0,  // Bottas (Cadillac)
 };
 
 /**
@@ -70,6 +73,7 @@ export const DEFAULT_2026_CONSTRUCTOR_PRICES: Record<string, number> = {
   "Racing Bulls": 11.0,
   "Haas F1 Team": 9.0,
   "Kick Sauber": 7.0,
+  "Cadillac F1 Team": 5.0,
 };
 
 /** Convenience union — every code that has a default price. */

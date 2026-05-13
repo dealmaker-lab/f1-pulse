@@ -21,7 +21,7 @@ export async function fetchAllRaces(
   const separator = endpoint.includes("?") ? "&" : "?";
   const firstRes = await fetch(
     `${endpoint}${separator}limit=${PAGE_SIZE}&offset=0`,
-    { cache: "no-store" }
+    { next: { revalidate: 300 } }
   );
   const firstJson = await firstRes.json();
   const total = parseInt(firstJson?.MRData?.total || "0");
@@ -36,7 +36,7 @@ export async function fetchAllRaces(
     fetches.push(
       fetch(
         `${endpoint}${separator}limit=${PAGE_SIZE}&offset=${i * PAGE_SIZE}`,
-        { cache: "no-store" }
+        { next: { revalidate: 300 } }
       ).then((r) => r.json())
     );
   }

@@ -778,10 +778,10 @@ export default function RadioPage() {
       {!loading && filteredMessages.length === 0 && selectedSession && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <AlertTriangle className="w-8 h-8 text-f1-muted" />
-          <span className="text-f1-sub text-sm">
+          <span className="text-f1-sub text-sm max-w-md text-center">
             {messages.length > 0
               ? "No messages match your filters"
-              : "No radio messages available for this session"}
+              : "Team radio coverage was reduced significantly in 2026 — most race weekends have no published audio. Try a 2023-2025 session for richer data."}
           </span>
           {(selectedDriver || selectedTeam) && messages.length > 0 && (
             <button

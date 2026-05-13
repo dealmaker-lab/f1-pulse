@@ -5,8 +5,9 @@ export interface TeamInfo {
   name: string;
   shortName: string;
   color: string;
-  logoUrl: string;
+  logoUrl?: string;
   carUrl?: string;
+  country?: string;
 }
 
 // Map team names (various spellings) to normalized team data
@@ -72,6 +73,13 @@ const TEAM_DATA: Record<string, TeamInfo> = {
     color: "#52E252",
     logoUrl: "https://media.formula1.com/content/dam/fom-website/teams/2025/kick-sauber-logo.png.transform/2col/image.png",
   },
+  "Cadillac F1 Team": {
+    name: "Cadillac F1 Team",
+    shortName: "Cadillac",
+    color: "#1E3D6B",
+    logoUrl: undefined,
+    country: "USA",
+  },
 };
 
 // Aliases for team name matching
@@ -88,8 +96,7 @@ const TEAM_ALIASES: Record<string, string> = {
   "Racing Point": "Aston Martin",
   "Force India": "Aston Martin",
   "Renault": "Alpine",
-  "Cadillac F1 Team": "Haas F1 Team",
-  "Cadillac": "Haas F1 Team",
+  "Cadillac": "Cadillac F1 Team",
   "Audi": "Kick Sauber",
 };
 

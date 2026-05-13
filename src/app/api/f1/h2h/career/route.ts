@@ -62,7 +62,7 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function safeFetchJson(url: string, retries = 2): Promise<any> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { next: { revalidate: 300 } });
       const text = await res.text();
       try {
         return JSON.parse(text);

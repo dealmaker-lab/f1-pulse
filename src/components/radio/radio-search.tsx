@@ -236,8 +236,10 @@ export default function RadioSearch({ sessionKey }: Props) {
           </div>
 
           {view.data.count === 0 ? (
-            <div className="text-f1-muted text-xs py-3 text-center">
-              No matches for &ldquo;{debounced}&rdquo;
+            <div className="text-f1-muted text-xs py-3 text-center max-w-md mx-auto leading-relaxed">
+              Team radio coverage was reduced significantly in 2026 — most race
+              weekends have no published audio. Try a 2023-2025 session for
+              richer data.
             </div>
           ) : (
             <ul className="space-y-2">

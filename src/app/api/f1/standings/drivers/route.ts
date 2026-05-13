@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(`${JOLPICA_BASE}/${year}/driverstandings/?format=json`, {
-      cache: "no-store",
+      next: { revalidate: 300 },
     });
     const json = await res.json();
 

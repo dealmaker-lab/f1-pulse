@@ -86,7 +86,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const radioRaw = await getTeamRadio(sessionKey);
-    const allRadio: RadioRecord[] = Array.isArray(radioRaw) ? radioRaw : [];
+    // getTeamRadio returns unknown[]; we narrow to RadioRecord[] via the
+    // structural cast since OpenF1's contract is stable.
+    const allRadio: RadioRecord[] = Array.isArray(radioRaw)
+      ? (radioRaw as RadioRecord[])
+      : [];
     const totalRadios = allRadio.length;
 
     // Cost cap: at most N transcriptions per request. Newest first so the

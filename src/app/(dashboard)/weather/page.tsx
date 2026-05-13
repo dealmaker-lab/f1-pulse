@@ -14,6 +14,8 @@ import {
 } from "recharts";
 import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 import { OPENF1_YEARS } from "@/lib/constants";
+import { getCircuitCoords } from "@/lib/circuit-coords";
+import RainOverlay from "@/components/weather/rain-overlay";
 
 // ===== Types =====
 interface SessionInfo {
@@ -217,6 +219,13 @@ export default function WeatherPage() {
 
   const driverColor = selectedDriver ? `#${selectedDriver.team_colour || "3b82f6"}` : "#3b82f6";
 
+  // Look up live coordinates for the currently-selected circuit so the rain
+  // overlay can center its tile grid. `null` when no session selected or the
+  // circuit isn't in our lookup table — the overlay is hidden in that case.
+  const circuitCoords = selectedSession
+    ? getCircuitCoords(selectedSession.circuit_short_name)
+    : null;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -403,6 +412,26 @@ export default function WeatherPage() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Rain radar overlay — RainViewer past-frame animation. Only renders
+              when we have lat/lon for the circuit; otherwise the panel is
+              hidden entirely so we don't show an empty radar tile for unknown
+              circuits. */}
+          {circuitCoords && (
+            <div className="glass-card p-5">
+              <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                <CloudRain className="w-4 h-4 text-racing-blue" />
+                Live Rain Radar
+                <span className="text-[10px] font-mono ml-2 px-2 py-0.5 rounded text-f1-muted bg-[var(--f1-hover)]">
+                  {circuitCoords.label}
+                </span>
+              </h2>
+              <p className="text-[11px] text-f1-muted mb-4">
+                Past 2 hours of radar precipitation, animated. Source: RainViewer.
+              </p>
+              <RainOverlay lat={circuitCoords.lat} lon={circuitCoords.lon} />
+            </div>
+          )}
 
           {/* Lap time + track temp overlay */}
           {lapWeatherOverlay.length > 0 && (

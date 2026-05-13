@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
     const [races, qualifyingRaces, standingsRes] = await Promise.all([
       fetchAllRaces(`${JOLPICA_BASE}/${String(year)}/results/?format=json`, "Results"),
       fetchAllRaces(`${JOLPICA_BASE}/${String(year)}/qualifying/?format=json`, "QualifyingResults"),
-      fetch(`${JOLPICA_BASE}/${String(year)}/driverstandings/?format=json`, { cache: "no-store" }),
+      fetch(`${JOLPICA_BASE}/${String(year)}/driverstandings/?format=json`, { next: { revalidate: 300 } }),
     ]);
 
     const standingsJson = await standingsRes.json();

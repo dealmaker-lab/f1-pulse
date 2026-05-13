@@ -58,9 +58,19 @@ const CATEGORY_COLORS: Record<
     icon: Shield,
   },
   Drs: {
+    // Kept for 2023-2025 historical sessions — OpenF1 still emits "Drs"
+    // race-control entries (DRS enabled/disabled). 2026+ uses "Override".
     bg: "rgba(57,181,74,0.08)",
     text: "#39B54A",
     border: "rgba(57,181,74,0.2)",
+    icon: Zap,
+  },
+  Override: {
+    // 2026 active-aero / Override category. Uses F1 amber to match the
+    // race replay's override-active ring on the track map.
+    bg: "rgba(255,201,6,0.08)",
+    text: "#FFC906",
+    border: "rgba(255,201,6,0.2)",
     icon: Zap,
   },
   Other: {
@@ -85,6 +95,7 @@ function getCategoryStyle(category: string, flag: string | null) {
   if (flag === "YELLOW" || flag === "DOUBLE YELLOW") return CATEGORY_COLORS.Flag;
   if (category === "SafetyCar" || category === "Vsc") return CATEGORY_COLORS.SafetyCar;
   if (category === "Drs") return CATEGORY_COLORS.Drs;
+  if (category === "Override") return CATEGORY_COLORS.Override;
   return CATEGORY_COLORS.Other;
 }
 

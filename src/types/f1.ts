@@ -37,9 +37,39 @@ export interface TelemetryPoint {
   brake: number;      // 0-100 (pressure)
   rpm: number;
   gear: number;       // 0-8
+  /** @deprecated 2023-2025 legacy. 2026+ uses aero_mode + override fields below. */
   drs: number;        // 0-14
+  /** 2026+ active aero state. "Z" = high downforce (default), "X" = low drag. */
+  aero_mode?: "Z" | "X" | null;
+  /** 2026+ override boost active for this sample (battery deployment). */
+  override_active?: boolean | null;
+  /** 2026+ per-lap override energy budget remaining, 0..1. */
+  override_budget_remaining?: number | null;
   x: number;          // track position x
   y: number;          // track position y
+}
+
+/**
+ * Raw car_data sample from OpenF1. 2026 schema is unconfirmed — we read for
+ * any of the optional aero/override fields and gracefully degrade when none
+ * are present (e.g. historical 2023-2025 sessions only carry `drs`).
+ */
+export interface CarDataEntry {
+  date: string;
+  driver_number: number;
+  speed: number;
+  throttle: number;
+  brake: number;
+  n_gear: number;
+  rpm: number;
+  /** @deprecated 2023-2025 legacy DRS state (0-14, open at 10-14). */
+  drs: number | null;
+  /** 2026+ active aero state. Optional — field may not be emitted yet. */
+  aero_mode?: "Z" | "X" | null;
+  /** 2026+ override boost active flag. */
+  override_active?: boolean | null;
+  /** 2026+ per-lap override energy budget remaining, 0..1. */
+  override_budget_remaining?: number | null;
 }
 
 export interface PitStop {
@@ -134,7 +164,12 @@ export interface PositionFrame {
     y: number;
     gap: number;
     compound: TireCompound;
+    /** @deprecated 2023-2025 legacy. 2026+ replaces DRS with override_active. */
     drs: boolean;
+    /** 2026+ override active for this frame. */
+    override_active?: boolean | null;
+    /** 2026+ active aero state. */
+    aero_mode?: "Z" | "X" | null;
     inPit: boolean;
   }[];
 }

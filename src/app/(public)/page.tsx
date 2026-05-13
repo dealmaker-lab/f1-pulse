@@ -298,7 +298,7 @@ const features = [
   {
     icon: Activity,
     title: "Live Telemetry",
-    description: "Speed, throttle, brake and DRS data at 3.7Hz sampling for every driver, every lap.",
+    description: "Active aero mode (Z/X), Override status, throttle, brake at 3.7Hz sampling for every driver, every lap.",
   },
   {
     icon: Timer,
