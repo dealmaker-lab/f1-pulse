@@ -9,6 +9,29 @@
  * in favour of SignalR Core years ago, but F1 never migrated, so this code
  * speaks the legacy `clientProtocol=1.5` dialect on purpose.
  *
+ * F1 TV authentication (optional, for "full" stream mode)
+ * -------------------------------------------------------
+ * As of 2026, F1 gates the richest telemetry streams (CarData.z position
+ * deltas, TimingAppData tyre detail, etc.) behind an F1 TV session cookie.
+ * The public/anonymous hub still works but returns reduced data on some
+ * topics — typically just Heartbeat + sparse TimingData.
+ *
+ * To enable the "full" stream, set the `F1TV_AUTH_COOKIE` env var on the
+ * server. Obtain it via:
+ *   1. Sign into https://f1tv.formula1.com in a browser
+ *   2. DevTools → Application → Cookies → f1.com
+ *   3. Copy the `login-session` cookie value (NOT the JWT — the opaque ID)
+ *   4. Set as a server env var, e.g.
+ *      F1TV_AUTH_COOKIE="login-session=abc123..."
+ *
+ * SECURITY: This cookie is a bearer token for the user's F1 TV account.
+ * It MUST stay server-side. Never expose it to the browser, never log it,
+ * never include it in error messages surfaced to clients. This file reads
+ * it from env only — callers don't need to thread it through.
+ *
+ * The proxy works without the cookie (public stream); the cookie is purely
+ * an optional capability upgrade.
+ *
  * Things that have broken in the past and may break again at any time:
  *   - User-Agent sniffing — F1's edge sometimes 403s anything that looks
  *     like a browser or a default Node fetch. We send `BestHTTP/2 v2.10.0`
@@ -92,6 +115,36 @@ interface SignalREnvelope {
 const DEFAULT_USER_AGENT = "BestHTTP/2 v2.10.0";
 const CLIENT_PROTOCOL = "1.5";
 
+/**
+ * Read the optional F1 TV auth cookie from process env. Returns `null` if
+ * unset or empty. The value should already be a fully-formed `Cookie` header
+ * (e.g. `login-session=abc123`). We don't validate the shape — F1 will just
+ * ignore us into anonymous mode if the cookie is invalid.
+ *
+ * Exported as a function (not a constant) so tests can mutate env between
+ * runs without re-importing the module.
+ */
+export function getF1TvAuthCookie(): string | null {
+  const raw = process.env.F1TV_AUTH_COOKIE;
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Stream mode reflecting whether the upstream is using the F1 TV auth
+ * cookie. `"full"` = cookie set, expect richer payloads; `"public"` =
+ * anonymous, expect Heartbeat-heavy / reduced payloads. This is purely a
+ * label — the actual data on the wire depends entirely on what F1 sends.
+ *
+ * Never leaks the cookie value itself.
+ */
+export type StreamMode = "full" | "public";
+
+export function getStreamMode(): StreamMode {
+  return getF1TvAuthCookie() ? "full" : "public";
+}
+
 export class F1SignalRClient {
   private ws: WebSocket | null = null;
   private connectionToken: string | null = null;
@@ -147,12 +200,19 @@ export class F1SignalRClient {
       JSON.stringify([{ name: this.opts.hub }]),
     );
 
+    // If an F1 TV auth cookie is configured server-side, send it on the
+    // negotiate to unlock the "full" stream. Anonymous negotiate is still
+    // supported by F1 and returns a valid ConnectionToken either way.
+    const negotiateHeaders: Record<string, string> = {
+      "User-Agent": this.opts.userAgent ?? DEFAULT_USER_AGENT,
+      Accept: "*/*",
+    };
+    const authCookie = getF1TvAuthCookie();
+    if (authCookie) negotiateHeaders.Cookie = authCookie;
+
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: {
-        "User-Agent": this.opts.userAgent ?? DEFAULT_USER_AGENT,
-        Accept: "*/*",
-      },
+      headers: negotiateHeaders,
       // We're server-side. No CORS, no credentials magic.
       cache: "no-store",
     });
@@ -215,7 +275,15 @@ export class F1SignalRClient {
       "User-Agent": this.opts.userAgent ?? DEFAULT_USER_AGENT,
       Accept: "*/*",
     };
-    if (this.cookies) headers.Cookie = this.cookies;
+    // Merge any set-cookie returned by /negotiate with the optional F1 TV
+    // auth cookie. Cookies in HTTP can be concatenated with `; ` and the
+    // upstream will parse them as a list — order doesn't matter for the
+    // session lookup.
+    const authCookie = getF1TvAuthCookie();
+    const cookieParts: string[] = [];
+    if (this.cookies) cookieParts.push(this.cookies);
+    if (authCookie) cookieParts.push(authCookie);
+    if (cookieParts.length > 0) headers.Cookie = cookieParts.join("; ");
 
     return new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(wsUrl.toString(), { headers });

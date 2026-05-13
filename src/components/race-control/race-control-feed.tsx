@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useLivePolling } from "@/hooks/use-live-polling";
 import {
@@ -12,6 +12,13 @@ import {
   ChevronUp,
   Radio,
 } from "lucide-react";
+
+/** localStorage key for the broadcast-delay slider. Stable across sessions. */
+const DELAY_STORAGE_KEY = "f1-pulse:rc-delay-sec";
+/** Slider bounds. F1 international broadcasts run ~30–90s behind live timing. */
+const DELAY_MIN = 0;
+const DELAY_MAX = 120;
+const DELAY_STEP = 5;
 
 interface RaceControlMessage {
   date: string;
@@ -90,6 +97,51 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
   const [expanded, setExpanded] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Broadcast-delay slider. F1 live timing is wire-feed and runs ahead of
+  // the TV picture by ~30–90s (F1 TV Pro), 60–120s (F1 TV Access), or
+  // wildly more on terrestrial channels. Users can dial in their delay so
+  // the race-control feed matches what they're seeing on screen.
+  //
+  // SSR-safe: initialise to 0 and hydrate from localStorage in an effect.
+  // Otherwise the server-rendered HTML would mismatch the first client
+  // render, tripping React's hydration mismatch warning.
+  const [delaySec, setDelaySec] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem(DELAY_STORAGE_KEY);
+      if (stored === null) return;
+      const parsed = Number.parseInt(stored, 10);
+      if (Number.isFinite(parsed) && parsed >= DELAY_MIN && parsed <= DELAY_MAX) {
+        setDelaySec(parsed);
+      }
+    } catch {
+      // Private mode / disabled storage — silently keep the default.
+    }
+  }, []);
+  // Persist on change. We also clamp here as a belt-and-braces against
+  // any path that bypasses the slider's min/max attributes.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const clamped = Math.max(DELAY_MIN, Math.min(DELAY_MAX, delaySec));
+      window.localStorage.setItem(DELAY_STORAGE_KEY, String(clamped));
+    } catch {
+      /* ignore — non-fatal */
+    }
+  }, [delaySec]);
+
+  // Re-tick once per second when a delay is set so the visibility cutoff
+  // advances even when no new messages have arrived. With delay=0 this is
+  // pointless work, so we only schedule the timer when the user has dialed
+  // in some delay.
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (delaySec === 0) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [delaySec]);
+
   // Route through our /api/f1/race-control proxy rather than hitting OpenF1
   // directly — keeps session_key validation, error sanitization, and any
   // future caching server-side.
@@ -101,8 +153,19 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
     enabled: !!sessionKey,
   });
 
-  // OpenF1 returns oldest-first; reverse for newest-first display.
-  const messages = Array.isArray(data) ? [...data].reverse() : [];
+  // OpenF1 returns oldest-first; reverse for newest-first display, then
+  // apply the broadcast-delay filter. Messages whose timestamp is newer
+  // than (now - delay) are hidden so the feed lines up with TV.
+  const cutoff = now - delaySec * 1000;
+  const messages = (Array.isArray(data) ? [...data].reverse() : []).filter(
+    (msg) => {
+      if (delaySec === 0) return true;
+      if (!msg.date) return true;
+      const ts = new Date(msg.date).getTime();
+      if (!Number.isFinite(ts)) return true;
+      return ts <= cutoff;
+    },
+  );
 
   if (loading) {
     return (
@@ -138,30 +201,58 @@ export default function RaceControlFeed({ sessionKey, className }: Props) {
 
   return (
     <div className={cn("glass-card overflow-hidden", className)}>
-      {/* Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[var(--f1-hover)] transition-colors"
-      >
-        <div className="flex items-center gap-2">
+      {/* Header. The expand toggle and the delay slider are sibling
+          interactive controls — we deliberately AVOID nesting the slider
+          inside the toggle <button>, because nested interactives break
+          keyboard focus, click bubbling, and screen reader semantics. */}
+      <div className="w-full flex items-center justify-between px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-controls="race-control-feed-list"
+          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+        >
           <Radio className="w-4 h-4 text-f1-red" />
-          <span className="ferrari-label font-semibold">
-            Race Control
-          </span>
+          <span className="ferrari-label font-semibold">Race Control</span>
           <span className="text-ferrari-micro font-mono text-f1-muted bg-[var(--f1-hover)] px-1.5 py-0.5 rounded-ferrari">
             {messages.length}
           </span>
-        </div>
-        {expanded ? (
-          <ChevronUp className="w-3.5 h-3.5 text-f1-muted" />
-        ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-f1-muted" />
-        )}
-      </button>
+          {expanded ? (
+            <ChevronUp className="w-3.5 h-3.5 text-f1-muted" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5 text-f1-muted" />
+          )}
+        </button>
+
+        {/* Broadcast delay slider. ≥44px tall hit area on mobile via the
+            wrapper's `min-h-[44px]` and the input's `h-11 sm:h-2` — the
+            visible track is thin on desktop but the touch surface stays
+            tall on small screens. */}
+        <label
+          className="flex items-center gap-2 min-h-[44px] sm:min-h-0"
+          title="Delay the displayed timing so it matches your TV broadcast"
+        >
+          <span className="text-ferrari-micro font-mono text-f1-muted whitespace-nowrap">
+            Delay: {delaySec}s
+          </span>
+          <input
+            type="range"
+            min={DELAY_MIN}
+            max={DELAY_MAX}
+            step={DELAY_STEP}
+            value={delaySec}
+            onChange={(e) => setDelaySec(Number.parseInt(e.target.value, 10))}
+            aria-label={`Broadcast delay in seconds, currently ${delaySec}`}
+            className="w-20 sm:w-24 h-11 sm:h-2 accent-f1-red cursor-pointer"
+          />
+        </label>
+      </div>
 
       {/* Messages list */}
       {expanded && (
         <div
+          id="race-control-feed-list"
           ref={scrollRef}
           className="max-h-[300px] overflow-y-auto px-3 pb-3 space-y-1.5"
         >

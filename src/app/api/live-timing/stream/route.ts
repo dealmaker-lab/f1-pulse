@@ -27,7 +27,10 @@
  */
 
 import { NextRequest } from "next/server";
-import { F1SignalRClient } from "@/lib/f1-livetiming/signalr-client";
+import {
+  F1SignalRClient,
+  getStreamMode,
+} from "@/lib/f1-livetiming/signalr-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -238,9 +241,14 @@ export async function GET(req: NextRequest): Promise<Response> {
         }
       };
 
-      // Send the SSE retry hint and an initial open event.
+      // Send the SSE retry hint and an initial open event. `streamMode`
+      // tells the client whether the upstream is authenticated ("full") or
+      // anonymous ("public") so UIs can flag when richer telemetry is
+      // unavailable. The cookie value itself never leaves the server.
       safeEnqueue(`retry: 5000\n\n`);
-      safeEnqueue(sseFrame("open", { topics }));
+      safeEnqueue(
+        sseFrame("open", { topics, streamMode: getStreamMode() }),
+      );
 
       try {
         unsubscribe = await hub.subscribe(topics, (topic, data) => {

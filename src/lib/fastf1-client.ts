@@ -8,7 +8,16 @@
  * Cold start of the Python runtime + FastF1 archive lookup can take 5–10s
  * on first hit. Components consuming this should display a "may take a
  * moment on first request" hint while loading.
+ *
+ * For historical data (year < current year) `fetchTelemetryOverlay` first
+ * tries the TracingInsights CDN — a flat-JSON dump that skips both the
+ * sidecar cold start and the FastF1 archive lookup. On miss it transparently
+ * falls back to the Python sidecar. The `source` field on the response
+ * tells the caller which path served the request.
  */
+
+import { CURRENT_YEAR } from "./constants";
+import { fetchTracingInsightsTelemetry } from "./tracinginsights";
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -40,6 +49,15 @@ export interface TelemetryDriver {
   telemetry: TelemetrySample[];
 }
 
+/**
+ * Which backend served the telemetry — `"tracinginsights"` means the flat
+ * CDN dump (fast, historical only), `"fastf1"` means the Python sidecar
+ * (slower cold start, but works for current-year + supports specific-lap
+ * lookups). Callers can use this for diagnostics or to show a "fast path"
+ * badge in the UI.
+ */
+export type TelemetrySource = "tracinginsights" | "fastf1";
+
 export interface TelemetryOverlayResponse {
   drivers: TelemetryDriver[];
   circuit: string;
@@ -51,6 +69,8 @@ export interface TelemetryOverlayResponse {
   nSamples: number;
   /** Soft errors (e.g. one driver had no fastest lap), if any */
   warnings: string[] | null;
+  /** Backend that produced this response. */
+  source: TelemetrySource;
 }
 
 export interface FastF1LapRow {
@@ -237,6 +257,45 @@ export async function fetchTelemetryOverlay(
     throw new FastF1Error("at most 4 drivers per request", 400);
   }
 
+  // Fast path: TracingInsights CDN for historical years (data is fully
+  // published and immutable). We skip it for the current year because the
+  // weekend dumps land hours-to-days after each session — we don't want to
+  // race against the publisher. We also skip when a specific lap was
+  // requested; TracingInsights' fastest-lap path doesn't cover that yet.
+  const canUseTracing =
+    input.year < CURRENT_YEAR &&
+    (input.lap === undefined || input.lap === "fastest");
+  if (canUseTracing) {
+    try {
+      const ti = await fetchTracingInsightsTelemetry({
+        year: input.year,
+        round: input.round,
+        session: input.session,
+        driverCodes: input.drivers,
+      });
+      // TracingInsights doesn't publish circuit/event metadata in the file
+      // structure — we surface raceName for both and leave circuit unset.
+      // FastF1 fallback fills these properly when needed.
+      return {
+        drivers: ti.drivers,
+        circuit: ti.raceName,
+        event: ti.raceName,
+        session: input.session,
+        year: input.year,
+        round: input.round,
+        nSamples: ti.drivers[0]?.telemetry.length ?? 0,
+        warnings: ti.warnings.length > 0 ? ti.warnings : null,
+        source: "tracinginsights",
+      };
+    } catch (err) {
+      // Soft miss — fall through to FastF1 sidecar. Log so we can spot
+      // chronic gaps, but do not surface to the user.
+      console.warn(
+        `[fastf1-client] TracingInsights miss, falling back to sidecar: ${(err as Error).message}`,
+      );
+    }
+  }
+
   const params = new URLSearchParams({
     year: String(input.year),
     round: String(input.round),
@@ -266,6 +325,7 @@ export async function fetchTelemetryOverlay(
     round: raw.round,
     nSamples: raw.n_samples,
     warnings: raw.warnings,
+    source: "fastf1",
   };
 }
 
