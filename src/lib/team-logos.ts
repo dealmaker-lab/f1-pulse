@@ -67,16 +67,24 @@ const TEAM_DATA: Record<string, TeamInfo> = {
     color: "#B6BABD",
     logoUrl: "https://media.formula1.com/content/dam/fom-website/teams/2025/haas-logo.png.transform/2col/image.png",
   },
+  // Historical entry — Sauber ran as Kick Sauber through 2025, became Audi in 2026
   "Kick Sauber": {
     name: "Stake F1 Team Kick Sauber",
     shortName: "Sauber",
     color: "#52E252",
     logoUrl: "https://media.formula1.com/content/dam/fom-website/teams/2025/kick-sauber-logo.png.transform/2col/image.png",
   },
+  "Audi": {
+    name: "Audi Revolut F1 Team",
+    shortName: "Audi",
+    color: "#BB0A30",
+    logoUrl: undefined,
+    country: "Germany",
+  },
   "Cadillac F1 Team": {
-    name: "Cadillac F1 Team",
+    name: "Cadillac Formula 1 Team",
     shortName: "Cadillac",
-    color: "#1E3D6B",
+    color: "#101820",
     logoUrl: undefined,
     country: "USA",
   },
@@ -90,6 +98,7 @@ const TEAM_ALIASES: Record<string, string> = {
   "Alpine F1 Team": "Alpine",
   "Haas": "Haas F1 Team",
   "Sauber": "Kick Sauber",
+  "Stake": "Kick Sauber",
   "Alfa Romeo": "Kick Sauber",
   "AlphaTauri": "Racing Bulls",
   "Toro Rosso": "Racing Bulls",
@@ -97,7 +106,9 @@ const TEAM_ALIASES: Record<string, string> = {
   "Force India": "Aston Martin",
   "Renault": "Alpine",
   "Cadillac": "Cadillac F1 Team",
-  "Audi": "Kick Sauber",
+  "Cadillac Formula 1 Team": "Cadillac F1 Team",
+  "Audi F1 Team": "Audi",
+  "Audi Revolut F1 Team": "Audi",
 };
 
 export function getTeamInfo(teamName: string): TeamInfo | null {
@@ -157,39 +168,46 @@ export const DRIVER_HEADSHOTS: Record<string, string> = {
   ANT: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/A/ANDANT01_Andrea_Kimi_Antonelli/andant01.png.transform/1col/image.png",
   HAD: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/I/ISAHAD01_Isack_Hadjar/isahad01.png.transform/1col/image.png",
   BOR: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/G/GABBO01_Gabriel_Bortoleto/gabbo01.png.transform/1col/image.png",
+  LIN: "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/A/ARVLIN01_Arvid_Lindblad/arvlin01.png.transform/1col/image.png",
 };
 
 export function getDriverHeadshot(code: string): string | null {
   return DRIVER_HEADSHOTS[code] || null;
 }
 
-/** Fallback driver data when OpenF1 returns incomplete info */
+/**
+ * Fallback driver data when OpenF1 returns incomplete info.
+ * Numbers follow the 2026 grid (Norris carries #1 as reigning champion,
+ * Verstappen reverts to #3). Entries for drivers no longer racing are kept
+ * only where their number is unused in 2026.
+ */
 export const DRIVER_FALLBACK: Record<number, { code: string; name: string; team: string }> = {
-  1: { code: "VER", name: "Max Verstappen", team: "Red Bull Racing" },
-  4: { code: "NOR", name: "Lando Norris", team: "McLaren" },
-  5: { code: "GAS", name: "Pierre Gasly", team: "Alpine" },
+  1: { code: "NOR", name: "Lando Norris", team: "McLaren" },
+  3: { code: "VER", name: "Max Verstappen", team: "Red Bull Racing" },
+  5: { code: "BOR", name: "Gabriel Bortoleto", team: "Audi" },
+  6: { code: "HAD", name: "Isack Hadjar", team: "Red Bull Racing" },
   10: { code: "GAS", name: "Pierre Gasly", team: "Alpine" },
-  11: { code: "PER", name: "Sergio Perez", team: "Red Bull Racing" },
+  11: { code: "PER", name: "Sergio Perez", team: "Cadillac F1 Team" },
+  12: { code: "ANT", name: "Andrea Kimi Antonelli", team: "Mercedes" },
   14: { code: "ALO", name: "Fernando Alonso", team: "Aston Martin" },
   16: { code: "LEC", name: "Charles Leclerc", team: "Ferrari" },
   18: { code: "STR", name: "Lance Stroll", team: "Aston Martin" },
-  22: { code: "TSU", name: "Yuki Tsunoda", team: "Racing Bulls" },
   23: { code: "ALB", name: "Alexander Albon", team: "Williams" },
-  24: { code: "ZHO", name: "Guanyu Zhou", team: "Kick Sauber" },
-  27: { code: "HUL", name: "Nico Hulkenberg", team: "Kick Sauber" },
+  27: { code: "HUL", name: "Nico Hulkenberg", team: "Audi" },
+  30: { code: "LAW", name: "Liam Lawson", team: "Racing Bulls" },
   31: { code: "OCO", name: "Esteban Ocon", team: "Haas F1 Team" },
+  41: { code: "LIN", name: "Arvid Lindblad", team: "Racing Bulls" },
+  43: { code: "COL", name: "Franco Colapinto", team: "Alpine" },
   44: { code: "HAM", name: "Lewis Hamilton", team: "Ferrari" },
   55: { code: "SAI", name: "Carlos Sainz", team: "Williams" },
   63: { code: "RUS", name: "George Russell", team: "Mercedes" },
+  77: { code: "BOT", name: "Valtteri Bottas", team: "Cadillac F1 Team" },
   81: { code: "PIA", name: "Oscar Piastri", team: "McLaren" },
-  87: { code: "BOR", name: "Gabriel Bortoleto", team: "Kick Sauber" },
-  12: { code: "ANT", name: "Andrea Kimi Antonelli", team: "Mercedes" },
-  6: { code: "HAD", name: "Isack Hadjar", team: "Racing Bulls" },
-  30: { code: "LAW", name: "Liam Lawson", team: "Red Bull Racing" },
-  38: { code: "BEA", name: "Oliver Bearman", team: "Haas F1 Team" },
-  43: { code: "COL", name: "Franco Colapinto", team: "Alpine" },
-  7: { code: "DOO", name: "Jack Doohan", team: "Alpine" },
+  87: { code: "BEA", name: "Oliver Bearman", team: "Haas F1 Team" },
+  // Pre-2026 numbers that don't clash with the current grid
+  4: { code: "NOR", name: "Lando Norris", team: "McLaren" },
+  22: { code: "TSU", name: "Yuki Tsunoda", team: "Racing Bulls" },
+  24: { code: "ZHO", name: "Guanyu Zhou", team: "Kick Sauber" },
   20: { code: "MAG", name: "Kevin Magnussen", team: "Haas F1 Team" },
-  77: { code: "BOT", name: "Valtteri Bottas", team: "Kick Sauber" },
-  3: { code: "RIC", name: "Daniel Ricciardo", team: "Racing Bulls" },
+  7: { code: "DOO", name: "Jack Doohan", team: "Alpine" },
 };

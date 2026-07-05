@@ -203,7 +203,7 @@ export default function ConstructorsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {standings.slice(0, 10).map((c, i) => (
+          {standings.map((c, i) => (
             <button
               key={c.team}
               onClick={() => setSelectedTeam(c.team)}

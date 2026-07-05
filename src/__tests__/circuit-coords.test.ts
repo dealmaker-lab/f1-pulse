@@ -2,12 +2,25 @@ import { describe, it, expect } from "vitest";
 import { getCircuitCoords, CIRCUIT_COORDS } from "@/lib/circuit-coords";
 
 describe("getCircuitCoords", () => {
-  it("all 24 circuits in the table return non-null", () => {
+  it("all 25 circuits in the table return non-null", () => {
     const keys = Object.keys(CIRCUIT_COORDS);
-    expect(keys).toHaveLength(24);
+    expect(keys).toHaveLength(25);
     for (const key of keys) {
       expect(getCircuitCoords(key)).not.toBeNull();
     }
+  });
+
+  it("resolves OpenF1 circuit_short_name aliases", () => {
+    expect(getCircuitCoords("Spielberg")?.label).toBe("Red Bull Ring");
+    expect(getCircuitCoords("Sakhir")?.label).toBe("Bahrain");
+    expect(getCircuitCoords("Melbourne")?.label).toBe("Melbourne");
+    expect(getCircuitCoords("Catalunya")?.label).toBe("Barcelona");
+    expect(getCircuitCoords("Austin")?.label).toBe("Austin");
+    expect(getCircuitCoords("Lusail")?.label).toBe("Losail");
+    expect(getCircuitCoords("Singapore")?.label).toBe("Singapore");
+    expect(getCircuitCoords("Yas Marina Circuit")?.label).toBe("Yas Marina");
+    expect(getCircuitCoords("Madring")?.label).toBe("Madrid (Madring)");
+    expect(getCircuitCoords("madrid")?.label).toBe("Madrid (Madring)");
   });
 
   it("returns null for unknown circuit names", () => {

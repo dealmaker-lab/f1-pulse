@@ -6,6 +6,8 @@
  * `supabase/migrations/20260429_fantasy_f1.sql` — apply with `npx supabase db push`.
  */
 
+import { getTeamInfo } from "@/lib/team-logos";
+
 /** Hard cap on a lineup's combined driver+constructor cost, in $M. */
 export const FANTASY_BUDGET_M = 100;
 
@@ -43,16 +45,15 @@ export const DEFAULT_2026_DRIVER_PRICES: Record<string, number> = {
   GAS: 13.0, // Gasly
   HAD: 12.0, // Hadjar
   // Tier C
-  TSU: 11.0, // Tsunoda
-  HUL: 10.0, // Hulkenberg
-  LAW: 10.0, // Lawson
+  HUL: 10.0, // Hulkenberg (Audi)
+  LAW: 10.0, // Lawson (Racing Bulls)
   STR: 9.5,  // Stroll
   OCO: 9.0,  // Ocon
   BEA: 8.5,  // Bearman
   // Tier D
-  COL: 7.0,  // Colapinto
-  BOR: 6.5,  // Bortoleto
-  DOO: 6.0,  // Doohan
+  COL: 7.0,  // Colapinto (Alpine)
+  BOR: 6.5,  // Bortoleto (Audi)
+  LIN: 6.0,  // Lindblad (Racing Bulls — 2026 rookie)
   // Cadillac F1 Team (2026 entry)
   PER: 8.5,  // Perez (Cadillac)
   BOT: 8.0,  // Bottas (Cadillac)
@@ -72,7 +73,7 @@ export const DEFAULT_2026_CONSTRUCTOR_PRICES: Record<string, number> = {
   "Alpine": 11.0,
   "Racing Bulls": 11.0,
   "Haas F1 Team": 9.0,
-  "Kick Sauber": 7.0,
+  "Audi": 7.0,
   "Cadillac F1 Team": 5.0,
 };
 
@@ -135,6 +136,13 @@ export function scoreLineup(input: {
   const byCode = new Map<string, FantasyResultRow>();
   for (const r of results) byCode.set(r.code, r);
 
+  // Lineups store canonical team-logos names ("Red Bull Racing") while
+  // Jolpica results use its own labels ("Red Bull", "Sauber", …) — without
+  // normalization several constructors silently scored 0.
+  const canonicalTeam = (name: string): string =>
+    getTeamInfo(name)?.name ?? name;
+  const constructorCanonical = canonicalTeam(constructor);
+
   // Helper: per-driver score (used both for the lineup picks and the
   // constructor sum-of-its-drivers calculation).
   const driverScore = (row: FantasyResultRow | undefined): number => {
@@ -164,7 +172,9 @@ export function scoreLineup(input: {
   }
 
   // Constructor score = sum of its drivers' driver-scores / 2.
-  const teamRows = results.filter((r) => r.team === constructor);
+  const teamRows = results.filter(
+    (r) => canonicalTeam(r.team) === constructorCanonical,
+  );
   const constructorRaw = teamRows.reduce((s, r) => s + driverScore(r), 0);
   total += constructorRaw / 2;
 

@@ -126,6 +126,31 @@ export const CIRCUIT_COORDS: Record<string, CircuitCoord> = {
     tz: "Asia/Dubai",
     label: "Yas Marina",
   },
+  madrid: {
+    lat: 40.4681,
+    lon: -3.6155,
+    tz: "Europe/Madrid",
+    label: "Madrid (Madring)",
+  },
+};
+
+/**
+ * OpenF1 `circuit_short_name` values that differ from our canonical keys.
+ * Without these, weather features were silently blank for ~8 circuits
+ * (OpenF1 says "Spielberg", our key is "red-bull-ring", etc.).
+ */
+const CIRCUIT_COORD_ALIASES: Record<string, string> = {
+  sakhir: "bahrain",
+  melbourne: "albert-park",
+  catalunya: "barcelona",
+  spielberg: "red-bull-ring",
+  austin: "circuit-of-the-americas",
+  cota: "circuit-of-the-americas",
+  lusail: "losail",
+  singapore: "marina-bay",
+  "yas-marina-circuit": "yas-marina",
+  "sao-paulo": "interlagos",
+  madring: "madrid",
 };
 
 /**
@@ -139,5 +164,6 @@ export function getCircuitCoords(
 ): CircuitCoord | null {
   if (!name) return null;
   const normalized = name.trim().toLowerCase().replace(/\s+/g, "-");
-  return CIRCUIT_COORDS[normalized] ?? null;
+  const key = CIRCUIT_COORD_ALIASES[normalized] ?? normalized;
+  return CIRCUIT_COORDS[key] ?? null;
 }
