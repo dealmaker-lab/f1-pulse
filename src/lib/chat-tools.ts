@@ -24,6 +24,7 @@ const FETCH_TIMEOUT_MS = 8_000;
 /** Minimal Jolpica/Ergast envelope shapes for the routes we consume. */
 interface JolpicaRoot {
   MRData?: {
+    total?: string;
     StandingsTable?: {
       StandingsLists?: Array<{
         DriverStandings?: JolpicaDriverStanding[];
@@ -35,6 +36,11 @@ interface JolpicaRoot {
         round: string;
         raceName: string;
         date: string;
+        time?: string;
+        Circuit?: {
+          circuitName?: string;
+          Location?: { country?: string; locality?: string };
+        };
         Results?: JolpicaResult[];
       }>;
     };
@@ -156,6 +162,63 @@ async function fetchApi(
       safeFetch(`${JOLPICA}/${year}/drivers/${driver2}/results.json?limit=100`),
     ]);
     return { driver1: a, driver2: b };
+  }
+  if (path === "/api/f1/races") {
+    // Season calendar — raw Jolpica race rows (getSeasonCalendar maps them).
+    const json = (await safeFetch(`${JOLPICA}/${year}.json?limit=100`)) as JolpicaRoot;
+    return json?.MRData?.RaceTable?.Races ?? [];
+  }
+  if (path === "/api/f1/standings/progression") {
+    // Cumulative points per driver per round, built from paginated season
+    // results (Jolpica caps limit at 100 rows per page). Sprint points are
+    // not included — Jolpica exposes them on a separate endpoint.
+    const races = new Map<
+      number,
+      { raceName: string; rows: Array<{ code: string; points: number }> }
+    >();
+    for (let offset = 0; offset < 1500; offset += 100) {
+      const json = (await safeFetch(
+        `${JOLPICA}/${year}/results.json?limit=100&offset=${offset}`,
+      )) as JolpicaRoot;
+      for (const race of json?.MRData?.RaceTable?.Races ?? []) {
+        const rnd = parseInt(race.round);
+        if (!races.has(rnd)) races.set(rnd, { raceName: race.raceName, rows: [] });
+        for (const r of race.Results ?? []) {
+          races.get(rnd)!.rows.push({
+            code: r.Driver?.code ?? r.Driver?.familyName ?? "?",
+            points: parseFloat(r.points || "0"),
+          });
+        }
+      }
+      const total = parseInt(json?.MRData?.total ?? "0");
+      if (Number.isNaN(total) || offset + 100 >= total) break;
+    }
+    const rounds = Array.from(races.keys()).sort((a, b) => a - b);
+    const raceNames: string[] = [];
+    const cumulative = new Map<string, number>();
+    const history = new Map<string, number[]>();
+    for (const rnd of rounds) {
+      const race = races.get(rnd)!;
+      raceNames.push(race.raceName);
+      for (const row of race.rows) {
+        cumulative.set(row.code, (cumulative.get(row.code) ?? 0) + row.points);
+      }
+      cumulative.forEach((pts, code) => {
+        if (!history.has(code)) {
+          history.set(code, Array(raceNames.length - 1).fill(0));
+        }
+        history.get(code)!.push(pts);
+      });
+    }
+    const drivers = Array.from(history.entries())
+      .map(([code, pointsHistory]) => ({
+        code,
+        points: pointsHistory[pointsHistory.length - 1] ?? 0,
+        pointsHistory,
+      }))
+      .sort((a, b) => b.points - a.points)
+      .slice(0, 10);
+    return { raceNames, drivers };
   }
 
   // ── OpenF1 (live + recent telemetry, 2023+) ─────────────────────────
@@ -439,15 +502,16 @@ export const chatTools = {
     execute: async ({ year, round }) => {
       const data = await fetchApi("/api/f1/results", { year, round });
       if (!Array.isArray(data)) return data;
+      // fetchApi returns the mapped shape ({ driver: { code, name }, team,
+      // grid, position, status }) — not raw Jolpica rows.
       return data
         .map((r: Record<string, unknown>) => {
-          const driver = r.Driver as Record<string, string> | undefined;
-          const constructor = r.Constructor as Record<string, string> | undefined;
+          const driver = r.driver as { code?: string; name?: string } | undefined;
           const grid = Number(r.grid) || 0;
           const finish = Number(r.position) || 0;
           return {
-            driver: driver?.code || driver?.familyName,
-            team: constructor?.name,
+            driver: driver?.code || driver?.name,
+            team: r.team,
             grid,
             finish,
             gained: grid - finish,

@@ -107,11 +107,16 @@ export async function GET(req: NextRequest) {
     // Run transcriptions in parallel — the route handler already caches each
     // url in memory, so warm instances respond instantly. Cold instances take
     // the full ~Whisper-latency hit, which is why we cap at 20.
+    // Forward the caller's cookies — /api/radio/transcribe sits behind the
+    // same Clerk gate (and Vercel deployment protection); a bare
+    // server-to-server fetch 401s and every search silently returned zero.
+    const cookie = req.headers.get("cookie") ?? "";
     const transcriptions = await Promise.all(
       toSearch.map(async (r) => {
         try {
           const res = await fetch(getTranscribeUrl(req, r.recording_url), {
             cache: "no-store",
+            headers: cookie ? { cookie } : undefined,
           });
           if (!res.ok) return null;
           const data = (await res.json()) as { text?: string };

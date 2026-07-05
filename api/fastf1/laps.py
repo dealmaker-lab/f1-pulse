@@ -70,9 +70,14 @@ def _send_json(handler, status: int, body: dict) -> None:
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(payload)))
-    handler.send_header(
-        "Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400"
-    )
+    # Never edge-cache errors — a cached 404 during a live weekend would keep
+    # serving "session not found" for an hour after the data appears.
+    if status >= 400:
+        handler.send_header("Cache-Control", "no-store")
+    else:
+        handler.send_header(
+            "Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400"
+        )
     handler.send_header("Access-Control-Allow-Origin", "*")
     handler.end_headers()
     handler.wfile.write(payload)
