@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateSessionKey, sanitizeError } from "@/lib/api-validation";
+import { openf1Fetch, OpenF1Error } from "@/lib/openf1-fetch";
 
 /**
  * Proxy for OpenF1's `/race_control` endpoint.
  *
- * Reasons to proxy instead of hitting OpenF1 from the browser directly:
- *  - Validates `session_key` (positive integer) before forwarding
- *  - Centralizes upstream-URL config — moves with OpenF1 changes
- *  - Sanitizes upstream errors before they reach the client
- *  - Lets us cache/rate-limit later without touching consumers
+ * Validates `session_key`, rate-limits + error-guards the upstream call, and
+ * accepts optional `date_gt` (ISO → OpenF1 `date>`) so a live poller fetches
+ * only new race-control entries instead of the whole session each tick.
  *
- * Race control feed is the most time-critical "live" surface — we use
- * `cache: "no-store"` upstream and let the client's polling drive freshness.
+ * Race control feed is the most time-critical "live" surface — the client's
+ * polling drives freshness.
  */
-
-const BASE = "https://api.openf1.org/v1";
-
 export async function GET(req: NextRequest) {
   const sessionKey = validateSessionKey(
     req.nextUrl.searchParams.get("session_key"),
   );
+  const dateGt = req.nextUrl.searchParams.get("date_gt");
   if (!sessionKey) {
     return NextResponse.json(
       { error: "Valid session_key (positive integer) required" },
@@ -28,23 +25,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(
-      `${BASE}/race_control?session_key=${sessionKey}`,
-      { cache: "no-store" },
-    );
-    if (!res.ok) {
-      return NextResponse.json(
-        { error: "Upstream API error" },
-        { status: res.status },
-      );
-    }
-    const data = await res.json();
-    return NextResponse.json(data);
+    const data = await openf1Fetch<unknown[]>("race_control", {
+      session_key: sessionKey,
+      "date>": dateGt && !Number.isNaN(Date.parse(dateGt)) ? dateGt : undefined,
+    });
+    return NextResponse.json(Array.isArray(data) ? data : []);
   } catch (err) {
+    const status = err instanceof OpenF1Error ? err.status : 502;
     console.error("race-control proxy error:", sanitizeError(err));
     return NextResponse.json(
       { error: "Failed to fetch race control" },
-      { status: 502 },
+      { status },
     );
   }
 }

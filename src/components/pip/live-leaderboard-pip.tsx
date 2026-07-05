@@ -253,28 +253,29 @@ export function LiveLeaderboardPip(): JSX.Element {
     const ctrl = new AbortController();
     let timer: number | null = null;
 
+    // Delta cursors + accumulators. After the first tick we ask OpenF1 only
+    // for entries newer than what we've seen (`date>`), so a late-race poll
+    // transfers a handful of new rows instead of the whole multi-MB history.
+    let posSince = "";
+    let intSince = "";
+    let rcSince = "";
+    const posByDriver = new Map<number, PositionEntry>();
+    const intByDriver = new Map<number, IntervalEntry>();
+    let rcAccum: RaceControlEntry[] = [];
+    const maxDate = (rows: { date?: string }[], seed: string): string =>
+      rows.reduce((m, r) => (r.date && r.date > m ? r.date : m), seed);
+
     const poll = async (): Promise<void> => {
       try {
-        // Drivers change rarely — refetch each tick anyway because OpenF1
-        // returns near-empty arrays at the very start of a session. Cheap
-        // enough at session-key cardinality.
+        const gt = (base: string, since: string) =>
+          since ? `${base}&date_gt=${encodeURIComponent(since)}` : base;
+        // Drivers: refetch full each tick — small, and OpenF1 returns
+        // near-empty arrays at the very start of a session.
         const [drvRes, posRes, intRes, rcRes] = await Promise.all([
-          fetch(`/api/f1/drivers?session_key=${sk}`, {
-            cache: "no-store",
-            signal: ctrl.signal,
-          }),
-          fetch(`/api/f1/positions?session_key=${sk}`, {
-            cache: "no-store",
-            signal: ctrl.signal,
-          }),
-          fetch(`/api/f1/intervals?session_key=${sk}`, {
-            cache: "no-store",
-            signal: ctrl.signal,
-          }),
-          fetch(`/api/f1/race-control?session_key=${sk}`, {
-            cache: "no-store",
-            signal: ctrl.signal,
-          }).catch(() => null),
+          fetch(`/api/f1/drivers?session_key=${sk}`, { cache: "no-store", signal: ctrl.signal }),
+          fetch(gt(`/api/f1/positions?session_key=${sk}`, posSince), { cache: "no-store", signal: ctrl.signal }),
+          fetch(gt(`/api/f1/intervals?session_key=${sk}`, intSince), { cache: "no-store", signal: ctrl.signal }),
+          fetch(gt(`/api/f1/race-control?session_key=${sk}`, rcSince), { cache: "no-store", signal: ctrl.signal }).catch(() => null),
         ]);
         if (ctrl.signal.aborted) return;
         const drvJson: unknown = await drvRes.json();
@@ -282,10 +283,36 @@ export function LiveLeaderboardPip(): JSX.Element {
         const intJson: unknown = await intRes.json();
         const rcJson: unknown = rcRes ? await rcRes.json() : [];
         if (ctrl.signal.aborted) return;
+
         if (Array.isArray(drvJson)) setDrivers(drvJson as DriverInfo[]);
-        if (Array.isArray(posJson)) setPositions(posJson as PositionEntry[]);
-        if (Array.isArray(intJson)) setIntervals(intJson as IntervalEntry[]);
-        if (Array.isArray(rcJson)) setRaceControl(rcJson as RaceControlEntry[]);
+
+        if (Array.isArray(posJson) && posJson.length) {
+          const rows = posJson as PositionEntry[];
+          for (const p of rows) {
+            const prev = posByDriver.get(p.driver_number);
+            if (!prev || p.date > prev.date) posByDriver.set(p.driver_number, p);
+          }
+          posSince = maxDate(rows, posSince);
+          setPositions(Array.from(posByDriver.values()));
+        }
+
+        if (Array.isArray(intJson) && intJson.length) {
+          const rows = intJson as IntervalEntry[];
+          for (const iv of rows) {
+            const prev = intByDriver.get(iv.driver_number);
+            if (!prev || iv.date > prev.date) intByDriver.set(iv.driver_number, iv);
+          }
+          intSince = maxDate(rows, intSince);
+          setIntervals(Array.from(intByDriver.values()));
+        }
+
+        if (Array.isArray(rcJson) && rcJson.length) {
+          const rows = rcJson as RaceControlEntry[];
+          // Keep the most recent 60 messages so the marquee has context.
+          rcAccum = [...rcAccum, ...rows].slice(-60);
+          rcSince = maxDate(rows, rcSince);
+          setRaceControl(rcAccum);
+        }
       } catch {
         // Network blip — let the next tick retry. Silently swallow because
         // the PiP window has no place to display an error toast.
