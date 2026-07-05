@@ -228,20 +228,28 @@ export default function H2HPage() {
 
   // Load driver list for the year
   useEffect(() => {
-    fetch(`/api/f1/standings/drivers?year=${year}`)
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
+    fetch(`/api/f1/standings/drivers?year=${year}`, { signal })
       .then((r) => r.json())
       .then((standings) => {
+        if (signal.aborted) return;
         if (Array.isArray(standings)) {
           setDriverList(standings);
-          // Auto-select top 2 if current selections aren't in the list
+          // Auto-select top 2 if current selections aren't in the list.
+          // Functional updates so we don't have to depend on (and re-run
+          // for) every d1Code/d2Code change.
           if (standings.length >= 2) {
             const codes = standings.map((s: StandingEntry) => s.driver.code);
-            if (!codes.includes(d1Code)) setD1Code(standings[0].driver.code);
-            if (!codes.includes(d2Code)) setD2Code(standings[1].driver.code);
+            setD1Code((cur) => (codes.includes(cur) ? cur : standings[0].driver.code));
+            setD2Code((cur) => (codes.includes(cur) ? cur : standings[1].driver.code));
           }
         }
       })
-      .catch(console.error);
+      .catch((err) => {
+        if (!signal.aborted) console.error(err);
+      });
+    return () => ctrl.abort();
   }, [year]);
 
   // Fetch H2H data

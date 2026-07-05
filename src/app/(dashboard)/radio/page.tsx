@@ -219,10 +219,12 @@ export default function RadioPage() {
     setSelectedSession(null);
     setAvailableSessionKeys(new Set());
 
-    fetch(`/api/f1/sessions?year=${year}`)
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
+    fetch(`/api/f1/sessions?year=${year}`, { signal })
       .then((r) => r.json())
       .then(async (data: SessionInfo[]) => {
-        if (!Array.isArray(data)) return;
+        if (signal.aborted || !Array.isArray(data)) return;
         const pastOnly = filterAllPastSessions(data);
 
         // Check radio availability for all sessions
@@ -230,9 +232,11 @@ export default function RadioPage() {
         if (sessionKeys.length > 0) {
           try {
             const availRes = await fetch(
-              `/api/f1/radio/availability?session_keys=${sessionKeys.join(",")}`
+              `/api/f1/radio/availability?session_keys=${sessionKeys.join(",")}`,
+              { signal }
             );
             const availData = await availRes.json();
+            if (signal.aborted) return;
             const availSet = new Set<number>(availData.available || []);
             setAvailableSessionKeys(availSet);
 
@@ -248,6 +252,7 @@ export default function RadioPage() {
               setSelectedSession(withRadio[withRadio.length - 1]);
             }
           } catch {
+            if (signal.aborted) return;
             // Fallback: show all sessions if availability check fails
             setAllSessions(pastOnly);
             const races = pastOnly.filter((s) => s.session_name === "Race");
@@ -260,7 +265,10 @@ export default function RadioPage() {
         }
       })
       .catch(() => {})
-      .finally(() => setLoadingSessions(false));
+      .finally(() => {
+        if (!signal.aborted) setLoadingSessions(false);
+      });
+    return () => ctrl.abort();
   }, [year]);
 
   // Fetch radio data for selected session

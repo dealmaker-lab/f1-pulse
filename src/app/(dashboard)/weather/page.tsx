@@ -95,13 +95,19 @@ export default function WeatherPage() {
 
   // Fetch ALL sessions for the year, filter client-side by session_name
   useEffect(() => {
-    fetch(`/api/f1/sessions?year=${year}`)
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
+    fetch(`/api/f1/sessions?year=${year}`, { signal })
       .then((r) => r.json())
       .then((data: SessionInfo[]) => {
+        if (signal.aborted) return;
         const arr = Array.isArray(data) ? data : [];
         setAllSessions(arr);
       })
-      .catch(() => setError("Failed to load sessions"));
+      .catch(() => {
+        if (!signal.aborted) setError("Failed to load sessions");
+      });
+    return () => ctrl.abort();
   }, [year]);
 
   // Filter sessions to only past sessions matching the filter, sorted chronologically (earliest first)
@@ -119,18 +125,33 @@ export default function WeatherPage() {
     }
   }, [sessions]);
 
-  // Fetch weather + laps + drivers when session changes
+  // Fetch weather + laps + drivers when session changes. State is cleared
+  // up-front so a session with no data can't keep the previous session's
+  // charts rendered.
   useEffect(() => {
-    if (!selectedSession) return;
+    if (!selectedSession) {
+      setWeather([]);
+      setLaps([]);
+      setDrivers([]);
+      setSelectedDriver(null);
+      return;
+    }
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
     setLoading(true);
     setError(null);
+    setWeather([]);
+    setLaps([]);
+    setDrivers([]);
+    setSelectedDriver(null);
 
     Promise.all([
-      fetch(`/api/f1/weather?session_key=${selectedSession.session_key}`).then((r) => r.json()),
-      fetch(`/api/f1/laps?session_key=${selectedSession.session_key}`).then((r) => r.json()),
-      fetch(`/api/f1/drivers?session_key=${selectedSession.session_key}`).then((r) => r.json()),
+      fetch(`/api/f1/weather?session_key=${selectedSession.session_key}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/laps?session_key=${selectedSession.session_key}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/drivers?session_key=${selectedSession.session_key}`, { signal }).then((r) => r.json()),
     ])
       .then(([w, l, d]) => {
+        if (signal.aborted) return;
         setWeather(Array.isArray(w) ? w : []);
         setLaps(Array.isArray(l) ? l : []);
         const unique = Array.isArray(d)
@@ -141,8 +162,13 @@ export default function WeatherPage() {
         setDrivers(unique as DriverInfo[]);
         if (unique.length) setSelectedDriver(unique[0] as DriverInfo);
       })
-      .catch(() => setError("Failed to load data"))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (!signal.aborted) setError("Failed to load data");
+      })
+      .finally(() => {
+        if (!signal.aborted) setLoading(false);
+      });
+    return () => ctrl.abort();
   }, [selectedSession]);
 
   // ===== Weather timeline (temp + humidity over the race) =====
@@ -292,7 +318,7 @@ export default function WeatherPage() {
             <div>
               <label className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold block mb-1.5">Driver</label>
               <div className="flex flex-wrap gap-1">
-                {drivers.slice(0, 10).map((d) => {
+                {drivers.map((d) => {
                   const c = `#${d.team_colour || "888"}`;
                   const isSelected = selectedDriver?.driver_number === d.driver_number;
                   return (

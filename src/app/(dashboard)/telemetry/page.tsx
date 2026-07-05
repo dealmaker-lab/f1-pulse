@@ -163,16 +163,24 @@ export default function TelemetryPage() {
 
   // ===== Fetch ALL sessions for the year, filter client-side by session_name =====
   useEffect(() => {
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
     setLoadingSessions(true);
     setError(null);
-    fetch(`/api/f1/sessions?year=${year}`)
+    fetch(`/api/f1/sessions?year=${year}`, { signal })
       .then((r) => r.json())
       .then((data: SessionInfo[]) => {
+        if (signal.aborted) return;
         const arr = Array.isArray(data) ? data : [];
         setAllSessions(arr);
       })
-      .catch(() => setError("Failed to load sessions"))
-      .finally(() => setLoadingSessions(false));
+      .catch(() => {
+        if (!signal.aborted) setError("Failed to load sessions");
+      })
+      .finally(() => {
+        if (!signal.aborted) setLoadingSessions(false);
+      });
+    return () => ctrl.abort();
   }, [year]);
 
   // Filter sessions by session_name (official F1 session names)
@@ -202,10 +210,12 @@ export default function TelemetryPage() {
     setRawData1([]);
     setRawData2([]);
 
-    fetch(`/api/f1/drivers?session_key=${selectedSession.session_key}`)
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
+    fetch(`/api/f1/drivers?session_key=${selectedSession.session_key}`, { signal })
       .then((r) => r.json())
       .then((data: DriverInfo[]) => {
-        if (!Array.isArray(data)) return;
+        if (signal.aborted || !Array.isArray(data)) return;
         const unique = Array.from(
           new Map(data.map((d) => [d.driver_number, d])).values()
         ).sort((a, b) => a.driver_number - b.driver_number);
@@ -215,17 +225,26 @@ export default function TelemetryPage() {
           setDriver2(unique[1]);
         }
       })
-      .catch(() => setError("Failed to load drivers"))
-      .finally(() => setLoadingDrivers(false));
+      .catch(() => {
+        if (!signal.aborted) setError("Failed to load drivers");
+      })
+      .finally(() => {
+        if (!signal.aborted) setLoadingDrivers(false);
+      });
+    return () => ctrl.abort();
   }, [selectedSession]);
 
   // ===== Fetch laps for each driver =====
   useEffect(() => {
     if (!selectedSession || !driver1) return;
-    fetch(`/api/f1/laps?session_key=${selectedSession.session_key}&driver_number=${driver1.driver_number}`)
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
+    setLaps1([]);
+    setSelectedLap1(null);
+    fetch(`/api/f1/laps?session_key=${selectedSession.session_key}&driver_number=${driver1.driver_number}`, { signal })
       .then((r) => r.json())
       .then((data: LapInfo[]) => {
-        if (!Array.isArray(data)) return;
+        if (signal.aborted || !Array.isArray(data)) return;
         const valid = data.filter((l) => l.lap_duration && !l.is_pit_out_lap);
         setLaps1(valid);
         if (valid.length) {
@@ -236,14 +255,19 @@ export default function TelemetryPage() {
         }
       })
       .catch(() => {});
+    return () => ctrl.abort();
   }, [selectedSession, driver1]);
 
   useEffect(() => {
     if (!selectedSession || !driver2) return;
-    fetch(`/api/f1/laps?session_key=${selectedSession.session_key}&driver_number=${driver2.driver_number}`)
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
+    setLaps2([]);
+    setSelectedLap2(null);
+    fetch(`/api/f1/laps?session_key=${selectedSession.session_key}&driver_number=${driver2.driver_number}`, { signal })
       .then((r) => r.json())
       .then((data: LapInfo[]) => {
-        if (!Array.isArray(data)) return;
+        if (signal.aborted || !Array.isArray(data)) return;
         const valid = data.filter((l) => l.lap_duration && !l.is_pit_out_lap);
         setLaps2(valid);
         if (valid.length) {
@@ -254,6 +278,7 @@ export default function TelemetryPage() {
         }
       })
       .catch(() => {});
+    return () => ctrl.abort();
   }, [selectedSession, driver2]);
 
   // ===== Fetch car data for both drivers =====
@@ -262,13 +287,16 @@ export default function TelemetryPage() {
     setLoadingTelemetry(true);
     setError(null);
 
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
     Promise.all([
-      fetch(`/api/f1/car-data?session_key=${selectedSession.session_key}&driver_number=${driver1.driver_number}`)
+      fetch(`/api/f1/car-data?session_key=${selectedSession.session_key}&driver_number=${driver1.driver_number}`, { signal })
         .then((r) => r.ok ? r.json() : []),
-      fetch(`/api/f1/car-data?session_key=${selectedSession.session_key}&driver_number=${driver2.driver_number}`)
+      fetch(`/api/f1/car-data?session_key=${selectedSession.session_key}&driver_number=${driver2.driver_number}`, { signal })
         .then((r) => r.ok ? r.json() : []),
     ])
       .then(([d1, d2]) => {
+        if (signal.aborted) return;
         const data1 = Array.isArray(d1) ? d1 : [];
         const data2 = Array.isArray(d2) ? d2 : [];
         setRawData1(data1);
@@ -281,8 +309,13 @@ export default function TelemetryPage() {
           setError(`No telemetry data for ${driver2.name_acronym} — may have retired or data is unavailable`);
         }
       })
-      .catch(() => setError("Failed to load telemetry data — try a different session"))
-      .finally(() => setLoadingTelemetry(false));
+      .catch(() => {
+        if (!signal.aborted) setError("Failed to load telemetry data — try a different session");
+      })
+      .finally(() => {
+        if (!signal.aborted) setLoadingTelemetry(false);
+      });
+    return () => ctrl.abort();
   }, [selectedSession, driver1, driver2]);
 
   // ===== Process telemetry for selected laps =====
