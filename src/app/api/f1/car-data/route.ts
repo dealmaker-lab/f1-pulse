@@ -1,34 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateSessionKey, validateDriverNumber, sanitizeError } from "@/lib/api-validation";
+import { openf1Fetch, OpenF1Error } from "@/lib/openf1-fetch";
 
-const BASE = "https://api.openf1.org/v1";
-
+/**
+ * Car telemetry (~3.7Hz). A full race session is multi-MB per driver;
+ * `sample=N` (1..50) decimates server-side for consumers that only need
+ * coarse traces (the replay page keeps every 20th sample). Telemetry
+ * deep-dive keeps full resolution by omitting the param.
+ */
 export async function GET(req: NextRequest) {
   const sessionKey = validateSessionKey(req.nextUrl.searchParams.get("session_key"));
   const driverNumber = validateDriverNumber(req.nextUrl.searchParams.get("driver_number"));
+  const sampleRaw = parseInt(req.nextUrl.searchParams.get("sample") || "1");
+  const sample = Number.isFinite(sampleRaw) ? Math.min(50, Math.max(1, sampleRaw)) : 1;
 
   if (!sessionKey || !driverNumber) {
     return NextResponse.json(
       { error: "Valid session_key and driver_number (positive integers) required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   try {
-    const params = new URLSearchParams({
-      session_key: String(sessionKey),
-      driver_number: String(driverNumber),
+    const data = await openf1Fetch<unknown[]>("car_data", {
+      session_key: sessionKey,
+      driver_number: driverNumber,
     });
-    const res = await fetch(`${BASE}/car_data?${params}`, { cache: "no-store" });
+    if (!Array.isArray(data)) return NextResponse.json([]);
 
-    if (!res.ok) {
-      return NextResponse.json({ error: "Upstream API error" }, { status: res.status });
-    }
-
-    const data = await res.json();
-    return NextResponse.json(data);
+    const out = sample > 1 ? data.filter((_, idx) => idx % sample === 0) : data;
+    return NextResponse.json(out, {
+      headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600" },
+    });
   } catch (err) {
+    const status = err instanceof OpenF1Error ? err.status : 500;
     console.error("Car data fetch error:", sanitizeError(err));
-    return NextResponse.json({ error: "Failed to fetch car data" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch car data" }, { status });
   }
 }

@@ -408,7 +408,10 @@ export default function RaceReplayPage() {
 
           const results = await Promise.all(
             batch.map((num) =>
-              fetch(`/api/f1/location?session_key=${sk}&driver_number=${num}`, { signal })
+              // slim=1 drops (0,0) pit/grid points and strips to {date,x,y};
+              // sample=4 keeps ~1 point/sec — both server-side, so we
+              // transfer ~10% of the raw feed instead of discarding it here.
+              fetch(`/api/f1/location?session_key=${sk}&driver_number=${num}&sample=4&slim=1`, { signal })
                 .then((r) => r.json())
                 .then((data) => ({ num, data: Array.isArray(data) ? data : [] }))
                 .catch(() => ({ num, data: [] as LocationPoint[] }))
@@ -418,9 +421,7 @@ export default function RaceReplayPage() {
           if (signal.aborted) return;
 
           results.forEach(({ num, data }) => {
-            // Filter out (0,0) points (pit/grid) and sample every 4th (~1/sec)
-            const valid = data.filter((p: LocationPoint) => p.x !== 0 || p.y !== 0);
-            locMap[num] = valid.filter((_: LocationPoint, idx: number) => idx % 4 === 0);
+            locMap[num] = data;
           });
         }
 
@@ -472,25 +473,28 @@ export default function RaceReplayPage() {
         if (signal.aborted) return;
         setLocationData(locMap);
 
-        // Phase 3: car telemetry — load top 10 drivers for better coverage
+        // Phase 3: car telemetry — first 10 drivers, decimated server-side
+        // (sample=20 ≈ 0.2Hz, all the replay cards need) and fetched in
+        // parallel batches of 5 instead of strictly serially.
         setLoadingMsg("Loading car telemetry...");
         const telemetryDrivers = driverNums.slice(0, 10);
         const cdMap: Record<number, CarDataEntry[]> = {};
 
-        for (const num of telemetryDrivers) {
+        for (let i = 0; i < telemetryDrivers.length; i += 5) {
           if (signal.aborted) return;
-          try {
-            const res = await fetch(`/api/f1/car-data?session_key=${sk}&driver_number=${num}`, { signal });
-            const data = await res.json();
-            if (Array.isArray(data)) {
-              // Filter to only entries with actual data (speed > 0 or during race)
-              // and sample every 20th for manageable size
-              const sampled = data.filter((_: CarDataEntry, idx: number) => idx % 20 === 0);
-              cdMap[num] = sampled;
-            }
-          } catch {
-            // Skip individual driver failures
-          }
+          const batch = telemetryDrivers.slice(i, i + 5);
+          const results = await Promise.all(
+            batch.map((num) =>
+              fetch(`/api/f1/car-data?session_key=${sk}&driver_number=${num}&sample=20`, { signal })
+                .then((r) => r.json())
+                .then((data) => ({ num, data: Array.isArray(data) ? (data as CarDataEntry[]) : null }))
+                .catch(() => ({ num, data: null }))
+            )
+          );
+          if (signal.aborted) return;
+          results.forEach(({ num, data }) => {
+            if (data) cdMap[num] = data;
+          });
         }
         if (signal.aborted) return;
         setCarDataMap(cdMap);
