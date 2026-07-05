@@ -549,3 +549,20 @@ html, body {
 .hero-anim-2 { animation-delay: 0.24s; }
 .hero-anim-3 { animation-delay: 0.34s; }
 .hero-anim-4 { animation-delay: 0.46s; }
+
+/* ── OLED (pure-black) mode — race-day battery saver on dark theme ──
+   Overrides the dark surface tokens to true black so OLED panels power
+   down those pixels. Cards keep a hairline border to stay legible. */
+html.oled {
+  --f1-black:   #000000;
+  --f1-surface: #050505;
+  --f1-card:    #0a0a0a;
+  --f1-stripe:  rgba(255,255,255,0.02);
+}
+html.oled .glass-card {
+  background: #0a0a0a;
+  backdrop-filter: none;
+}
+html.oled body {
+  background-color: #000000;
+}

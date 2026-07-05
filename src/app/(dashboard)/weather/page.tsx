@@ -3,9 +3,10 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   CloudRain, Thermometer, Droplets, Wind, Loader2,
-  ChevronDown, AlertTriangle, TrendingUp,
+  ChevronDown, AlertTriangle, TrendingUp, Gauge as GaugeIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import WeatherGauge from "@/components/weather/gauge";
 import { getTeamLogoUrl } from "@/lib/team-logos";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -222,6 +223,12 @@ export default function WeatherPage() {
     }));
   }, [lapTempCorrelation]);
 
+  // Latest weather reading (for the complication gauges)
+  const latestWeather = useMemo(
+    () => (weather.length ? weather[weather.length - 1] : null),
+    [weather],
+  );
+
   // ===== Stats summary =====
   const stats = useMemo(() => {
     if (!weather.length || !lapTempCorrelation.length) return null;
@@ -385,6 +392,24 @@ export default function WeatherPage() {
                   {card.sub && <div className="text-[11px] text-f1-muted mt-1">{card.sub}</div>}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Complication gauges — latest reading of the session */}
+          {latestWeather && (
+            <div className="glass-card p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <GaugeIcon className="w-4 h-4 text-racing-amber" />
+                <span className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold">
+                  Latest Conditions
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 place-items-center">
+                <WeatherGauge value={latestWeather.track_temperature} min={0} max={60} label="Track Temp" unit="°C" decimals={1} color="#e10600" />
+                <WeatherGauge value={latestWeather.air_temperature} min={0} max={45} label="Air Temp" unit="°C" decimals={1} color="#ff8000" />
+                <WeatherGauge value={latestWeather.humidity} min={0} max={100} label="Humidity" unit="%" color="#4C98E8" />
+                <WeatherGauge value={latestWeather.wind_speed} min={0} max={15} label="Wind" unit="m/s" decimals={1} color="#00d2be" />
+              </div>
             </div>
           )}
 

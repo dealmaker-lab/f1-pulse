@@ -19,6 +19,7 @@ import PitWindowPredictor from "@/components/race/pit-window-predictor";
 import AeroOverrideBadge from "@/components/race/aero-override-badge";
 import { LiveStatusBanner } from "@/components/live-timing/live-status-banner";
 import { PipToggleButton } from "@/components/pip/pip-toggle-button";
+import RaceDayControls from "@/components/race/race-day-controls";
 
 // ===== Speed Presets =====
 const SPEED_PRESETS = [
@@ -929,6 +930,8 @@ export default function RaceReplayPage() {
                 <span>↑↓=speed</span>
               </div>
             )}
+            {/* Race-day: OLED battery-saver + screen keep-awake (mobile-first) */}
+            <RaceDayControls />
             {/* Picture-in-Picture floating leaderboard — opens a small
                 always-on-top window with the live top-8 + flag + RC ticker.
                 Hidden on mobile because the API is desktop-only. */}
