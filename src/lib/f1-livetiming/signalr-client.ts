@@ -59,6 +59,7 @@
  */
 
 import WebSocket from "ws";
+import { inflateRawSync } from "zlib";
 
 // `ws` exports RawData as a namespace member (`WebSocket.RawData`), not a
 // top-level named export. Re-alias here so we can use it as a normal type.
@@ -374,10 +375,21 @@ export class F1SignalRClient {
         continue;
       }
       const topic = args[0];
-      const data = args[1];
+      let data = args[1];
       if (typeof topic !== "string") {
         console.warn("[f1-signalr] feed topic was not a string:", topic);
         continue;
+      }
+      // ".z" topics (Position.z, CarData.z) arrive as base64 raw-deflate
+      // strings — inflate server-side so consumers get plain JSON.
+      if (topic.endsWith(".z") && typeof data === "string") {
+        try {
+          data = JSON.parse(
+            inflateRawSync(Buffer.from(data, "base64")).toString("utf8"),
+          );
+        } catch {
+          // Leave the payload as-is; consumers already treat it as unknown.
+        }
       }
       try {
         this.opts.onMessage(topic, data);

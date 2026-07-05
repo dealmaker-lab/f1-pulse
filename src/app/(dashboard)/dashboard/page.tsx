@@ -838,6 +838,7 @@ export default function DashboardPage() {
                 circuitName={heroCircuitName}
                 height="h-[320px] sm:h-[380px]"
                 showLabels={false}
+                live={isLiveSession}
               />
               {/* Fade overlay at edges */}
               <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-transparent via-transparent to-[var(--f1-black)] opacity-20" />

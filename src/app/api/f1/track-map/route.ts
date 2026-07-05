@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const BASE = "https://api.openf1.org/v1";
+import { validateSessionKey, sanitizeError } from "@/lib/api-validation";
+import { openf1Fetch } from "@/lib/openf1-fetch";
 
 interface LocationPoint {
   x: number;
@@ -10,29 +10,72 @@ interface LocationPoint {
   driver_number: number;
 }
 
+interface MultiViewerCircuit {
+  x: number[];
+  y: number[];
+  rotation: number;
+  corners: Array<{
+    number: number;
+    angle: number;
+    trackPosition: { x: number; y: number };
+  }>;
+  marshalSectors: Array<{
+    number: number;
+    angle: number;
+    trackPosition: { x: number; y: number };
+  }>;
+}
+
+export interface TrackMapCorner {
+  number: number;
+  x: number;
+  y: number;
+}
+
+export interface TrackMapMarshalSector {
+  number: number;
+  x: number;
+  y: number;
+}
+
 /**
  * GET /api/f1/track-map
  *
- * Returns two datasets:
- * 1. trackOutline — sampled x/y points from a single driver's lap to draw the circuit shape
- * 2. carPositions — all drivers' latest positions at a given point in time (or latest)
- *
  * Query params:
  *   session_key (required) — OpenF1 session key
- *   driver_number (optional) — for track outline, defaults to first available
- *   date_start (optional) — ISO timestamp to fetch positions around
- *   date_end (optional) — ISO timestamp end range
+ *   driver_number (optional) — for the OpenF1-probe fallback outline
+ *   date_start / date_end (optional) — ISO range for mode=positions
  *   mode — "outline" | "positions" | "both" (default: "both")
+ *
+ * Outline strategy: MultiViewer's circuits API first (exact geometry,
+ * corner numbers, TRUE marshal-sector boundaries — all in OpenF1's
+ * coordinate space, one cached fetch), falling back to reconstructing a
+ * lap from OpenF1 location data. The old fallback could fan out into
+ * 100 upstream fetches (5 offsets × 20 drivers); it is now bounded.
  */
 export async function GET(req: NextRequest) {
-  const sessionKey = req.nextUrl.searchParams.get("session_key");
+  const sessionKey = validateSessionKey(req.nextUrl.searchParams.get("session_key"));
   const driverNumber = req.nextUrl.searchParams.get("driver_number");
   const mode = req.nextUrl.searchParams.get("mode") || "both";
   const dateStart = req.nextUrl.searchParams.get("date_start");
   const dateEnd = req.nextUrl.searchParams.get("date_end");
 
   if (!sessionKey) {
-    return NextResponse.json({ error: "session_key required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Valid session_key (positive integer) required" },
+      { status: 400 },
+    );
+  }
+  // Bound the positions window to 10 minutes so a wide range can't pull an
+  // entire session's location feed into memory.
+  if (dateStart && dateEnd) {
+    const spanMs = new Date(dateEnd).getTime() - new Date(dateStart).getTime();
+    if (!Number.isFinite(spanMs) || spanMs < 0 || spanMs > 10 * 60 * 1000) {
+      return NextResponse.json(
+        { error: "date_start..date_end window must be 0-10 minutes" },
+        { status: 400 },
+      );
+    }
   }
 
   try {
@@ -40,46 +83,81 @@ export async function GET(req: NextRequest) {
       trackOutline?: { x: number; y: number }[];
       carPositions?: { driver_number: number; x: number; y: number; date: string }[];
       bounds?: { minX: number; maxX: number; minY: number; maxY: number };
+      corners?: TrackMapCorner[];
+      marshalSectors?: TrackMapMarshalSector[];
+      rotation?: number;
+      outlineSource?: "multiviewer" | "openf1";
     } = {};
 
-    // --- Track outline: get ~90s of one driver's data to trace one full lap ---
     if (mode === "outline" || mode === "both") {
-      // First, get the session start time from a small data slice
-      const probeUrl = `${BASE}/location?session_key=${sessionKey}${
-        driverNumber ? `&driver_number=${driverNumber}` : ""
-      }`;
+      const sessionData = await openf1Fetch<
+        Array<{ circuit_key?: number; year?: number; date_start?: string }>
+      >("sessions", { session_key: sessionKey }, { revalidate: 3600 });
+      const sessionInfo = Array.isArray(sessionData) ? sessionData[0] : undefined;
 
-      // Get a broad sample: fetch first few seconds to find the time range,
-      // then fetch ~100s (about 1 lap) starting ~5 minutes in (cars are on track)
-      const sessionInfoUrl = `${BASE}/sessions?session_key=${sessionKey}`;
-      const sessionRes = await fetch(sessionInfoUrl, { next: { revalidate: 3600 } });
-      const sessionData = await sessionRes.json();
-      const sessionInfo = Array.isArray(sessionData) ? sessionData[0] : sessionData;
+      // ── Primary: MultiViewer exact geometry ──
+      if (sessionInfo?.circuit_key && sessionInfo?.year) {
+        try {
+          const mvRes = await fetch(
+            `https://api.multiviewer.app/api/v1/circuits/${sessionInfo.circuit_key}/${sessionInfo.year}`,
+            { next: { revalidate: 7200 } },
+          );
+          if (mvRes.ok) {
+            const mv = (await mvRes.json()) as MultiViewerCircuit;
+            if (Array.isArray(mv.x) && mv.x.length > 50 && mv.x.length === mv.y.length) {
+              result.trackOutline = mv.x.map((x, i) => ({ x, y: mv.y[i] }));
+              result.bounds = {
+                minX: Math.min(...mv.x),
+                maxX: Math.max(...mv.x),
+                minY: Math.min(...mv.y),
+                maxY: Math.max(...mv.y),
+              };
+              result.corners = (mv.corners ?? []).map((c) => ({
+                number: c.number,
+                x: c.trackPosition.x,
+                y: c.trackPosition.y,
+              }));
+              result.marshalSectors = (mv.marshalSectors ?? []).map((s) => ({
+                number: s.number,
+                x: s.trackPosition.x,
+                y: s.trackPosition.y,
+              }));
+              result.rotation = mv.rotation;
+              result.outlineSource = "multiviewer";
+            }
+          }
+        } catch {
+          // Unofficial endpoint, no SLA — fall through to the OpenF1 probe.
+        }
+      }
 
-      if (sessionInfo?.date_start) {
+      // ── Fallback: reconstruct one lap from OpenF1 location data ──
+      if (!result.trackOutline && sessionInfo?.date_start) {
         const sessionStart = new Date(sessionInfo.date_start);
-        // Try multiple time windows to find a good complete lap outline
-        // Different offsets help for different session types (race vs qualifying)
-        const offsets = [20, 30, 10, 40, 5]; // minutes into session
-        const lapDuration = 130; // seconds — generous to ensure full lap capture
-
-        // Candidate driver numbers to try (common across 2024-2026 grids)
+        const offsets = [20, 30, 10]; // minutes into session
+        const lapDuration = 130; // seconds
         const candidateDrivers = driverNumber
           ? [driverNumber]
-          : ["1", "4", "44", "16", "55", "63", "81", "11", "14", "22", "27", "10", "31", "23", "2", "18", "77", "24", "20", "3"];
+          : ["1", "44", "16", "63", "81"];
 
         let bestOutline: { x: number; y: number }[] = [];
         let bestBounds = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 
-        for (const offset of offsets) {
-          if (bestOutline.length > 50) break; // good enough
+        outer: for (const offset of offsets) {
           const lapStart = new Date(sessionStart.getTime() + offset * 60 * 1000);
           const lapEnd = new Date(lapStart.getTime() + lapDuration * 1000);
 
           for (const tryDriver of candidateDrivers) {
-            const outlineUrl = `${BASE}/location?session_key=${sessionKey}&driver_number=${tryDriver}&date>${lapStart.toISOString()}&date<${lapEnd.toISOString()}`;
-            const outlineRes = await fetch(outlineUrl, { next: { revalidate: 3600 } });
-            const outlineData: LocationPoint[] = await outlineRes.json();
+            const outlineData = await openf1Fetch<LocationPoint[]>(
+              "location",
+              {
+                session_key: sessionKey,
+                driver_number: tryDriver,
+                "date>": lapStart.toISOString(),
+                "date<": lapEnd.toISOString(),
+              },
+              { revalidate: 3600 },
+            ).catch(() => [] as LocationPoint[]);
 
             if (Array.isArray(outlineData) && outlineData.length > 20) {
               const validPoints = outlineData.filter((p) => p.x !== 0 || p.y !== 0);
@@ -96,7 +174,7 @@ export async function GET(req: NextRequest) {
                   maxY: Math.max(...ys),
                 };
               }
-              if (sampled.length > 50) break; // found a good outline
+              if (sampled.length > 50) break outer;
             }
           }
         }
@@ -104,37 +182,37 @@ export async function GET(req: NextRequest) {
         if (bestOutline.length > 0) {
           result.trackOutline = bestOutline;
           result.bounds = bestBounds;
+          result.outlineSource = "openf1";
         }
       }
     }
 
-    // --- Car positions: get all drivers' positions at a specific timestamp ---
-    if (mode === "positions" || mode === "both") {
-      if (dateStart && dateEnd) {
-        const posUrl = `${BASE}/location?session_key=${sessionKey}&date>${dateStart}&date<${dateEnd}`;
-        const posRes = await fetch(posUrl, { cache: "no-store" });
-        const posData: LocationPoint[] = await posRes.json();
+    // --- Car positions: all drivers' latest positions in a bounded window ---
+    if ((mode === "positions" || mode === "both") && dateStart && dateEnd) {
+      const posData = await openf1Fetch<LocationPoint[]>("location", {
+        session_key: sessionKey,
+        "date>": dateStart,
+        "date<": dateEnd,
+      });
 
-        if (Array.isArray(posData)) {
-          // Get latest position per driver
-          const latestByDriver = new Map<
-            number,
-            { driver_number: number; x: number; y: number; date: string }
-          >();
-          for (const p of posData) {
-            if (p.x === 0 && p.y === 0) continue;
-            const existing = latestByDriver.get(p.driver_number);
-            if (!existing || p.date > existing.date) {
-              latestByDriver.set(p.driver_number, {
-                driver_number: p.driver_number,
-                x: p.x,
-                y: p.y,
-                date: p.date,
-              });
-            }
+      if (Array.isArray(posData)) {
+        const latestByDriver = new Map<
+          number,
+          { driver_number: number; x: number; y: number; date: string }
+        >();
+        for (const p of posData) {
+          if (p.x === 0 && p.y === 0) continue;
+          const existing = latestByDriver.get(p.driver_number);
+          if (!existing || p.date > existing.date) {
+            latestByDriver.set(p.driver_number, {
+              driver_number: p.driver_number,
+              x: p.x,
+              y: p.y,
+              date: p.date,
+            });
           }
-          result.carPositions = Array.from(latestByDriver.values());
         }
+        result.carPositions = Array.from(latestByDriver.values());
       }
     }
 
@@ -144,10 +222,10 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("Track map API error:", err);
+    console.error("Track map API error:", sanitizeError(err));
     return NextResponse.json(
       { error: "Failed to fetch track map data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

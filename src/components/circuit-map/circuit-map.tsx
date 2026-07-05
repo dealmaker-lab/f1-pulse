@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { cn, getTeamColor } from "@/lib/utils";
 import { getCircuitSvg, CIRCUIT_DISPLAY_NAMES } from "@/lib/circuit-assets";
+import { useLiveTiming } from "@/hooks/use-live-timing";
 import { Loader2 } from "lucide-react";
 
 interface TrackPoint {
@@ -86,6 +87,24 @@ interface CircuitMapProps {
   miniSectors?: MiniSectorBest[];
   /** Number of mini-sectors to render. Default 25. */
   numMiniSectors?: number;
+  /**
+   * Subscribe to the F1 live-timing position stream and render live car
+   * dots. Degrades gracefully: if the anonymous stream doesn't carry
+   * position data (F1 gates it behind F1 TV auth since 2025), no dots
+   * render and the map behaves exactly as before.
+   */
+  live?: boolean;
+}
+
+/** F1 SignalR Position.z payload (after server-side inflate). */
+interface LiveTimingPositionPayload {
+  Position?: Array<{
+    Timestamp?: string;
+    Entries?: Record<
+      string,
+      { Status?: string; X?: number; Y?: number; Z?: number }
+    >;
+  }>;
 }
 
 /**
@@ -128,6 +147,23 @@ function normalizePoints(
   }));
 }
 
+/** Index of the outline point closest to `pt` (squared distance). */
+function nearestIndex(
+  track: { x: number; y: number }[],
+  pt: { x: number; y: number },
+): number {
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < track.length; i++) {
+    const d = (track[i].x - pt.x) ** 2 + (track[i].y - pt.y) ** 2;
+    if (d < bestDist) {
+      bestDist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
 function pointsToSmoothPath(points: { x: number; y: number }[]): string {
   if (points.length < 2) return "";
   const tension = 0.3;
@@ -159,10 +195,17 @@ export default function CircuitMap({
   numMarshalSectors = 20,
   miniSectors,
   numMiniSectors = 25,
+  live = false,
 }: CircuitMapProps) {
   const [trackOutline, setTrackOutline] = useState<TrackPoint[]>([]);
   const [carPositions, setCarPositions] = useState<CarPosition[]>([]);
   const [drivers, setDrivers] = useState<DriverInfo[]>([]);
+  // Real geometry from MultiViewer (when the track-map API resolves it):
+  // corner apexes with numbers, and TRUE marshal-sector start points.
+  const [corners, setCorners] = useState<{ number: number; x: number; y: number }[]>([]);
+  const [marshalSectorPoints, setMarshalSectorPoints] = useState<
+    { number: number; x: number; y: number }[]
+  >([]);
   const [bounds, setBounds] = useState<{
     minX: number;
     maxX: number;
@@ -173,6 +216,35 @@ export default function CircuitMap({
   const [error, setError] = useState<string | null>(null);
   const [hoveredDriver, setHoveredDriver] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // ── Live car dots ──
+  // Feed the (previously dormant) carPositions plumbing from the SignalR
+  // Position.z topic. The hook no-ops when passed no topics.
+  const { messages: liveMessages } = useLiveTiming(live ? ["Position.z"] : []);
+  useEffect(() => {
+    if (!live) {
+      setCarPositions([]);
+      return;
+    }
+    const payload = liveMessages["Position.z"] as
+      | LiveTimingPositionPayload
+      | undefined;
+    const frames = payload?.Position;
+    if (!Array.isArray(frames) || frames.length === 0) return;
+    const latest = frames[frames.length - 1];
+    if (!latest?.Entries) return;
+    const stamp = latest.Timestamp ?? new Date().toISOString();
+    const next: CarPosition[] = [];
+    for (const [numStr, entry] of Object.entries(latest.Entries)) {
+      const num = Number(numStr);
+      if (!Number.isFinite(num)) continue;
+      const x = entry?.X ?? 0;
+      const y = entry?.Y ?? 0;
+      if (x === 0 && y === 0) continue; // pits / no fix
+      next.push({ driver_number: num, x, y, date: stamp });
+    }
+    if (next.length > 0) setCarPositions(next);
+  }, [live, liveMessages]);
 
   // Resolve circuit SVG asset from the circuit name
   const circuitSvg = useMemo(
@@ -205,6 +277,10 @@ export default function CircuitMap({
         if (mapData.trackOutline?.length > 0) {
           setTrackOutline(mapData.trackOutline);
           setBounds(mapData.bounds);
+          setCorners(Array.isArray(mapData.corners) ? mapData.corners : []);
+          setMarshalSectorPoints(
+            Array.isArray(mapData.marshalSectors) ? mapData.marshalSectors : [],
+          );
         } else if (!circuitSvg) {
           // Only error if we also don't have a static SVG fallback
           setError("No track data available for this session");
@@ -249,6 +325,25 @@ export default function CircuitMap({
    */
   const marshalSectorPaths = useMemo<string[]>(() => {
     if (!marshalFlags?.length || normalizedTrack.length < 30) return [];
+
+    // Preferred: TRUE sector boundaries from MultiViewer. Each sector's
+    // start point is mapped to its nearest outline point; the sector's arc
+    // runs to the next sector's start (wrapping at the finish line).
+    if (marshalSectorPoints.length >= 2 && bounds) {
+      const ordered = [...marshalSectorPoints].sort((a, b) => a.number - b.number);
+      const normStarts = normalizePoints(ordered, bounds);
+      const startIdx = normStarts.map((pt) => nearestIndex(normalizedTrack, pt));
+      return startIdx.map((from, i) => {
+        const to = startIdx[(i + 1) % startIdx.length];
+        const slice =
+          from <= to
+            ? normalizedTrack.slice(from, to + 1)
+            : [...normalizedTrack.slice(from), ...normalizedTrack.slice(0, to + 1)];
+        return slice.length >= 2 ? pointsToSmoothPath(slice) : "";
+      });
+    }
+
+    // Fallback: equal-length slices (approximation for probe-derived outlines)
     const n = Math.max(1, numMarshalSectors);
     const len = normalizedTrack.length;
     const paths: string[] = [];
@@ -259,7 +354,7 @@ export default function CircuitMap({
       paths.push(slice.length >= 2 ? pointsToSmoothPath(slice) : "");
     }
     return paths;
-  }, [normalizedTrack, marshalFlags, numMarshalSectors]);
+  }, [normalizedTrack, marshalFlags, numMarshalSectors, marshalSectorPoints, bounds]);
 
   /**
    * Slice the normalized track into per-mini-sector path segments so each
@@ -602,6 +697,26 @@ export default function CircuitMap({
                 />
               </g>
             )}
+
+            {/* Corner numbers — only with real MultiViewer geometry */}
+            {!compact &&
+              showLabels &&
+              bounds &&
+              corners.length > 0 &&
+              normalizePoints(corners, bounds).map((pt, i) => (
+                <text
+                  key={`corner-${corners[i].number}`}
+                  x={pt.x}
+                  y={pt.y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize="9"
+                  fontFamily="'Fira Code', monospace"
+                  className="fill-black/35 dark:fill-white/35 pointer-events-none select-none"
+                >
+                  {corners[i].number}
+                </text>
+              ))}
           </>
         )}
 
