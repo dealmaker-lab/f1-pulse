@@ -563,11 +563,14 @@ export default function TelemetryPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] uppercase tracking-widest text-f1-muted font-semibold">{slot.label}</span>
                   <div className="flex items-center gap-2">
-                    {slot.driver && maxLap > 0 && maxLap < 50 && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-racing-red/10 text-racing-red border border-racing-red/20">
-                        DNF Lap {maxLap}
-                      </span>
-                    )}
+                    {slot.driver &&
+                      selectedSession?.session_name === "Race" &&
+                      maxLap > 0 &&
+                      maxLap < 50 && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-racing-red/10 text-racing-red border border-racing-red/20">
+                          DNF Lap {maxLap}
+                        </span>
+                      )}
                     {slot.driver && (
                       <span className="text-xs font-bold font-mono px-2 py-0.5 rounded" style={{ color: slot.color, backgroundColor: `${slot.color}15` }}>
                         {slot.driver.name_acronym}

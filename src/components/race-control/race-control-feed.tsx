@@ -74,10 +74,28 @@ const CATEGORY_COLORS: Record<
     icon: Zap,
   },
   Other: {
-    bg: "rgba(225,6,0,0.06)",
-    text: "#e10600",
-    border: "rgba(225,6,0,0.15)",
+    bg: "rgba(255,255,255,0.04)",
+    text: "rgba(255,255,255,0.65)",
+    border: "rgba(255,255,255,0.10)",
     icon: Radio,
+  },
+  GreenFlag: {
+    bg: "rgba(57,181,74,0.08)",
+    text: "#39B54A",
+    border: "rgba(57,181,74,0.2)",
+    icon: Flag,
+  },
+  BlueFlag: {
+    bg: "rgba(0,103,255,0.08)",
+    text: "#4C98E8",
+    border: "rgba(0,103,255,0.2)",
+    icon: Flag,
+  },
+  Chequered: {
+    bg: "rgba(255,255,255,0.05)",
+    text: "rgba(255,255,255,0.8)",
+    border: "rgba(255,255,255,0.15)",
+    icon: Flag,
   },
 };
 
@@ -93,6 +111,11 @@ function getCategoryStyle(category: string, flag: string | null) {
   // a yellow flag visually, but RED supersedes everything.
   if (flag === "RED") return RED_FLAG_STYLE;
   if (flag === "YELLOW" || flag === "DOUBLE YELLOW") return CATEGORY_COLORS.Flag;
+  // Routine flags get calm colors — GREEN/CLEAR/BLUE/CHEQUERED were falling
+  // through to the alarm-red "Other" style.
+  if (flag === "GREEN" || flag === "CLEAR") return CATEGORY_COLORS.GreenFlag;
+  if (flag === "BLUE") return CATEGORY_COLORS.BlueFlag;
+  if (flag === "CHEQUERED") return CATEGORY_COLORS.Chequered;
   if (category === "SafetyCar" || category === "Vsc") return CATEGORY_COLORS.SafetyCar;
   if (category === "Drs") return CATEGORY_COLORS.Drs;
   if (category === "Override") return CATEGORY_COLORS.Override;

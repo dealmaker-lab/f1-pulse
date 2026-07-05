@@ -38,10 +38,10 @@ interface TierVisual {
 
 function getTierVisuals(label: Tier): TierVisual {
   const ring = getTireColor(label);
-  // White HARD compound needs dark text or it disappears on a light card.
-  // Everything else gets white text so the C-code stays legible against
-  // the saturated red/yellow.
-  const textColor = label === "HARD" ? "#1a1a1a" : "#FFFFFF";
+  // Light discs (HARD's near-white, MEDIUM's yellow) need dark text —
+  // white-on-yellow was ~1.6:1 contrast, effectively illegible.
+  const textColor =
+    label === "HARD" || label === "MEDIUM" ? "#1a1a1a" : "#FFFFFF";
   return {
     label,
     ringColor: ring,
