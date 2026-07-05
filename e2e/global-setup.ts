@@ -22,10 +22,18 @@ function findLightpanda(): string {
   );
 }
 
-function isPortInUse(port: number): boolean {
+/**
+ * Probe the CDP HTTP endpoint directly. Portable (the previous `ss -tlnp`
+ * check only exists on Linux, so on macOS a healthy server was never
+ * detected and setup always timed out) and stricter — it confirms the CDP
+ * server is actually answering, not just that something holds the port.
+ */
+async function isCdpReady(port: number): Promise<boolean> {
   try {
-    execSync(`ss -tlnp | grep :${port}`, { stdio: "pipe" });
-    return true;
+    const res = await fetch(`http://127.0.0.1:${port}/json/version`, {
+      signal: AbortSignal.timeout(1_000),
+    });
+    return res.ok;
   } catch {
     return false;
   }
@@ -34,7 +42,7 @@ function isPortInUse(port: number): boolean {
 export default async function globalSetup() {
   const port = parseInt(process.env.CDP_PORT || "9222");
 
-  if (isPortInUse(port)) {
+  if (await isCdpReady(port)) {
     console.log(`✓ Lightpanda CDP already running on port ${port}`);
     return;
   }
@@ -57,15 +65,16 @@ export default async function globalSetup() {
   // Store PID in global state for teardown
   process.env.__LIGHTPANDA_PID = String(proc.pid);
 
-  // Wait for port to be in use (max 10 seconds)
+  // Wait for the CDP endpoint to answer (max 30 seconds — nightly builds
+  // can take longer than 10s to boot cold)
   const start = Date.now();
-  while (Date.now() - start < 10_000) {
-    if (isPortInUse(port)) {
+  while (Date.now() - start < 30_000) {
+    if (await isCdpReady(port)) {
       console.log(`✓ Lightpanda started (PID: ${proc.pid})`);
       return;
     }
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 250));
   }
 
-  throw new Error("Lightpanda failed to start within 10s");
+  throw new Error("Lightpanda failed to start within 30s");
 }
