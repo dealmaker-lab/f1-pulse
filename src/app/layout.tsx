@@ -1,7 +1,25 @@
 import type { Metadata, Viewport } from "next";
+import { Titillium_Web, Fira_Code } from "next/font/google";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+
+// Self-hosted at build time — no render-blocking Google request, works
+// offline. Exposed as CSS variables so globals.css / Tailwind reference them.
+// (The old globals.css @import sat after @tailwind and was silently dropped
+// by browsers, so the whole app had been falling back to system-ui.)
+const titillium = Titillium_Web({
+  subsets: ["latin"],
+  weight: ["300", "400", "600", "700", "900"],
+  variable: "--font-titillium",
+  display: "swap",
+});
+const firaCode = Fira_Code({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-fira-code",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "F1 Pulse — Race Analytics & Visualization",
@@ -47,7 +65,11 @@ export default function RootLayout({
         },
       }}
     >
-      <html lang="en" suppressHydrationWarning>
+      <html
+        lang="en"
+        suppressHydrationWarning
+        className={`${titillium.variable} ${firaCode.variable}`}
+      >
         <head>
           <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
         </head>

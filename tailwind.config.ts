@@ -6,6 +6,10 @@ const config: Config = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // lib/hooks return className strings too (e.g. intervalColorClass →
+    // 'text-racing-red/60'); without these globs those classes are purged.
+    "./src/lib/**/*.{js,ts,jsx,tsx}",
+    "./src/hooks/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
@@ -73,10 +77,10 @@ const config: Config = {
       },
       fontFamily: {
         /* F1 official body font */
-        sans:    ['Titillium Web', 'system-ui', 'sans-serif'],
-        display: ['Titillium Web', 'system-ui', 'sans-serif'],
+        sans:    ['var(--font-titillium)', 'Titillium Web', 'system-ui', 'sans-serif'],
+        display: ['var(--font-titillium)', 'Titillium Web', 'system-ui', 'sans-serif'],
         /* Keep Fira Code for telemetry/mono values */
-        mono:    ['Fira Code', 'monospace'],
+        mono:    ['var(--font-fira-code)', 'Fira Code', 'monospace'],
       },
       fontSize: {
         /* F1-style condensed display sizes */

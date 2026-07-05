@@ -10,8 +10,8 @@
     "test": "npx playwright test",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
-    "test:deploy": "npx playwright test e2e/post-deploy.spec.ts --project=chromium-dark --project=chromium-light",
-    "test:smoke": "npx playwright test e2e/smoke.spec.ts --project=chromium-dark",
+    "test:deploy": "npx playwright test e2e/post-deploy.spec.ts --project=desktop --project=mobile",
+    "test:smoke": "npx playwright test e2e/smoke.spec.ts --project=desktop",
     "test:screenshots": "npx playwright test e2e/post-deploy.spec.ts && echo '✅ Screenshots saved to e2e/screenshots/'",
     "test:report": "npx playwright show-report"
   },

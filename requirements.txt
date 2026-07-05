@@ -1,3 +1,5 @@
-fastf1>=3.8.3
-pandas>=2.0.0
-numpy>=1.24.0
+# Pinned with compatible-release bounds so a Vercel deploy can't silently
+# pull a future major (pandas 3.x / numpy 2.x break FastF1 at once).
+fastf1>=3.8.3,<3.9
+pandas>=2.0.0,<2.3
+numpy>=1.24.0,<2.0
