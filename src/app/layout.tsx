@@ -41,8 +41,8 @@ export default function RootLayout({
         variables: {
           colorPrimary: "#e10600",
           colorBackground: "#15151e",
-          colorInputBackground: "#1e1e2a",
-          colorInputText: "#ffffff",
+          colorInput: "#1e1e2a",
+          colorInputForeground: "#ffffff",
           fontFamily: "'Titillium Web', system-ui, sans-serif",
         },
       }}

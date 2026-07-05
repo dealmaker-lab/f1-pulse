@@ -18,7 +18,7 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.63",
     "@ai-sdk/react": "^3.0.136",
-    "@clerk/nextjs": "^7.0.6",
+    "@clerk/nextjs": "^7.5.12",
     "@supabase/supabase-js": "^2.100.1",
     "ai": "^6.0.134",
     "class-variance-authority": "^0.7.0",
@@ -32,7 +32,7 @@
     "react-dom": "^18.2.0",
     "recharts": "^2.12.0",
     "tailwind-merge": "^2.2.0",
-    "ws": "^8.16.0",
+    "ws": "^8.21.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
