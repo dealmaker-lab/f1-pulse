@@ -3,8 +3,10 @@ import { generateText } from "ai";
 import { getServiceClient } from "./supabase";
 import { DB_SCHEMA } from "./db-schema";
 
-// SQL validation -- only allow SELECT queries
-function validateSQL(sql: string): { valid: boolean; error?: string } {
+// SQL validation -- only allow SELECT queries.
+// Exported so the test suite validates the REAL guard instead of a replica
+// that silently drifts behind it (the security boundary must be tested).
+export function validateSQL(sql: string): { valid: boolean; error?: string } {
   // Strip both `-- line comments` and `/* block comments */` before validating
   // so an attacker can't smuggle DML past the keyword check by hiding it
   // inside a comment.

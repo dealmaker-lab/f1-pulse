@@ -66,3 +66,25 @@ describe("getCircuitCoords", () => {
     }
   });
 });
+
+// ── resolveCircuitSlug (shipped today; consumed by Pirelli + predictions) ──
+import { resolveCircuitSlug } from "@/lib/circuit-coords";
+
+describe("resolveCircuitSlug", () => {
+  it("normalizes OpenF1 circuit_short_name to the canonical slug", () => {
+    expect(resolveCircuitSlug("Spielberg")).toBe("red-bull-ring");
+    expect(resolveCircuitSlug("Sakhir")).toBe("bahrain");
+    expect(resolveCircuitSlug("Catalunya")).toBe("barcelona");
+    expect(resolveCircuitSlug("Yas Marina Circuit")).toBe("yas-marina");
+    expect(resolveCircuitSlug("Madring")).toBe("madrid");
+  });
+
+  it("passes through already-canonical slugs unchanged", () => {
+    expect(resolveCircuitSlug("monza")).toBe("monza");
+    expect(resolveCircuitSlug("red-bull-ring")).toBe("red-bull-ring");
+  });
+
+  it("is case- and whitespace-insensitive", () => {
+    expect(resolveCircuitSlug("  MONTE CARLO  ")).toBe("monte-carlo");
+  });
+});

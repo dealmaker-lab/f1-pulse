@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+// Import the REAL validator — the security boundary must be tested directly,
+// not a hand-copied replica that silently drifts behind it.
+import { validateSQL } from "@/lib/nl2sql";
 
 /**
  * NL2SQL Test Fixtures — TDD for SQL generation accuracy.
@@ -8,38 +11,6 @@ import { describe, it, expect } from "vitest";
  * The actual NL2SQL generation requires an API key so we test the
  * validation and schema utilities here.
  */
-
-// Import the validation function by testing it directly
-// (we replicate the logic here since it's a private function)
-function validateSQL(sql: string): { valid: boolean; error?: string } {
-  const trimmed = sql.trim().toUpperCase();
-
-  if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
-    return { valid: false, error: "Only SELECT queries are allowed" };
-  }
-
-  const blocked = [
-    "INSERT",
-    "UPDATE",
-    "DELETE",
-    "DROP",
-    "ALTER",
-    "CREATE",
-    "TRUNCATE",
-    "GRANT",
-    "REVOKE",
-    "EXECUTE",
-    "EXEC",
-  ];
-  for (const keyword of blocked) {
-    const regex = new RegExp(`\\b${keyword}\\b`, "i");
-    if (regex.test(sql)) {
-      return { valid: false, error: `Query contains blocked keyword: ${keyword}` };
-    }
-  }
-
-  return { valid: true };
-}
 
 describe("NL2SQL — SQL Validation", () => {
   it("allows simple SELECT queries", () => {
@@ -90,9 +61,12 @@ describe("NL2SQL — SQL Validation", () => {
   });
 
   it("blocks INSERT hidden inside a SELECT-looking query", () => {
+    // The real guard rejects this at the multi-statement check (the `;`)
+    // before it even reaches the keyword scan — stronger than blocking on
+    // the INSERT keyword alone.
     const result = validateSQL("SELECT 1; INSERT INTO races (year) VALUES (2025)");
     expect(result.valid).toBe(false);
-    expect(result.error).toContain("INSERT");
+    expect(result.error).toContain("Multiple statements");
   });
 
   it("blocks DELETE hidden inside a CTE", () => {
@@ -114,6 +88,31 @@ describe("NL2SQL — SQL Validation", () => {
       "SELECT * FROM results WHERE status = 'Finished'",
     );
     expect(result.valid).toBe(true);
+  });
+
+  // ── Cases the old inline replica silently didn't cover ──
+  it("blocks the newer keywords MERGE / REPLACE / CALL", () => {
+    expect(validateSQL("MERGE INTO races USING x ON true").valid).toBe(false);
+    expect(validateSQL("REPLACE INTO races VALUES (1)").valid).toBe(false);
+    expect(validateSQL("CALL some_proc()").valid).toBe(false);
+  });
+
+  it("strips a DELETE hidden inside a -- line comment before validating", () => {
+    // The real guard removes comments first, so this is a plain SELECT and
+    // must be allowed — proving comment stripping runs before the keyword scan.
+    const result = validateSQL("SELECT * FROM races -- DELETE FROM races");
+    expect(result.valid).toBe(true);
+  });
+
+  it("strips /* block comments */ before validating", () => {
+    const result = validateSQL("SELECT * /* DROP TABLE races */ FROM races");
+    expect(result.valid).toBe(true);
+  });
+
+  it("rejects multi-statement payloads but tolerates a trailing semicolon", () => {
+    expect(validateSQL("SELECT * FROM races;").valid).toBe(true);
+    expect(validateSQL("SELECT 1 ; SELECT 2").valid).toBe(false);
+    expect(validateSQL("SELECT 1 ; SELECT 2").error).toContain("Multiple statements");
   });
 });
 

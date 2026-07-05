@@ -19,11 +19,13 @@ const BREAKPOINTS = {
   "2xl": 1536,
 };
 
-/** Sidebar nav items from sidebar.tsx */
+/** Sidebar nav items — mirrors NAV_ITEMS in sidebar.tsx (kept in sync) */
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/race", label: "Race Replay" },
+  { href: "/race-analysis", label: "Analysis" },
   { href: "/h2h", label: "Head to Head" },
+  { href: "/fantasy", label: "Fantasy" },
   { href: "/telemetry", label: "Telemetry" },
   { href: "/strategy", label: "Strategy" },
   { href: "/weather", label: "Weather" },
@@ -144,8 +146,8 @@ describe("Responsive — Sidebar Collapse", () => {
     expect(SIDEBAR_WIDTH_COLLAPSED).toBe(68);
   });
 
-  it("has 9 navigation items", () => {
-    expect(navItems).toHaveLength(9);
+  it("has 11 navigation items", () => {
+    expect(navItems).toHaveLength(11);
   });
 
   it("mobile menu button visible below lg breakpoint", () => {

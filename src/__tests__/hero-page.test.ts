@@ -34,7 +34,7 @@ const DRIVERS = [
 ];
 
 const features = [
-  { icon: "Activity", title: "Live Telemetry", description: "Speed, throttle, brake and DRS data at 3.7Hz sampling for every driver, every lap." },
+  { icon: "Activity", title: "Live Telemetry", description: "Active aero mode (Z/X), Override status, throttle, brake at 3.7Hz sampling for every driver, every lap." },
   { icon: "Timer", title: "Lap Analysis", description: "Compare lap times across sessions, compounds and weather conditions with micro-sector detail." },
   { icon: "Trophy", title: "Championship Tracker", description: "Real-time standings with progression charts and 75+ years of historical comparisons." },
   { icon: "BarChart3", title: "Strategy Analyzer", description: "Pit stop timing, tire stint analysis and undercut/overcut scenario modeling." },
@@ -49,15 +49,17 @@ const stats = [
   { label: "Years of Data", value: 75 },
 ];
 
+// 2026 snapshot after R8 (Austria) — mirrors FALLBACK_STANDINGS in
+// src/app/(public)/page.tsx: Antonelli leads, Norris runs #1 as champion.
 const FALLBACK_STANDINGS: DriverStanding[] = [
-  { position: 1, points: 245, wins: 8, driver: { code: "VER", name: "Max Verstappen", number: 1, nationality: "Dutch", team: "Red Bull", teamColor: "#3671C6", driverId: "max_verstappen" } },
-  { position: 2, points: 200, wins: 4, driver: { code: "NOR", name: "Lando Norris", number: 4, nationality: "British", team: "McLaren", teamColor: "#FF8000", driverId: "norris" } },
-  { position: 3, points: 188, wins: 3, driver: { code: "LEC", name: "Charles Leclerc", number: 16, nationality: "Monegasque", team: "Ferrari", teamColor: "#E8002D", driverId: "leclerc" } },
-  { position: 4, points: 160, wins: 2, driver: { code: "HAM", name: "Lewis Hamilton", number: 44, nationality: "British", team: "Ferrari", teamColor: "#E8002D", driverId: "hamilton" } },
-  { position: 5, points: 148, wins: 1, driver: { code: "PIA", name: "Oscar Piastri", number: 81, nationality: "Australian", team: "McLaren", teamColor: "#FF8000", driverId: "piastri" } },
-  { position: 6, points: 130, wins: 1, driver: { code: "SAI", name: "Carlos Sainz", number: 55, nationality: "Spanish", team: "Williams", teamColor: "#64C4FF", driverId: "sainz" } },
-  { position: 7, points: 115, wins: 0, driver: { code: "RUS", name: "George Russell", number: 63, nationality: "British", team: "Mercedes", teamColor: "#27F4D2", driverId: "russell" } },
-  { position: 8, points: 98, wins: 0, driver: { code: "ALO", name: "Fernando Alonso", number: 14, nationality: "Spanish", team: "Aston Martin", teamColor: "#229971", driverId: "alonso" } },
+  { position: 1, points: 179, wins: 5, driver: { code: "ANT", name: "Kimi Antonelli", number: 12, nationality: "Italian", team: "Mercedes", teamColor: "#27F4D2", driverId: "antonelli" } },
+  { position: 2, points: 136, wins: 2, driver: { code: "RUS", name: "George Russell", number: 63, nationality: "British", team: "Mercedes", teamColor: "#27F4D2", driverId: "russell" } },
+  { position: 3, points: 132, wins: 1, driver: { code: "HAM", name: "Lewis Hamilton", number: 44, nationality: "British", team: "Ferrari", teamColor: "#E8002D", driverId: "hamilton" } },
+  { position: 4, points: 85, wins: 0, driver: { code: "NOR", name: "Lando Norris", number: 1, nationality: "British", team: "McLaren", teamColor: "#FF8000", driverId: "norris" } },
+  { position: 5, points: 83, wins: 0, driver: { code: "LEC", name: "Charles Leclerc", number: 16, nationality: "Monegasque", team: "Ferrari", teamColor: "#E8002D", driverId: "leclerc" } },
+  { position: 6, points: 82, wins: 0, driver: { code: "PIA", name: "Oscar Piastri", number: 81, nationality: "Australian", team: "McLaren", teamColor: "#FF8000", driverId: "piastri" } },
+  { position: 7, points: 76, wins: 0, driver: { code: "VER", name: "Max Verstappen", number: 3, nationality: "Dutch", team: "Red Bull", teamColor: "#3671C6", driverId: "max_verstappen" } },
+  { position: 8, points: 42, wins: 0, driver: { code: "HAD", name: "Isack Hadjar", number: 6, nationality: "French", team: "Red Bull", teamColor: "#3671C6", driverId: "hadjar" } },
 ];
 
 /** Mirrors the AnimatedNumber counter logic */
@@ -223,17 +225,22 @@ describe("Hero Page — FALLBACK_STANDINGS", () => {
     }
   });
 
-  it("leader (VER) has 245 points and 8 wins", () => {
+  it("leader (ANT) has 179 points and 5 wins", () => {
     const leader = FALLBACK_STANDINGS[0];
-    expect(leader.driver.code).toBe("VER");
-    expect(leader.points).toBe(245);
-    expect(leader.wins).toBe(8);
+    expect(leader.driver.code).toBe("ANT");
+    expect(leader.points).toBe(179);
+    expect(leader.wins).toBe(5);
   });
 
-  it("last place (ALO) has 98 points and 0 wins", () => {
+  it("Norris (reigning champion) carries #1", () => {
+    const nor = FALLBACK_STANDINGS.find((s) => s.driver.code === "NOR");
+    expect(nor?.driver.number).toBe(1);
+  });
+
+  it("last place (HAD) has 42 points and 0 wins", () => {
     const last = FALLBACK_STANDINGS[7];
-    expect(last.driver.code).toBe("ALO");
-    expect(last.points).toBe(98);
+    expect(last.driver.code).toBe("HAD");
+    expect(last.points).toBe(42);
     expect(last.wins).toBe(0);
   });
 
@@ -246,8 +253,6 @@ describe("Hero Page — FALLBACK_STANDINGS", () => {
     expect(teamColorMap["McLaren"]).toBe("#FF8000");
     expect(teamColorMap["Ferrari"]).toBe("#E8002D");
     expect(teamColorMap["Mercedes"]).toBe("#27F4D2");
-    expect(teamColorMap["Aston Martin"]).toBe("#229971");
-    expect(teamColorMap["Williams"]).toBe("#64C4FF");
   });
 });
 

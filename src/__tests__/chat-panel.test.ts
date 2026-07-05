@@ -10,11 +10,12 @@ import { describe, it, expect } from "vitest";
 
 // ── Inline the constants and logic from chat-panel.tsx ──
 
+// Mirrors SUGGESTIONS in src/components/chat/chat-panel.tsx (kept in sync).
 const SUGGESTIONS = [
-  "Who leads the 2026 championship?",
-  "Compare Hamilton vs Verstappen this season",
-  "What were the pit strategies at the last race?",
-  "Show me the constructor standings",
+  "Compare Verstappen vs Hamilton tire strategy at Silverstone",
+  "Who gained the most positions from grid at the last race?",
+  "Show race control messages from Bahrain 2025",
+  "Which driver had the most consistent lap times at Monza?",
 ];
 
 /** Mirrors the input validation from ChatPanel.handleSubmit */
@@ -63,12 +64,12 @@ describe("ChatPanel — Suggestions", () => {
     }
   });
 
-  it("suggestions cover key F1 topics (championship, comparison, strategy, standings)", () => {
+  it("suggestions cover key F1 topics (strategy, overtakes, race control, pace)", () => {
     const topics = SUGGESTIONS.join(" ").toLowerCase();
-    expect(topics).toContain("championship");
+    expect(topics).toContain("strategy");
     expect(topics).toContain("verstappen");
-    expect(topics).toContain("pit");
-    expect(topics).toContain("standings");
+    expect(topics).toContain("positions");
+    expect(topics).toContain("race control");
   });
 });
 
