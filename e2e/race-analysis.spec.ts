@@ -23,6 +23,10 @@ const TAB_LABELS = [
   "Tyre Degradation",
   "Sectors",
   "Telemetry Overlay",
+  "Pit Optimizer",
+  "Overtakes",
+  "Stewards",
+  "Reactions",
 ];
 
 test.describe("Race Analysis page", () => {

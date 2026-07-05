@@ -5,8 +5,11 @@ import { PUBLIC_PAGES, waitForPageReady, setLightMode, setDarkMode } from "./hel
  * Theme tests — verify light/dark mode renders correctly on public pages.
  * Protected pages require auth and are tested separately.
  *
- * Note: These tests use page.evaluate() to toggle themes, which can trigger
- * Lightpanda CDP connection drops. Tests are wrapped in try-catch for resilience.
+ * Resilience: toggling the theme via page.evaluate() can trigger a Lightpanda
+ * CDP drop, so the *toggle* is wrapped and skips on drop. The actual
+ * assertions are NOT swallowed — a wrong theme color must fail the test.
+ * (Previously every expect() was inside a catch → console.warn, so the tests
+ * could not fail.)
  */
 
 // Only test theme on public pages (hero) — protected pages redirect to sign-in
@@ -20,36 +23,26 @@ for (const { path, name } of THEME_PAGES) {
 
       try {
         await setDarkMode(page);
-        // Small delay for theme to apply — use setTimeout instead of waitForTimeout
-        // which is more resilient to CDP drops
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
       } catch {
-        // CDP may drop during evaluate — skip theme verification but don't fail
-        test.skip();
+        test.skip(true, "CDP dropped while toggling theme");
         return;
       }
 
-      try {
-        // Background should be dark
-        const bgColor = await page.evaluate(() => {
-          return getComputedStyle(document.documentElement).getPropertyValue("--f1-black").trim();
-        });
-        // Dark theme --f1-black should be a dark color
-        expect(bgColor).toBeTruthy();
-      } catch {
-        // CDP dropped after theme was set — not a real failure
-        console.warn(`CDP dropped during dark mode check for ${name}`);
-      }
+      // Assertion propagates — dark theme must define a dark --f1-black.
+      const bgColor = await page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue("--f1-black").trim(),
+      );
+      expect(bgColor.toLowerCase()).toBe("#15151e");
 
-      try {
-        // Screenshot for visual regression
-        await page.screenshot({
+      await page
+        .screenshot({
           path: `e2e/screenshots/${name.toLowerCase().replace(/\s+/g, "-")}-dark.png`,
           fullPage: true,
+        })
+        .catch(() => {
+          /* screenshot is best-effort */
         });
-      } catch {
-        // Screenshot failed due to CDP drop — non-critical
-      }
     });
 
     test("light mode renders correctly", async ({ page }) => {
@@ -58,40 +51,31 @@ for (const { path, name } of THEME_PAGES) {
 
       try {
         await setLightMode(page);
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
       } catch {
-        test.skip();
+        test.skip(true, "CDP dropped while toggling theme");
         return;
       }
 
-      try {
-        // Verify html class does NOT have "dark"
-        const htmlClass = await page.locator("html").getAttribute("class");
-        if (htmlClass !== null && htmlClass !== undefined) {
-          expect(htmlClass).not.toContain("dark");
-        }
+      // html must not carry the `dark` class in light mode.
+      const htmlClass = (await page.locator("html").getAttribute("class")) ?? "";
+      expect(htmlClass).not.toContain("dark");
 
-        // Key text should be visible (not white-on-white)
-        const heading = page.locator("h1, h2, h3").first();
-        if (await heading.count()) {
-          const color = await heading.evaluate((el) => getComputedStyle(el).color);
-          // Color should NOT be white/near-white in light mode
-          expect(color).not.toMatch(/rgba?\(255,\s*255,\s*255/);
-        }
-      } catch {
-        // CDP dropped during light mode check — not a real failure
-        console.warn(`CDP dropped during light mode check for ${name}`);
+      // Headings must not render white-on-white in light mode.
+      const heading = page.locator("h1, h2, h3").first();
+      if (await heading.count()) {
+        const color = await heading.evaluate((el) => getComputedStyle(el).color);
+        expect(color).not.toMatch(/rgba?\(255,\s*255,\s*255/);
       }
 
-      try {
-        // Screenshot for visual regression
-        await page.screenshot({
+      await page
+        .screenshot({
           path: `e2e/screenshots/${name.toLowerCase().replace(/\s+/g, "-")}-light.png`,
           fullPage: true,
+        })
+        .catch(() => {
+          /* screenshot is best-effort */
         });
-      } catch {
-        // Screenshot failed due to CDP drop — non-critical
-      }
     });
   });
 }

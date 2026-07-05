@@ -11,7 +11,9 @@ export const PUBLIC_PAGES = [
 export const PAGES = [
   { path: "/dashboard", name: "Dashboard" },
   { path: "/race", name: "Race Replay" },
+  { path: "/race-analysis", name: "Race Analysis" },
   { path: "/h2h", name: "Head to Head" },
+  { path: "/fantasy", name: "Fantasy" },
   { path: "/telemetry", name: "Telemetry" },
   { path: "/strategy", name: "Strategy" },
   { path: "/weather", name: "Weather" },

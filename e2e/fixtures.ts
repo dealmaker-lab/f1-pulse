@@ -77,8 +77,17 @@ export const test = base.extend<{ context: BrowserContext; page: Page }>({
     await use(context);
     try { await browser.close(); } catch { /* already closed */ }
   },
-  page: async ({ context, baseURL }, use) => {
+  page: async ({ context, baseURL, viewport }, use) => {
     const page = await context.newPage();
+    // Apply the project viewport at the page level. Lightpanda hangs on
+    // browser.newContext({ viewport }), so the context fixture can't carry
+    // it — without this the mobile project (390×844) silently ran at
+    // Lightpanda's default width and never exercised the mobile layout.
+    if (viewport) {
+      await page.setViewportSize(viewport).catch(() => {
+        /* older Lightpanda builds may not support resize — best effort */
+      });
+    }
     // Monkey-patch goto to prepend baseURL for relative paths (like Playwright does natively)
     // Also add retry logic for CDP connection drops during navigation
     const originalGoto = page.goto.bind(page);
