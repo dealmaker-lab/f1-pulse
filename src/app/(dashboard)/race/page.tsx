@@ -763,7 +763,14 @@ export default function RaceReplayPage() {
         else break;
       }
       if (latest) {
-        intervalMap[num] = { gap: latest.gap_to_leader, interval: latest.interval };
+        // OpenF1 sends "+1 LAP" (a string) for lapped drivers despite the
+        // numeric type — coerce so gap math never string-concatenates.
+        const rawGap = latest.gap_to_leader as number | string | null;
+        const rawInterval = latest.interval as number | string | null;
+        intervalMap[num] = {
+          gap: typeof rawGap === "number" ? rawGap : null,
+          interval: typeof rawInterval === "number" ? rawInterval : null,
+        };
       }
     });
 

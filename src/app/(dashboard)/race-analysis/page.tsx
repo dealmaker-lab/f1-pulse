@@ -15,6 +15,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { gpNameForCircuit } from "@/lib/gp-names";
 import { OPENF1_YEARS } from "@/lib/constants";
 import { SESSION_FILTER_OPTIONS, filterPastSessions } from "@/lib/session-filters";
 import { buildRaceTrace, buildLapPositions } from "@/lib/race-trace-utils";
@@ -595,9 +596,17 @@ export default function RaceAnalysisPage() {
   // returning the 1-based index of the selected race's meeting.
   const roundForFastF1 = useMemo(() => {
     if (!race || allRaces.length === 0) return null;
-    // Earliest date_start per meeting_key
+    // Only meetings that host a Grand Prix race count as rounds — pre-season
+    // testing meetings have no "Race" session and would shift every round.
+    const raceMeetings = new Set(
+      allRaces
+        .filter((s) => s.session_name === "Race")
+        .map((s) => s.meeting_key),
+    );
+    // Earliest date_start per race meeting_key
     const earliestByMeeting = new Map<number, number>();
     for (const s of allRaces) {
+      if (!raceMeetings.has(s.meeting_key)) continue;
       const t = new Date(s.date_start).getTime();
       const cur = earliestByMeeting.get(s.meeting_key);
       if (cur === undefined || t < cur) earliestByMeeting.set(s.meeting_key, t);
@@ -927,20 +936,22 @@ export default function RaceAnalysisPage() {
     }
 
     if (tab === "stewards") {
-      // FIA stewards' decisions, reprimands, summons for this event
+      // FIA stewards' decisions, reprimands, summons for this event.
+      // FIA documents are titled by Grand Prix name, not circuit.
       return (
         <StewardsTimeline
           year={year}
-          eventName={race.circuit_short_name}
+          eventName={gpNameForCircuit(race.circuit_short_name)}
         />
       );
     }
 
     // tab === "reactions" — Reddit r/formula1 race-day comment volume
     // Approximate race window: start..start+3h (typical F1 race length)
+    // Race threads are titled "<year> <GP name> - Race Discussion".
     const startTime = new Date(race.date_start);
     const endTime = new Date(startTime.getTime() + 3 * 60 * 60 * 1000);
-    const raceTitle = `${race.circuit_short_name} ${year}`;
+    const raceTitle = `${year} ${gpNameForCircuit(race.circuit_short_name)}`;
     return (
       <FanReactionChart
         raceTitle={raceTitle}

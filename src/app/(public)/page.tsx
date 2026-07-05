@@ -12,6 +12,7 @@ import {
   Radio,
   Flag,
 } from "lucide-react";
+import { CURRENT_YEAR } from "@/lib/constants";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -178,15 +179,17 @@ function CircuitAnimation() {
 }
 
 // ─── Standings Ticker ────────────────────────────────────────────────
+// Snapshot of the 2026 standings after R8 (Austria) — only shown if the live
+// standings fetch fails.
 const FALLBACK_STANDINGS: DriverStanding[] = [
-  { position: 1, points: 245, wins: 8, driver: { code: "VER", name: "Max Verstappen", number: 1, nationality: "Dutch", team: "Red Bull", teamColor: "#3671C6", driverId: "max_verstappen" } },
-  { position: 2, points: 200, wins: 4, driver: { code: "NOR", name: "Lando Norris", number: 4, nationality: "British", team: "McLaren", teamColor: "#FF8000", driverId: "norris" } },
-  { position: 3, points: 188, wins: 3, driver: { code: "LEC", name: "Charles Leclerc", number: 16, nationality: "Monegasque", team: "Ferrari", teamColor: "#E8002D", driverId: "leclerc" } },
-  { position: 4, points: 160, wins: 2, driver: { code: "HAM", name: "Lewis Hamilton", number: 44, nationality: "British", team: "Ferrari", teamColor: "#E8002D", driverId: "hamilton" } },
-  { position: 5, points: 148, wins: 1, driver: { code: "PIA", name: "Oscar Piastri", number: 81, nationality: "Australian", team: "McLaren", teamColor: "#FF8000", driverId: "piastri" } },
-  { position: 6, points: 130, wins: 1, driver: { code: "SAI", name: "Carlos Sainz", number: 55, nationality: "Spanish", team: "Williams", teamColor: "#64C4FF", driverId: "sainz" } },
-  { position: 7, points: 115, wins: 0, driver: { code: "RUS", name: "George Russell", number: 63, nationality: "British", team: "Mercedes", teamColor: "#27F4D2", driverId: "russell" } },
-  { position: 8, points: 98, wins: 0, driver: { code: "ALO", name: "Fernando Alonso", number: 14, nationality: "Spanish", team: "Aston Martin", teamColor: "#229971", driverId: "alonso" } },
+  { position: 1, points: 179, wins: 5, driver: { code: "ANT", name: "Kimi Antonelli", number: 12, nationality: "Italian", team: "Mercedes", teamColor: "#27F4D2", driverId: "antonelli" } },
+  { position: 2, points: 136, wins: 2, driver: { code: "RUS", name: "George Russell", number: 63, nationality: "British", team: "Mercedes", teamColor: "#27F4D2", driverId: "russell" } },
+  { position: 3, points: 132, wins: 1, driver: { code: "HAM", name: "Lewis Hamilton", number: 44, nationality: "British", team: "Ferrari", teamColor: "#E8002D", driverId: "hamilton" } },
+  { position: 4, points: 85, wins: 0, driver: { code: "NOR", name: "Lando Norris", number: 1, nationality: "British", team: "McLaren", teamColor: "#FF8000", driverId: "norris" } },
+  { position: 5, points: 83, wins: 0, driver: { code: "LEC", name: "Charles Leclerc", number: 16, nationality: "Monegasque", team: "Ferrari", teamColor: "#E8002D", driverId: "leclerc" } },
+  { position: 6, points: 82, wins: 0, driver: { code: "PIA", name: "Oscar Piastri", number: 81, nationality: "Australian", team: "McLaren", teamColor: "#FF8000", driverId: "piastri" } },
+  { position: 7, points: 76, wins: 0, driver: { code: "VER", name: "Max Verstappen", number: 3, nationality: "Dutch", team: "Red Bull", teamColor: "#3671C6", driverId: "max_verstappen" } },
+  { position: 8, points: 42, wins: 0, driver: { code: "HAD", name: "Isack Hadjar", number: 6, nationality: "French", team: "Red Bull", teamColor: "#3671C6", driverId: "hadjar" } },
 ];
 
 function StandingsTicker() {
@@ -197,7 +200,7 @@ function StandingsTicker() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/f1/standings/drivers?year=2025", { signal: controller.signal })
+    fetch(`/api/f1/standings/drivers?year=${CURRENT_YEAR}`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error("API error");
         return res.json();
@@ -335,14 +338,9 @@ export default function HeroPage() {
     gsap.registerPlugin(ScrollTrigger);
 
     const ctx = gsap.context(() => {
-      // Hero entrance -- staggered cascade
-      const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
-
-      tl.from(".hero-badge", { opacity: 0, y: 20, duration: 0.5 })
-        .from(".hero-headline", { opacity: 0, y: 40, duration: 0.7 }, "-=0.2")
-        .from(".hero-sub", { opacity: 0, y: 30, duration: 0.5 }, "-=0.3")
-        .from(".hero-cta", { opacity: 0, y: 20, duration: 0.5 }, "-=0.2")
-        .from(".hero-chart", { opacity: 0, y: 50, scale: 0.95, duration: 0.8 }, "-=0.3");
+      // Hero entrance is pure CSS (.hero-anim in globals.css) — a stalled GSAP
+      // timeline used to leave the whole above-the-fold hero at opacity 0.
+      // GSAP here only drives the scroll-triggered sections below.
 
       // Stats counter -- animate on scroll into view
       gsap.from(".stat-item", {
@@ -438,7 +436,7 @@ export default function HeroPage() {
 
         <div className="relative max-w-5xl mx-auto text-center">
           {/* Badge */}
-          <div className="hero-badge inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#e10600]/20 bg-[#e10600]/[0.06] mb-8">
+          <div className="hero-badge hero-anim inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#e10600]/20 bg-[#e10600]/[0.06] mb-8">
             <span className="w-1.5 h-1.5 rounded-full bg-[#e10600] animate-pulse" />
             <span
               className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#e10600]"
@@ -450,7 +448,7 @@ export default function HeroPage() {
 
           {/* Headline */}
           <h1
-            className="hero-headline text-4xl sm:text-6xl lg:text-7xl font-black uppercase leading-[0.95] tracking-tight mb-6"
+            className="hero-headline hero-anim hero-anim-1 text-4xl sm:text-6xl lg:text-7xl font-black uppercase leading-[0.95] tracking-tight mb-6"
             style={{ fontFamily: "Titillium Web, sans-serif", letterSpacing: "-0.02em" }}
           >
             <span className="text-white">Race Analytics</span>
@@ -467,7 +465,7 @@ export default function HeroPage() {
 
           {/* Subheadline */}
           <p
-            className="hero-sub max-w-2xl mx-auto text-base sm:text-lg text-white/45 leading-relaxed mb-10"
+            className="hero-sub hero-anim hero-anim-2 max-w-2xl mx-auto text-base sm:text-lg text-white/45 leading-relaxed mb-10"
             style={{ fontFamily: "Titillium Web, sans-serif" }}
           >
             3.7Hz telemetry. Lap-by-lap strategy. 75 years of championship data.
@@ -475,7 +473,7 @@ export default function HeroPage() {
           </p>
 
           {/* CTA buttons (ACTION) */}
-          <div className="hero-cta flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+          <div className="hero-cta hero-anim hero-anim-3 flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
             <Link
               href="/sign-up"
               className="group flex items-center gap-3 px-8 py-3.5 rounded-lg text-sm font-bold uppercase tracking-wider text-white transition-all duration-300 hover:shadow-[0_0_30px_rgba(225,6,0,0.4)] hover:scale-[1.02] active:scale-[0.98]"
@@ -498,7 +496,7 @@ export default function HeroPage() {
           </div>
 
           {/* Race position chart preview (DESIRE) */}
-          <div className="hero-chart relative glass-card overflow-hidden">
+          <div className="hero-chart hero-anim hero-anim-4 relative glass-card overflow-hidden">
             {/* Top bar */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
               <div className="flex items-center gap-2">

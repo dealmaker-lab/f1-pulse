@@ -76,7 +76,9 @@ export default function PitWindowPredictor({
     );
   }
 
-  const safeGap = currentGap ?? 0;
+  // Lapped drivers arrive with a non-numeric gap ("+1 LAP") upstream — treat
+  // anything non-finite as 0 so the projection never emits NaN.
+  const safeGap = typeof currentGap === "number" && Number.isFinite(currentGap) ? currentGap : 0;
   const prediction = projectPitWindow({
     currentGapToLeader: safeGap,
     lapsRemaining,
