@@ -249,6 +249,9 @@ async function fetchApi(
   if (path === "/api/f1/pit") {
     return safeFetch(`${OPENF1}/pit${qs({ session_key, driver_number })}`);
   }
+  if (path === "/api/f1/overtakes") {
+    return safeFetch(`${OPENF1}/overtakes${qs({ session_key })}`);
+  }
 
   throw new Error(`Unmapped tool path: ${path}`);
 }
@@ -635,6 +638,25 @@ export const chatTools = {
         };
       }
       return base;
+    },
+  }),
+
+  getOvertakes: tool({
+    description:
+      "Get all on-track overtakes for a session: who passed whom, for which position, and when. Use getSessions first to find the session_key.",
+    inputSchema: z.object({
+      session_key: z.number().describe("OpenF1 session key"),
+    }),
+    execute: async ({ session_key }) => {
+      const data = await fetchApi("/api/f1/overtakes", { session_key });
+      if (!Array.isArray(data)) return data;
+      if (data.length === 0) return { info: "No overtakes recorded for this session" };
+      return data.slice(0, 100).map((o: Record<string, unknown>) => ({
+        date: o.date,
+        overtaking_driver: o.overtaking_driver_number,
+        overtaken_driver: o.overtaken_driver_number,
+        for_position: o.position,
+      }));
     },
   }),
 

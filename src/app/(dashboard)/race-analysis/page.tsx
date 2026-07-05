@@ -33,6 +33,7 @@ import MultiDriverOverlay from "@/components/telemetry/multi-driver-overlay";
 import PitOptimizerOverlay from "@/components/race/pit-optimizer-overlay";
 import StewardsTimeline from "@/components/fia/stewards-timeline";
 import FanReactionChart from "@/components/reddit/fan-reaction-chart";
+import OvertakesTimeline from "@/components/race/overtakes-timeline";
 import type { SessionCode } from "@/lib/fastf1-client";
 
 const YEARS = OPENF1_YEARS;
@@ -46,6 +47,7 @@ type AnalysisTab =
   | "sectors"
   | "telemetry"
   | "optimizer"
+  | "overtakes"
   | "stewards"
   | "reactions";
 
@@ -701,6 +703,11 @@ export default function RaceAnalysisPage() {
       icon: <Wrench className="w-3.5 h-3.5" />,
     },
     {
+      id: "overtakes",
+      label: "Overtakes",
+      icon: <ArrowUpDown className="w-3.5 h-3.5" />,
+    },
+    {
       id: "stewards",
       label: "Stewards",
       icon: <AlertTriangle className="w-3.5 h-3.5" />,
@@ -933,6 +940,11 @@ export default function RaceAnalysisPage() {
           />
         </div>
       );
+    }
+
+    if (tab === "overtakes") {
+      // On-track passes from OpenF1's overtakes endpoint
+      return <OvertakesTimeline sessionKey={race.session_key} />;
     }
 
     if (tab === "stewards") {
