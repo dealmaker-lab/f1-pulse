@@ -163,7 +163,15 @@ export function getCircuitCoords(
   name: string | undefined,
 ): CircuitCoord | null {
   if (!name) return null;
+  return CIRCUIT_COORDS[resolveCircuitSlug(name)] ?? null;
+}
+
+/**
+ * Normalize any circuit name (OpenF1 `circuit_short_name`, UI label, slug)
+ * to the canonical hyphenated slug used as a key across the app's static
+ * circuit tables (coords, Pirelli allocations, pit-loss).
+ */
+export function resolveCircuitSlug(name: string): string {
   const normalized = name.trim().toLowerCase().replace(/\s+/g, "-");
-  const key = CIRCUIT_COORD_ALIASES[normalized] ?? normalized;
-  return CIRCUIT_COORDS[key] ?? null;
+  return CIRCUIT_COORD_ALIASES[normalized] ?? normalized;
 }

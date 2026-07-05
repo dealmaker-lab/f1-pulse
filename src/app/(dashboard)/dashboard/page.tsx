@@ -290,7 +290,14 @@ export default function DashboardPage() {
       fetch(`/api/f1/sessions?year=${year}`).then((r) => r.json()),
     ])
       .then(([sess, meets, all]) => {
-        setSessions(Array.isArray(sess) ? sess : []);
+        // OpenF1 session_type=Race also includes Sprints — keep only Grand
+        // Prix races so round numbering / calendar counts aren't inflated
+        // (sprint weekends were rendering as duplicate rounds).
+        setSessions(
+          Array.isArray(sess)
+            ? sess.filter((s: SessionInfo) => s.session_name === "Race")
+            : [],
+        );
         setMeetings(Array.isArray(meets) ? meets : []);
         setAllSessions(Array.isArray(all) ? all : []);
       })

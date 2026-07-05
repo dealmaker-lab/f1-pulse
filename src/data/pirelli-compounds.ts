@@ -13,7 +13,7 @@
  * `source: "static"` flag in the API response makes the provenance clear
  * to the client.
  *
- * Compound numbering: C1 is the hardest, C6 is the softest. For each event
+ * Compound numbering: C1 is the hardest, C5 is the softest (Pirelli dropped the C6 for 2026). For each event
  * Pirelli picks three adjacent compounds and assigns:
  *   - the hardest of the three  -> "Hard" (white)
  *   - the middle                -> "Medium" (yellow)
@@ -28,15 +28,17 @@
  * data) — not a strategy simulation.
  */
 
+import { resolveCircuitSlug } from "@/lib/circuit-coords";
+
 export interface CompoundAllocation {
-  /** Race round (1..24). */
+  /** Race round (1..22). */
   round: number;
   /** OpenF1 `circuit_short_name` — the canonical key used everywhere else in the app. */
   circuit: string;
-  /** Compound nominations. C1=hardest, C6=softest. */
-  hard: "C1" | "C2" | "C3" | "C4";
+  /** Compound nominations. C1=hardest, C5=softest. */
+  hard: "C1" | "C2" | "C3";
   medium: "C2" | "C3" | "C4" | "C5";
-  soft: "C3" | "C4" | "C5" | "C6";
+  soft: "C3" | "C4" | "C5";
   /** Min start pressure mandate (psi). Front/rear may differ by event. */
   minStartPressureFrontPsi?: number;
   minStartPressureRearPsi?: number;
@@ -58,28 +60,6 @@ const DEFAULT_REAR_PSI = 22.5;
 export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
   {
     round: 1,
-    circuit: "bahrain",
-    hard: "C1",
-    medium: "C2",
-    soft: "C3",
-    minStartPressureFrontPsi: 25.0,
-    minStartPressureRearPsi: 23.0,
-    estimatedMediumStintLaps: 18,
-    abrasion: "low",
-  },
-  {
-    round: 2,
-    circuit: "jeddah",
-    hard: "C2",
-    medium: "C3",
-    soft: "C4",
-    minStartPressureFrontPsi: 23.5,
-    minStartPressureRearPsi: 21.0,
-    estimatedMediumStintLaps: 22,
-    abrasion: "low",
-  },
-  {
-    round: 3,
     circuit: "albert-park",
     hard: "C3",
     medium: "C4",
@@ -90,18 +70,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "medium",
   },
   {
-    round: 4,
-    circuit: "suzuka",
-    hard: "C1",
-    medium: "C2",
-    soft: "C3",
-    minStartPressureFrontPsi: 24.5,
-    minStartPressureRearPsi: 22.5,
-    estimatedMediumStintLaps: 17,
-    abrasion: "high",
-  },
-  {
-    round: 5,
+    round: 2,
     circuit: "shanghai",
     hard: "C2",
     medium: "C3",
@@ -112,7 +81,18 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "medium",
   },
   {
-    round: 6,
+    round: 3,
+    circuit: "suzuka",
+    hard: "C1",
+    medium: "C2",
+    soft: "C3",
+    minStartPressureFrontPsi: 24.5,
+    minStartPressureRearPsi: 22.5,
+    estimatedMediumStintLaps: 17,
+    abrasion: "high",
+  },
+  {
+    round: 4,
     circuit: "miami",
     hard: "C2",
     medium: "C3",
@@ -123,40 +103,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "medium",
   },
   {
-    round: 7,
-    circuit: "imola",
-    hard: "C3",
-    medium: "C4",
-    soft: "C5",
-    minStartPressureFrontPsi: 24.5,
-    minStartPressureRearPsi: 22.5,
-    estimatedMediumStintLaps: 22,
-    abrasion: "medium",
-  },
-  {
-    round: 8,
-    circuit: "monte-carlo",
-    hard: "C4",
-    medium: "C5",
-    soft: "C6",
-    minStartPressureFrontPsi: 23.5,
-    minStartPressureRearPsi: 21.0,
-    estimatedMediumStintLaps: 30,
-    abrasion: "low",
-  },
-  {
-    round: 9,
-    circuit: "barcelona",
-    hard: "C1",
-    medium: "C2",
-    soft: "C3",
-    minStartPressureFrontPsi: 24.0,
-    minStartPressureRearPsi: 22.5,
-    estimatedMediumStintLaps: 18,
-    abrasion: "high",
-  },
-  {
-    round: 10,
+    round: 5,
     circuit: "montreal",
     hard: "C3",
     medium: "C4",
@@ -167,7 +114,29 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "low",
   },
   {
-    round: 11,
+    round: 6,
+    circuit: "monte-carlo",
+    hard: "C3",
+    medium: "C4",
+    soft: "C5",
+    minStartPressureFrontPsi: 23.5,
+    minStartPressureRearPsi: 21.0,
+    estimatedMediumStintLaps: 30,
+    abrasion: "low",
+  },
+  {
+    round: 7,
+    circuit: "barcelona",
+    hard: "C1",
+    medium: "C2",
+    soft: "C3",
+    minStartPressureFrontPsi: 24.0,
+    minStartPressureRearPsi: 22.5,
+    estimatedMediumStintLaps: 18,
+    abrasion: "high",
+  },
+  {
+    round: 8,
     circuit: "red-bull-ring",
     hard: "C2",
     medium: "C3",
@@ -178,7 +147,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "medium",
   },
   {
-    round: 12,
+    round: 9,
     circuit: "silverstone",
     hard: "C1",
     medium: "C2",
@@ -189,18 +158,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "high",
   },
   {
-    round: 13,
-    circuit: "hungaroring",
-    hard: "C3",
-    medium: "C4",
-    soft: "C5",
-    minStartPressureFrontPsi: 24.0,
-    minStartPressureRearPsi: 22.5,
-    estimatedMediumStintLaps: 24,
-    abrasion: "medium",
-  },
-  {
-    round: 14,
+    round: 10,
     circuit: "spa-francorchamps",
     hard: "C2",
     medium: "C3",
@@ -211,7 +169,18 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "medium",
   },
   {
-    round: 15,
+    round: 11,
+    circuit: "hungaroring",
+    hard: "C3",
+    medium: "C4",
+    soft: "C5",
+    minStartPressureFrontPsi: 24.0,
+    minStartPressureRearPsi: 22.5,
+    estimatedMediumStintLaps: 24,
+    abrasion: "medium",
+  },
+  {
+    round: 12,
     circuit: "zandvoort",
     hard: "C1",
     medium: "C2",
@@ -222,7 +191,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "medium",
   },
   {
-    round: 16,
+    round: 13,
     circuit: "monza",
     hard: "C3",
     medium: "C4",
@@ -233,7 +202,18 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "low",
   },
   {
-    round: 17,
+    round: 14,
+    circuit: "madrid",
+    hard: "C2",
+    medium: "C3",
+    soft: "C4",
+    minStartPressureFrontPsi: 24.0,
+    minStartPressureRearPsi: 22.0,
+    estimatedMediumStintLaps: 22,
+    abrasion: "low",
+  },
+  {
+    round: 15,
     circuit: "baku",
     hard: "C3",
     medium: "C4",
@@ -244,7 +224,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "low",
   },
   {
-    round: 18,
+    round: 16,
     circuit: "marina-bay",
     hard: "C3",
     medium: "C4",
@@ -255,7 +235,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "medium",
   },
   {
-    round: 19,
+    round: 17,
     circuit: "circuit-of-the-americas",
     hard: "C1",
     medium: "C2",
@@ -266,7 +246,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "high",
   },
   {
-    round: 20,
+    round: 18,
     circuit: "mexico-city",
     hard: "C2",
     medium: "C3",
@@ -277,7 +257,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "medium",
   },
   {
-    round: 21,
+    round: 19,
     circuit: "interlagos",
     hard: "C2",
     medium: "C3",
@@ -288,7 +268,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "medium",
   },
   {
-    round: 22,
+    round: 20,
     circuit: "las-vegas",
     hard: "C3",
     medium: "C4",
@@ -299,7 +279,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "low",
   },
   {
-    round: 23,
+    round: 21,
     circuit: "losail",
     hard: "C1",
     medium: "C2",
@@ -310,7 +290,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
     abrasion: "high",
   },
   {
-    round: 24,
+    round: 22,
     circuit: "yas-marina",
     hard: "C2",
     medium: "C3",
@@ -325,7 +305,7 @@ export const PIRELLI_2026_ALLOCATIONS: CompoundAllocation[] = [
 /**
  * Build a lookup map once at module load. Lookups happen on every
  * `/api/pirelli/preview` call and on every dashboard render — repeated
- * `Array.find` is fine at 24 entries but a Map makes intent clearer.
+ * `Array.find` is fine at 22 entries but a Map makes intent clearer.
  */
 const ALLOCATION_BY_CIRCUIT: ReadonlyMap<string, CompoundAllocation> = new Map(
   PIRELLI_2026_ALLOCATIONS.map((a) => [a.circuit.toLowerCase(), a]),
@@ -340,7 +320,12 @@ export function getCompoundAllocation(
   circuitShortName: string,
 ): CompoundAllocation | null {
   if (!circuitShortName) return null;
-  const allocation = ALLOCATION_BY_CIRCUIT.get(circuitShortName.toLowerCase());
+  // OpenF1 uses names like "Spielberg"/"Yas Marina Circuit"; our table keys
+  // are canonical slugs — resolve through the shared alias map so roughly
+  // half the calendar doesn't silently return null.
+  const allocation = ALLOCATION_BY_CIRCUIT.get(
+    resolveCircuitSlug(circuitShortName),
+  );
   if (!allocation) return null;
 
   // Fill in default pressures if a per-event mandate wasn't specified.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { JOLPICA_BASE, fetchAllRaces } from "@/lib/jolpica";
 import { validateYear, validateDriverCode, sanitizeError } from "@/lib/api-validation";
+import { CURRENT_YEAR } from "@/lib/constants";
 
 interface DriverResult {
   code: string;
@@ -62,7 +63,7 @@ function parseDriver(r: any): DriverResult {
 }
 
 export async function GET(req: NextRequest) {
-  const year = validateYear(req.nextUrl.searchParams.get("year"), 2025);
+  const year = validateYear(req.nextUrl.searchParams.get("year"), CURRENT_YEAR);
   const d1 = validateDriverCode(req.nextUrl.searchParams.get("d1"));
   const d2 = validateDriverCode(req.nextUrl.searchParams.get("d2"));
 
