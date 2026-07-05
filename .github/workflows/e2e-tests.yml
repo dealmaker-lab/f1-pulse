@@ -37,7 +37,12 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 15 min: the public-only run below is ~3-4 min of test time; the rest is
+    # fixed cost (npm ci + Lightpanda install + the up-to-5-min "Wait for Vercel
+    # deployment" loop). Generous enough that the upload steps are always
+    # reached — the old 25-min job was being killed mid-run by a gated-route
+    # retry storm before it could upload its report.
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -93,9 +98,16 @@ jobs:
           BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
 
+      # E2E_PUBLIC_ONLY=1 (set on the two desktop/mobile steps below) narrows the
+      # desktop/mobile projects to the no-Clerk public-signal specs and forces
+      # retries:0 — see playwright.config.ts. Remove the flag (or set 0) once a
+      # production Clerk session exists to run the full gated suite on every push.
+      #
       # ── Mint Clerk session (storageState saved to playwright/.clerk/user.json) ──
       # Marked continue-on-error: when Clerk secrets are missing/expired, smoke
-      # and post-deploy tests should still run on the live deployment.
+      # and post-deploy tests should still run on the live deployment. This step
+      # does NOT set E2E_PUBLIC_ONLY, so the authenticated project keeps its full
+      # spec set + retries once a real session is available.
       - name: Authenticate with Clerk
         continue-on-error: true
         run: npx playwright test --project=setup
@@ -117,26 +129,30 @@ jobs:
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
 
-      # Full desktop + mobile projects — runs ALL specs (previously CI ran
-      # only 5 of 17). Advisory (continue-on-error) because the feature specs
-      # navigate to Clerk-protected routes that redirect to sign-in without a
-      # production Clerk instance; the report artifact still surfaces real
-      # failures for review. Public specs (hero/sign-in) and today's
-      # unit-covered logic remain gated by the `unit` job above.
-      - name: Run desktop E2E (all specs)
+      # Desktop + mobile projects, PUBLIC specs only (E2E_PUBLIC_ONLY=1) — the
+      # no-Clerk specs that produce correct signal: public routes, /api/* contract
+      # checks, theme, and gated-route redirect smoke. retries:0 in this mode, so
+      # no gated redirect can cascade into a timeout. The gated feature specs are
+      # deferred to the `authenticated` project above until a Clerk prod session
+      # exists; flip E2E_PUBLIC_ONLY off there to run the full suite on push.
+      # Advisory (continue-on-error) for now — the deterministic `unit` job is the
+      # real gate; the report/screenshot artifacts still surface any failures.
+      - name: Run desktop E2E (public specs)
         run: npx playwright test --project=desktop
         env:
           BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
+          E2E_PUBLIC_ONLY: "1"
         continue-on-error: true
 
-      - name: Run mobile E2E (all specs)
+      - name: Run mobile E2E (public specs)
         run: npx playwright test --project=mobile
         env:
           BASE_URL: ${{ vars.BASE_URL || 'https://f1-pulse-dealmaker-labs-projects.vercel.app' }}
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS_F1_PULSE }}
           CDP_ENDPOINT: http://127.0.0.1:9222
+          E2E_PUBLIC_ONLY: "1"
         continue-on-error: true
 
       - name: Upload screenshots

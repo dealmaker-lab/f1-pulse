@@ -12,6 +12,7 @@
     "test:unit:watch": "vitest",
     "test:deploy": "npx playwright test e2e/post-deploy.spec.ts --project=desktop --project=mobile",
     "test:smoke": "npx playwright test e2e/smoke.spec.ts --project=desktop",
+    "test:public": "E2E_PUBLIC_ONLY=1 npx playwright test --project=desktop --project=mobile",
     "test:screenshots": "npx playwright test e2e/post-deploy.spec.ts && echo '✅ Screenshots saved to e2e/screenshots/'",
     "test:report": "npx playwright show-report"
   },
