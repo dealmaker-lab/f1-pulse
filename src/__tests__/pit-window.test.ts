@@ -99,3 +99,77 @@ describe("projectPitWindow", () => {
     expect(r.gapAfterPit).toBe(5 + r.pitLossSeconds);
   });
 });
+
+// ── projectPitRejoin ──────────────────────────────────────────────────
+import { projectPitRejoin } from "@/lib/pit-window";
+
+describe("projectPitRejoin", () => {
+  const field = [
+    { driverNumber: 1, code: "NOR", gapToLeader: 0 },
+    { driverNumber: 12, code: "ANT", gapToLeader: 3.2 },
+    { driverNumber: 44, code: "HAM", gapToLeader: 8.5 },
+    { driverNumber: 16, code: "LEC", gapToLeader: 24.0 },
+    { driverNumber: 3, code: "VER", gapToLeader: 30.5 },
+    { driverNumber: 55, code: "SAI", gapToLeader: null }, // lapped — excluded
+  ];
+
+  it("inserts the post-stop gap into the field and reads position", () => {
+    // ANT pits: 3.2 + 22 = 25.2 → behind LEC (24.0), ahead of VER (30.5) → P4
+    const r = projectPitRejoin({
+      driverNumber: 12,
+      currentGapToLeader: 3.2,
+      pitLossSeconds: 22,
+      field,
+    });
+    expect(r).not.toBeNull();
+    expect(r!.position).toBe(4);
+    expect(r!.carAhead?.code).toBe("LEC");
+    expect(r!.carAhead?.margin).toBeCloseTo(1.2, 5);
+    expect(r!.carBehind?.code).toBe("VER");
+    expect(r!.carBehind?.margin).toBeCloseTo(5.3, 5);
+    expect(r!.freeAir).toBe(false); // only 1.2s behind LEC
+  });
+
+  it("flags free air when the rejoin gap ahead is >= 2s", () => {
+    // HAM pits: 8.5 + 22 = 30.5+? use 24 → 8.5+22=30.5 ties VER... use LEC:
+    const r = projectPitRejoin({
+      driverNumber: 16,
+      currentGapToLeader: 24.0,
+      pitLossSeconds: 22,
+      field,
+    });
+    // 46.0 → behind VER (30.5) by 15.5s, last of classified → P5, free air
+    expect(r!.position).toBe(5);
+    expect(r!.carAhead?.code).toBe("VER");
+    expect(r!.freeAir).toBe(true);
+    expect(r!.carBehind).toBeNull();
+  });
+
+  it("returns null when the field has no usable gaps", () => {
+    expect(
+      projectPitRejoin({
+        driverNumber: 1,
+        currentGapToLeader: 0,
+        pitLossSeconds: 22,
+        field: [{ driverNumber: 1, code: "NOR", gapToLeader: 0 }],
+      }),
+    ).toBeNull();
+  });
+
+  it("leader pitting rejoins behind cars within pit-loss range", () => {
+    // NOR pits from the lead: 0 + 22 = 22 → ANT (3.2) and HAM (8.5) are
+    // ahead, LEC (24.0) is still behind → P3
+    const r = projectPitRejoin({
+      driverNumber: 1,
+      currentGapToLeader: 0,
+      pitLossSeconds: 22,
+      field,
+    });
+    expect(r!.position).toBe(3);
+    expect(r!.carAhead?.code).toBe("HAM");
+    expect(r!.carAhead?.margin).toBeCloseTo(13.5, 5);
+    expect(r!.carBehind?.code).toBe("LEC");
+    expect(r!.carBehind?.margin).toBeCloseTo(2.0, 5);
+    expect(r!.freeAir).toBe(true); // 13.5s behind HAM
+  });
+});

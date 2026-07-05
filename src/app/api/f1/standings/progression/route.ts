@@ -6,14 +6,29 @@ export async function GET(req: NextRequest) {
   const year = req.nextUrl.searchParams.get("year") || "2026";
 
   try {
-    // Fetch all results with pagination
-    const races = await fetchAllRaces(
-      `${JOLPICA_BASE}/${year}/results/?format=json`,
-      "Results"
-    );
+    // Fetch all results + sprints with pagination. Sprint points are part
+    // of the championship — omitting them made these curves disagree with
+    // the official standings shown elsewhere in the app.
+    const [races, sprintRaces] = await Promise.all([
+      fetchAllRaces(`${JOLPICA_BASE}/${year}/results/?format=json`, "Results"),
+      fetchAllRaces(`${JOLPICA_BASE}/${year}/sprint/?format=json`, "SprintResults").catch(
+        () => [] as Awaited<ReturnType<typeof fetchAllRaces>>,
+      ),
+    ]);
 
     if (races.length === 0) {
       return NextResponse.json({ raceNames: [], drivers: [] });
+    }
+
+    const sprintPtsByRound = new Map<string, Map<string, number>>();
+    for (const sr of sprintRaces) {
+      const m = new Map<string, number>();
+      for (const res of sr.SprintResults || []) {
+        const code =
+          res.Driver?.code || res.Driver?.familyName?.substring(0, 3).toUpperCase();
+        if (code) m.set(code, parseFloat(res.points) || 0);
+      }
+      sprintPtsByRound.set(String(sr.round), m);
     }
 
     const raceNames: string[] = [];
@@ -22,10 +37,11 @@ export async function GET(req: NextRequest) {
     races.forEach((race: any, raceIdx: number) => {
       raceNames.push(race.raceName || `Round ${race.round}`);
 
-      // Process each driver's result
+      // Process each driver's result (+ sprint points from the same round)
+      const roundSprints = sprintPtsByRound.get(String(race.round));
       (race.Results || []).forEach((r: any) => {
         const code = r.Driver?.code || r.Driver?.familyName?.substring(0, 3).toUpperCase();
-        const pts = parseFloat(r.points) || 0;
+        const pts = (parseFloat(r.points) || 0) + (roundSprints?.get(code) ?? 0);
 
         if (!driverCumulative[code]) {
           driverCumulative[code] = {

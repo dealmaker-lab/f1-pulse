@@ -145,6 +145,23 @@ export async function GET(req: NextRequest) {
       .filter((y) => d2Seasons.has(y))
       .sort((a: number, b: number) => a - b) as number[];
 
+    // Whole-career sprint results (2021+) in one fetch per driver — race
+    // results alone understate championship points in sprint-era seasons.
+    const [d1SprintJson, d2SprintJson] = await Promise.all([
+      safeFetchJson(`${JOLPICA_BASE}/drivers/${d1Id}/sprint.json?limit=100`).catch(() => null),
+      safeFetchJson(`${JOLPICA_BASE}/drivers/${d2Id}/sprint.json?limit=100`).catch(() => null),
+    ]);
+    const sprintPtsByKey = (json: any): Map<string, number> => {
+      const m = new Map<string, number>();
+      for (const race of json?.MRData?.RaceTable?.Races || []) {
+        const r = race.SprintResults?.[0];
+        if (r) m.set(`${race.season}-${race.round}`, parseFloat(r.points) || 0);
+      }
+      return m;
+    };
+    const d1SprintPts = sprintPtsByKey(d1SprintJson);
+    const d2SprintPts = sprintPtsByKey(d2SprintJson);
+
     if (commonSeasons.length === 0) {
       return NextResponse.json({
         error: "No common seasons found between these drivers",
@@ -214,7 +231,9 @@ export async function GET(req: NextRequest) {
 
           if (r1) {
             const pos = parseInt(r1.position);
-            const pts = parseFloat(r1.points) || 0;
+            const pts =
+              (parseFloat(r1.points) || 0) +
+              (d1SprintPts.get(`${year}-${round}`) ?? 0);
             seasonD1Points += pts;
             totalD1Points += pts;
             if (pos === 1) { totalD1Wins++; seasonD1Wins++; }
@@ -227,7 +246,9 @@ export async function GET(req: NextRequest) {
           }
           if (r2) {
             const pos = parseInt(r2.position);
-            const pts = parseFloat(r2.points) || 0;
+            const pts =
+              (parseFloat(r2.points) || 0) +
+              (d2SprintPts.get(`${year}-${round}`) ?? 0);
             seasonD2Points += pts;
             totalD2Points += pts;
             if (pos === 1) { totalD2Wins++; seasonD2Wins++; }

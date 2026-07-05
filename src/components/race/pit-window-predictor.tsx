@@ -2,7 +2,11 @@
 
 import { useMemo } from "react";
 import { cn, formatGap, getTireColor } from "@/lib/utils";
-import { projectPitWindow } from "@/lib/pit-window";
+import {
+  projectPitWindow,
+  projectPitRejoin,
+  type PitRejoinFieldEntry,
+} from "@/lib/pit-window";
 
 interface PitWindowProps {
   selectedDriver: {
@@ -20,6 +24,11 @@ interface PitWindowProps {
   tireAge: number;
   /** Compound currently fitted. */
   compound: string;
+  /**
+   * Whole-field gaps to leader — enables the "if he pits now he rejoins
+   * P8, 1.2s behind X" projection. Omit to hide the rejoin row.
+   */
+  field?: PitRejoinFieldEntry[];
 }
 
 /**
@@ -42,6 +51,7 @@ export default function PitWindowPredictor({
   circuitShortName,
   tireAge,
   compound,
+  field,
 }: PitWindowProps) {
   const compoundUpper = (compound || "UNKNOWN").toUpperCase();
 
@@ -85,6 +95,16 @@ export default function PitWindowPredictor({
     circuitShortName,
     tireDegPerLap,
   });
+
+  const rejoin =
+    field && field.length > 1
+      ? projectPitRejoin({
+          driverNumber: selectedDriver.driverNumber,
+          currentGapToLeader: safeGap,
+          pitLossSeconds: prediction.pitLossSeconds,
+          field,
+        })
+      : null;
 
   // Badge logic:
   //  - isUndercut: pitting now WILL net a smaller gap → green "UNDERCUT" recommendation
@@ -161,6 +181,40 @@ export default function PitWindowPredictor({
           </div>
         </div>
       </div>
+
+      {/* Rejoin projection — where the car comes out if it pits now */}
+      {rejoin && (
+        <div className="mt-3 pt-2 border-t border-white/5">
+          <div className="text-ferrari-label text-[9px] mb-1.5">
+            If Pit Now — Rejoins
+          </div>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-f1 font-mono text-base font-bold">
+              P{rejoin.position}
+            </span>
+            {rejoin.carAhead && (
+              <span className="text-f1-sub font-mono text-[10px]">
+                +{rejoin.carAhead.margin.toFixed(1)}s behind {rejoin.carAhead.code}
+              </span>
+            )}
+            {rejoin.carBehind && (
+              <span className="text-f1-sub font-mono text-[10px]">
+                · {rejoin.carBehind.margin.toFixed(1)}s to {rejoin.carBehind.code}
+              </span>
+            )}
+            <span
+              className={cn(
+                "px-1.5 py-0.5 rounded-sm text-[9px] font-mono font-bold tracking-wider",
+                rejoin.freeAir
+                  ? "text-racing-green bg-racing-green/10 border border-racing-green/30"
+                  : "text-racing-amber bg-racing-amber/10 border border-racing-amber/30",
+              )}
+            >
+              {rejoin.freeAir ? "FREE AIR" : "TRAFFIC"}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Footnote */}
       <div className="mt-3 pt-2 border-t border-white/5">

@@ -1364,6 +1364,11 @@ export default function RaceReplayPage() {
                 circuitShortName={selectedSession.circuit_short_name}
                 tireAge={entry.tireAge}
                 compound={entry.compound}
+                field={leaderboard.map((e) => ({
+                  driverNumber: e.driver.driver_number,
+                  code: e.driver.name_acronym,
+                  gapToLeader: e.gapToLeader,
+                }))}
               />
             );
           })()}

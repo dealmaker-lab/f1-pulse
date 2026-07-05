@@ -72,15 +72,30 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch all race results + qualifying for the year (with pagination)
-    const [races, qualifyingRaces, standingsRes] = await Promise.all([
+    // Fetch all race results + qualifying + sprints for the year (paginated)
+    const [races, qualifyingRaces, sprintRaces, standingsRes] = await Promise.all([
       fetchAllRaces(`${JOLPICA_BASE}/${String(year)}/results/?format=json`, "Results"),
       fetchAllRaces(`${JOLPICA_BASE}/${String(year)}/qualifying/?format=json`, "QualifyingResults"),
+      fetchAllRaces(`${JOLPICA_BASE}/${String(year)}/sprint/?format=json`, "SprintResults").catch(
+        () => [] as Awaited<ReturnType<typeof fetchAllRaces>>,
+      ),
       fetch(`${JOLPICA_BASE}/${String(year)}/driverstandings/?format=json`, { next: { revalidate: 300 } }),
     ]);
 
     const standingsJson = await standingsRes.json();
     const allStandings = standingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
+
+    // Sprint points per round per driver — race results alone understate
+    // season totals in every sprint-era season (six sprints in 2026).
+    const sprintPtsByRound = new Map<number, Map<string, number>>();
+    for (const sr of sprintRaces) {
+      const m = new Map<string, number>();
+      for (const res of sr.SprintResults || []) {
+        const code = driverCode(res.Driver);
+        if (code) m.set(code, parseFloat(res.points) || 0);
+      }
+      sprintPtsByRound.set(parseInt(sr.round), m);
+    }
 
     // Build race-by-race H2H
     const raceH2H: RaceH2H[] = [];
@@ -114,10 +129,12 @@ export async function GET(req: NextRequest) {
         driver2: dr2,
       });
 
-      // Accumulate stats
+      // Accumulate stats (incl. any sprint points from this round's weekend)
+      const roundSprintPts = sprintPtsByRound.get(parseInt(race.round));
       if (dr1) {
-        d1Points += dr1.points;
-        d1RunningPoints += dr1.points;
+        const sprint1 = roundSprintPts?.get(d1) ?? 0;
+        d1Points += dr1.points + sprint1;
+        d1RunningPoints += dr1.points + sprint1;
         if (dr1.position <= 3) d1Podiums++;
         if (dr1.position === 1) d1Wins++;
         if (dr1.status !== "Finished" && !dr1.status.startsWith("+")) d1DNFs++;
@@ -126,8 +143,9 @@ export async function GET(req: NextRequest) {
         d1RaceCount++;
       }
       if (dr2) {
-        d2Points += dr2.points;
-        d2RunningPoints += dr2.points;
+        const sprint2 = roundSprintPts?.get(d2) ?? 0;
+        d2Points += dr2.points + sprint2;
+        d2RunningPoints += dr2.points + sprint2;
         if (dr2.position <= 3) d2Podiums++;
         if (dr2.position === 1) d2Wins++;
         if (dr2.status !== "Finished" && !dr2.status.startsWith("+")) d2DNFs++;

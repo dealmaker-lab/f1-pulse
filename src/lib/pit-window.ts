@@ -152,3 +152,85 @@ export function projectPitWindow(input: PitWindowInput): PitWindowResult {
     isOvercut,
   };
 }
+
+// ── Pit-rejoin projection ────────────────────────────────────────────
+
+export interface PitRejoinFieldEntry {
+  driverNumber: number;
+  /** 3-letter code for display; falls back to #number when absent. */
+  code?: string;
+  /** Current gap to the leader in seconds; null/undefined = lapped or unknown. */
+  gapToLeader: number | null | undefined;
+}
+
+export interface PitRejoinProjection {
+  /** Predicted running position after the stop (1-based). */
+  position: number;
+  /** Car we'd rejoin behind, with our deficit to them in seconds. */
+  carAhead: { driverNumber: number; code: string; margin: number } | null;
+  /** Car we'd rejoin ahead of, with our cushion to them in seconds. */
+  carBehind: { driverNumber: number; code: string; margin: number } | null;
+  /** True when the rejoin leaves ≥2s of clear track ahead (no dirty air). */
+  freeAir: boolean;
+}
+
+/** Gap (s) to the car ahead below which we consider the rejoin "in traffic". */
+const FREE_AIR_THRESHOLD_S = 2.0;
+
+/**
+ * "If he pits now, where does he come out?" — insert the driver's
+ * post-stop gap (current gap + pit loss) into the field's sorted
+ * gaps-to-leader and read off position, the car ahead, and the cushion
+ * behind. Pure gap arithmetic over interval data the leaderboard already
+ * has; drivers with non-numeric gaps (lapped, no data) are excluded.
+ */
+export function projectPitRejoin(input: {
+  driverNumber: number;
+  currentGapToLeader: number;
+  pitLossSeconds: number;
+  field: PitRejoinFieldEntry[];
+}): PitRejoinProjection | null {
+  const { driverNumber, currentGapToLeader, pitLossSeconds, field } = input;
+  if (!Number.isFinite(currentGapToLeader) || !Number.isFinite(pitLossSeconds)) {
+    return null;
+  }
+
+  const rejoinGap = currentGapToLeader + pitLossSeconds;
+
+  const others = field
+    .filter(
+      (e) =>
+        e.driverNumber !== driverNumber &&
+        typeof e.gapToLeader === "number" &&
+        Number.isFinite(e.gapToLeader),
+    )
+    .map((e) => ({
+      driverNumber: e.driverNumber,
+      code: e.code ?? `#${e.driverNumber}`,
+      gap: e.gapToLeader as number,
+    }))
+    .sort((a, b) => a.gap - b.gap);
+
+  if (others.length === 0) return null;
+
+  const ahead = [...others].reverse().find((e) => e.gap <= rejoinGap) ?? null;
+  const behind = others.find((e) => e.gap > rejoinGap) ?? null;
+  const position = others.filter((e) => e.gap <= rejoinGap).length + 1;
+
+  const aheadMargin = ahead ? rejoinGap - ahead.gap : Infinity;
+
+  return {
+    position,
+    carAhead: ahead
+      ? { driverNumber: ahead.driverNumber, code: ahead.code, margin: aheadMargin }
+      : null,
+    carBehind: behind
+      ? {
+          driverNumber: behind.driverNumber,
+          code: behind.code,
+          margin: behind.gap - rejoinGap,
+        }
+      : null,
+    freeAir: aheadMargin >= FREE_AIR_THRESHOLD_S,
+  };
+}
