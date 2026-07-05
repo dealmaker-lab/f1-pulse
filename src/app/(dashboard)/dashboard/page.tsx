@@ -282,14 +282,17 @@ export default function DashboardPage() {
 
   // Fetch race calendar + all sessions for live detection
   useEffect(() => {
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
     setLoading(true);
     setSelectedRound("latest");
     Promise.all([
-      fetch(`/api/f1/sessions?year=${year}&type=Race`).then((r) => r.json()),
-      fetch(`/api/f1/meetings?year=${year}`).then((r) => r.json()),
-      fetch(`/api/f1/sessions?year=${year}`).then((r) => r.json()),
+      fetch(`/api/f1/sessions?year=${year}&type=Race`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/meetings?year=${year}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/sessions?year=${year}`, { signal }).then((r) => r.json()),
     ])
       .then(([sess, meets, all]) => {
+        if (signal.aborted) return;
         // OpenF1 session_type=Race also includes Sprints — keep only Grand
         // Prix races so round numbering / calendar counts aren't inflated
         // (sprint weekends were rendering as duplicate rounds).
@@ -301,20 +304,28 @@ export default function DashboardPage() {
         setMeetings(Array.isArray(meets) ? meets : []);
         setAllSessions(Array.isArray(all) ? all : []);
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (!signal.aborted) console.error(err);
+      })
+      .finally(() => {
+        if (!signal.aborted) setLoading(false);
+      });
+    return () => ctrl.abort();
   }, [year]);
 
   // Fetch standings + results + progression
   useEffect(() => {
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
     setStandingsLoading(true);
     Promise.all([
-      fetch(`/api/f1/standings/drivers?year=${year}`).then((r) => r.json()),
-      fetch(`/api/f1/standings/constructors?year=${year}`).then((r) => r.json()),
-      fetch(`/api/f1/results?year=${year}`).then((r) => r.json()),
-      fetch(`/api/f1/standings/progression?year=${year}`).then((r) => r.json()),
+      fetch(`/api/f1/standings/drivers?year=${year}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/standings/constructors?year=${year}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/results?year=${year}`, { signal }).then((r) => r.json()),
+      fetch(`/api/f1/standings/progression?year=${year}`, { signal }).then((r) => r.json()),
     ])
       .then(([drivers, constructors, results, prog]) => {
+        if (signal.aborted) return;
         setDriverStandings(Array.isArray(drivers) ? drivers : []);
         setConstructorStandings(Array.isArray(constructors) ? constructors : []);
         setRaceResults(Array.isArray(results) ? results : []);
@@ -323,8 +334,13 @@ export default function DashboardPage() {
           setSelectedDriver(drivers[0].driver.code);
         }
       })
-      .catch(console.error)
-      .finally(() => setStandingsLoading(false));
+      .catch((err) => {
+        if (!signal.aborted) console.error(err);
+      })
+      .finally(() => {
+        if (!signal.aborted) setStandingsLoading(false);
+      });
+    return () => ctrl.abort();
   }, [year]);
 
   // Sessions filtered by the selected session type (for non-Race browsing)

@@ -69,36 +69,43 @@ export default function ConstructorsPage() {
 
   // Fetch standings
   useEffect(() => {
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
     const fetchStandings = async () => {
       setLoadingStandings(true);
       setStandings([]);
       setSelectedTeam(null);
       try {
-        const res = await fetch(`/api/f1/standings/constructors?year=${selectedYear}`);
+        const res = await fetch(`/api/f1/standings/constructors?year=${selectedYear}`, { signal });
         if (res.ok) {
           const data = await res.json();
+          if (signal.aborted) return;
           const arr: ConstructorStanding[] = Array.isArray(data) ? data : [];
           setStandings(arr);
           if (arr.length > 0) setSelectedTeam(arr[0].team);
         }
       } catch (e) {
-        console.error("Failed to fetch constructor standings:", e);
+        if (!signal.aborted) console.error("Failed to fetch constructor standings:", e);
       } finally {
-        setLoadingStandings(false);
+        if (!signal.aborted) setLoadingStandings(false);
       }
     };
     fetchStandings();
+    return () => ctrl.abort();
   }, [selectedYear]);
 
   // Fetch points progression (from results API, compute per-constructor cumulative points)
   useEffect(() => {
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
     const fetchProgression = async () => {
       setLoadingProgression(true);
       setProgression(null);
       try {
-        const res = await fetch(`/api/f1/results?year=${selectedYear}`);
+        const res = await fetch(`/api/f1/results?year=${selectedYear}`, { signal });
         if (!res.ok) return;
         const allRaces = await res.json();
+        if (signal.aborted) return;
         if (!Array.isArray(allRaces) || allRaces.length === 0) return;
 
         // Build constructor cumulative points from race results
@@ -149,12 +156,13 @@ export default function ConstructorsPage() {
 
         setProgression({ raceNames, constructors: sortedConstructors });
       } catch (e) {
-        console.error("Failed to fetch progression:", e);
+        if (!signal.aborted) console.error("Failed to fetch progression:", e);
       } finally {
-        setLoadingProgression(false);
+        if (!signal.aborted) setLoadingProgression(false);
       }
     };
     fetchProgression();
+    return () => ctrl.abort();
   }, [selectedYear]);
 
   const team = standings.find((c) => c.team === selectedTeam);

@@ -133,73 +133,86 @@ export default function DriversPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch driver standings and results for progression
-  const fetchData = useCallback(async (selectedYear: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const [standingsRes, resultsRes] = await Promise.all([
-        fetch(`/api/f1/standings/drivers?year=${selectedYear}`, { cache: "no-store" }),
-        fetch(`/api/f1/results?year=${selectedYear}`, { cache: "no-store" }),
-      ]);
-
-      if (!standingsRes.ok) throw new Error("Failed to fetch standings");
-
-      const standingsData = await standingsRes.json();
-      const resultsData = resultsRes.ok ? await resultsRes.json() : [];
-
-      // Extract race names from results
-      const races: string[] = Array.isArray(resultsData)
-        ? resultsData.map((r: any) => r.raceName || r.name || `Round ${r.round}`)
-        : [];
-      setRaceNames(races);
-
-      // Compute podiums and pointsHistory from results if standings don't have them
-      const enriched = (Array.isArray(standingsData) ? standingsData : []).map((s: any) => {
-        // Count podiums from results
-        let podiums = 0;
-        const pointsByRound: number[] = [];
-        let cumPoints = 0;
-
-        if (Array.isArray(resultsData)) {
-          for (const race of resultsData) {
-            const dResult = (race.results || []).find((r: any) => r.driver?.code === s.driver?.code);
-            if (dResult) {
-              if (dResult.position <= 3) podiums++;
-              cumPoints += dResult.points || 0;
-            }
-            pointsByRound.push(cumPoints);
-          }
-        }
-
-        return {
-          ...s,
-          podiums: podiums || s.podiums || 0,
-          pointsHistory: pointsByRound.length > 0 ? pointsByRound : s.pointsHistory || [],
-        };
-      });
-
-      setStandings(enriched);
-
-      // Update selected driver if not in new standings
-      if (enriched.length > 0 && !enriched.some((d: any) => d.driver.code === selectedDriver)) {
-        setSelectedDriver(enriched[0].driver.code);
-      }
-      if (enriched.length > 1 && !enriched.some((d: any) => d.driver.code === compareDriver)) {
-        setCompareDriver(enriched.length > 1 ? enriched[1].driver.code : enriched[0].driver.code);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error fetching data");
-      setStandings([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedDriver, compareDriver]);
-
+  // Fetch driver standings and results for progression. Keyed on year ONLY —
+  // this used to depend on selectedDriver/compareDriver via useCallback, so
+  // every driver click blanked the page to a spinner and refetched both APIs.
   useEffect(() => {
-    fetchData(year);
-  }, [year, fetchData]);
+    const ctrl = new AbortController();
+    const { signal } = ctrl;
+
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [standingsRes, resultsRes] = await Promise.all([
+          fetch(`/api/f1/standings/drivers?year=${year}`, { cache: "no-store", signal }),
+          fetch(`/api/f1/results?year=${year}`, { cache: "no-store", signal }),
+        ]);
+
+        if (!standingsRes.ok) throw new Error("Failed to fetch standings");
+
+        const standingsData = await standingsRes.json();
+        const resultsData = resultsRes.ok ? await resultsRes.json() : [];
+        if (signal.aborted) return;
+
+        // Extract race names from results
+        const races: string[] = Array.isArray(resultsData)
+          ? resultsData.map((r: any) => r.raceName || r.name || `Round ${r.round}`)
+          : [];
+        setRaceNames(races);
+
+        // Compute podiums and pointsHistory from results if standings don't have them
+        const enriched = (Array.isArray(standingsData) ? standingsData : []).map((s: any) => {
+          // Count podiums from results
+          let podiums = 0;
+          const pointsByRound: number[] = [];
+          let cumPoints = 0;
+
+          if (Array.isArray(resultsData)) {
+            for (const race of resultsData) {
+              const dResult = (race.results || []).find((r: any) => r.driver?.code === s.driver?.code);
+              if (dResult) {
+                if (dResult.position <= 3) podiums++;
+                cumPoints += dResult.points || 0;
+              }
+              pointsByRound.push(cumPoints);
+            }
+          }
+
+          return {
+            ...s,
+            podiums: podiums || s.podiums || 0,
+            pointsHistory: pointsByRound.length > 0 ? pointsByRound : s.pointsHistory || [],
+          };
+        });
+
+        setStandings(enriched);
+      } catch (err) {
+        if (signal.aborted) return;
+        setError(err instanceof Error ? err.message : "Error fetching data");
+        setStandings([]);
+      } finally {
+        if (!signal.aborted) setLoading(false);
+      }
+    }
+
+    fetchData();
+    return () => ctrl.abort();
+  }, [year]);
+
+  // Keep driver selections valid when the standings list changes
+  useEffect(() => {
+    if (standings.length === 0) return;
+    if (!standings.some((d) => d.driver.code === selectedDriver)) {
+      setSelectedDriver(standings[0].driver.code);
+    }
+    if (standings.length > 1 && !standings.some((d) => d.driver.code === compareDriver)) {
+      setCompareDriver(standings[1].driver.code);
+    }
+    // Selections are validated against the fresh list only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [standings]);
 
   const driver = standings.find((d) => d.driver.code === selectedDriver);
   const compareDriverStanding = standings.find((d) => d.driver.code === compareDriver);
