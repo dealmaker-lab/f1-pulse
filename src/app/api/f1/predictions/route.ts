@@ -1,5 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { JOLPICA_BASE, fetchAllRaces } from "@/lib/jolpica";
+import { resolveCircuitSlug } from "@/lib/circuit-coords";
+
+/**
+ * Map our canonical circuit slugs (derived from OpenF1 circuit_short_name)
+ * to Jolpica/Ergast circuitIds — the two vocabularies never match directly,
+ * which used to make the circuit-history factor a constant.
+ */
+const SLUG_TO_JOLPICA_CIRCUIT: Record<string, string> = {
+  "albert-park": "albert_park",
+  shanghai: "shanghai",
+  suzuka: "suzuka",
+  miami: "miami",
+  montreal: "villeneuve",
+  "monte-carlo": "monaco",
+  barcelona: "catalunya",
+  "red-bull-ring": "red_bull_ring",
+  silverstone: "silverstone",
+  "spa-francorchamps": "spa",
+  hungaroring: "hungaroring",
+  zandvoort: "zandvoort",
+  monza: "monza",
+  baku: "baku",
+  "marina-bay": "marina_bay",
+  "circuit-of-the-americas": "americas",
+  "mexico-city": "rodriguez",
+  interlagos: "interlagos",
+  "las-vegas": "vegas",
+  losail: "losail",
+  "yas-marina": "yas_marina",
+  bahrain: "bahrain",
+  jeddah: "jeddah",
+  imola: "imola",
+};
 
 interface DriverPerformance {
   code: string;
@@ -19,8 +52,12 @@ interface DriverPerformance {
 }
 
 export async function GET(req: NextRequest) {
-  const year = req.nextUrl.searchParams.get("year") || "2026";
-  const circuit = req.nextUrl.searchParams.get("circuit") || "";
+  const rawYear = req.nextUrl.searchParams.get("year") || "2026";
+  const year = /^(19|20)\d{2}$/.test(rawYear) ? rawYear : "2026";
+  const rawCircuit = req.nextUrl.searchParams.get("circuit") || "";
+  const circuit = rawCircuit
+    ? SLUG_TO_JOLPICA_CIRCUIT[resolveCircuitSlug(rawCircuit)] || ""
+    : "";
 
   try {
     // Fetch data in parallel for speed (with pagination for results)
@@ -82,7 +119,7 @@ export async function GET(req: NextRequest) {
 
     for (const [code, info] of Array.from(currentDrivers.entries())) {
       // Get all results for this driver
-      const driverResults: { position: number; grid: number; points: number; circuitId: string; year: number }[] = [];
+      const driverResults: { position: number; grid: number; points: number; circuitId: string; year: number; round: number }[] = [];
 
       allResults.forEach((race: any) => {
         (race.Results || []).forEach((r: any) => {
@@ -94,6 +131,7 @@ export async function GET(req: NextRequest) {
               points: parseFloat(r.points) || 0,
               circuitId: race.Circuit?.circuitId || "",
               year: parseInt(race.season),
+              round: parseInt(race.round) || 0,
             });
           }
         });
@@ -101,9 +139,12 @@ export async function GET(req: NextRequest) {
 
       if (driverResults.length === 0) continue;
 
-      // 1. Recent form: average points in last 5 races
+      // 1. Recent form: average points in last 5 races. Sort by (year, round)
+      // descending — year alone kept insertion order within the season, so
+      // "recent form" was actually rounds 1-5 of the current year. The
+      // in-place sort also makes the consistency window below truly recent.
       const recent = driverResults
-        .sort((a, b) => b.year - a.year)
+        .sort((a, b) => b.year - a.year || b.round - a.round)
         .slice(0, 5);
       const recentForm = recent.reduce((sum, r) => sum + r.points, 0) / recent.length;
 
@@ -132,14 +173,14 @@ export async function GET(req: NextRequest) {
       const qualifyingScore =
         (25 - qualifyingPace) * 0.35 +      // recent qualifying pace
         recentForm * 0.25 +                   // current form
-        (11 - teamStrength) * 1.5 * 0.20 +   // team performance
+        (12 - teamStrength) * 1.5 * 0.20 +   // team performance
         (20 - circuitHistory) * 0.20;         // circuit familiarity
 
       // Race prediction (race pace + strategy + consistency)
       const raceScore =
         recentForm * 0.30 +                   // race results form
         (25 - qualifyingPace) * 0.20 +        // qualifying position affects race
-        (11 - teamStrength) * 1.5 * 0.20 +   // team strength
+        (12 - teamStrength) * 1.5 * 0.20 +   // team strength
         (20 - circuitHistory) * 0.15 +        // circuit knowledge
         (10 - consistency) * 0.15;            // consistency bonus
 
@@ -201,7 +242,10 @@ export async function GET(req: NextRequest) {
 async function fetchJSON(url: string) {
   try {
     const res = await fetch(url, { next: { revalidate: 300 } });
-    return res.json();
+    if (!res.ok) return {};
+    // Await inside the try so a JSON-parse rejection (e.g. a rate-limit HTML
+    // body) is caught here instead of 500ing the whole route.
+    return await res.json();
   } catch {
     return {};
   }

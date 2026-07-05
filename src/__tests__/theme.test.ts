@@ -270,8 +270,8 @@ describe("Theme — Tire Colors", () => {
     expect(getTireColor("MEDIUM")).toBe("#FFC906");
   });
 
-  it("HARD is #FFFFFF (white)", () => {
-    expect(getTireColor("HARD")).toBe("#FFFFFF");
+  it("HARD is a light gray that stays visible on light cards", () => {
+    expect(getTireColor("HARD")).toBe("#D8DAE0");
   });
 
   it("INTERMEDIATE is #39B54A (green)", () => {

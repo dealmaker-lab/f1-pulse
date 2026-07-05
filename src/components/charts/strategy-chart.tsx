@@ -19,8 +19,12 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
   return (
     <div className="w-full overflow-x-auto">
       <div className="min-w-[600px]">
-        {/* Lap scale header */}
-        <div className="flex items-center mb-2" style={{ paddingLeft: leftPad }}>
+        {/* Lap scale header — positioned inside a relative container that
+            starts where the stint bars start, so labels line up with laps. */}
+        <div
+          className="relative h-4 mb-2"
+          style={{ marginLeft: leftPad, marginRight: rightPad }}
+        >
           {Array.from({ length: Math.ceil(safeTotalLaps / 10) + 1 }, (_, i) => {
             const lap = i * 10;
             if (lap > safeTotalLaps) return null;
@@ -28,7 +32,7 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
               <span
                 key={lap}
                 className="text-[10px] font-mono text-f1-muted absolute"
-                style={{ left: `${leftPad + (lap / safeTotalLaps) * 100}%` }}
+                style={{ left: `${(lap / safeTotalLaps) * 100}%` }}
               >
                 {lap}
               </span>
@@ -66,6 +70,10 @@ export default function StrategyChart({ strategies, totalLaps }: Props) {
                         opacity: 0.85,
                         borderRadius: i === 0 ? "6px 0 0 6px" : i === driver.stints.length - 1 ? "0 6px 6px 0" : "0",
                         borderRight: i < driver.stints.length - 1 ? "2px solid #0a0a0f" : "none",
+                        boxShadow:
+                          compound === "HARD"
+                            ? "inset 0 0 0 1px rgba(107,114,128,0.55)"
+                            : undefined,
                       }}
                       title={
                         stint.avgPace !== undefined

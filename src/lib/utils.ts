@@ -70,7 +70,9 @@ export function getTireColor(compound: string): string {
   const colors: Record<string, string> = {
     SOFT: "#FF3333",
     MEDIUM: "#FFC906",
-    HARD: "#FFFFFF",
+    // Pirelli's hard is white, but pure white disappears on light cards —
+    // use a light gray that still reads as "white" on both themes.
+    HARD: "#D8DAE0",
     INTERMEDIATE: "#39B54A",
     WET: "#0067FF",
     UNKNOWN: "#888888",

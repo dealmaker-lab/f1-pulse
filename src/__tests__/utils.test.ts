@@ -90,6 +90,6 @@ describe("getTireColor", () => {
   });
 
   it("returns hard tire color", () => {
-    expect(getTireColor("HARD")).toBe("#FFFFFF");
+    expect(getTireColor("HARD")).toBe("#D8DAE0");
   });
 });
